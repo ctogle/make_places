@@ -201,6 +201,12 @@ def offset_faces(faces, offset):
             fa[fx] += offset
     return faces
 
+class vertex(object):
+    def __init__(self, pos, normal, uv):
+        self.pos = pos
+        self.normal = normal
+        self.uv = uv
+
 class element(object):
 
     def _default_(self, *args, **kwargs):

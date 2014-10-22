@@ -20,16 +20,27 @@ def ucube_g():
     pcube = pr.ucube()
     gritgeo.create_primitive(pcube)
 
-def uoctagon():
+def uoctagon_b():
     poct = pr.uoctagon()
     blgeo.create_primitive(poct)
 
-def ulineup():
+def uoctagon_g():
+    poct = pr.uoctagon()
+    gritgeo.create_primitive(poct)
+
+def ulineup_b():
     pcube = pr.ucube()
     poct = pr.uoctagon()
     pcube.translate([1,0,0])
     poct.translate([-1,0,0])
     blgeo.create_primitive(pcube,poct)
+
+def ulineup_g():
+    pcube = pr.ucube()
+    poct = pr.uoctagon()
+    pcube.translate([1,0,0])
+    poct.translate([-1,0,0])
+    gritgeo.create_primitive(pcube,poct)
 
 def cube_oct_elem(pos, scl, rot, children = []):
     uc = pr.ucube()
@@ -43,17 +54,27 @@ def cube_oct_elem(pos, scl, rot, children = []):
         rotation = rot, primitives = eprims)
     return elem
 
-def uelements():
+def uelements_b():
     el1 = cube_oct_elem([-2,-2,2], [2,2,1], [0,0,np.pi/2])
     el2 = cube_oct_elem([2,2,-2], [3,3,2], [0,0,3*(np.pi/2)])
     blgeo.create_element(el1,el2)
 
-def uelement_child():
+def uelements_g():
+    el1 = cube_oct_elem([-2,-2,2], [2,2,1], [0,0,np.pi/2])
+    el2 = cube_oct_elem([2,2,-2], [3,3,2], [0,0,3*(np.pi/2)])
+    gritgeo.create_element(el1,el2)
+
+def uelement_child_b():
     el1 = cube_oct_elem([2,4,1], [1,2,2], [0,0,np.pi/2])
     el2 = cube_oct_elem([0,0,-1], [2,2,1], [0,0,np.pi/2], children = [el1])
     blgeo.create_element(el2)
 
-def intersection():
+def uelement_child_g():
+    el1 = cube_oct_elem([2,4,1], [1,2,2], [0,0,np.pi/2])
+    el2 = cube_oct_elem([0,0,-1], [2,2,1], [0,0,np.pi/2], children = [el1])
+    gritgeo.create_element(el2)
+
+def intersection_b():
     iarg = {
         'position':[10,10,0], 
         'road_width':30, 
@@ -62,7 +83,16 @@ def intersection():
     elem = roads.intersection(**iarg)
     blgeo.create_element(elem)
 
-def road():
+def intersection_g():
+    iarg = {
+        'position':[10,10,0], 
+        'road_width':30, 
+        'road_height':5, 
+            }
+    elem = roads.intersection(**iarg)
+    gritgeo.create_element(elem)
+
+def road_b():
     rarg = {
         'start':[0,10,0],
         'end':[100,110,-10],
@@ -75,7 +105,20 @@ def road():
         print('elem',ke,elem.__dict__[ke])
     blgeo.create_element(elem)
 
-def roady():
+def road_g():
+    rarg = {
+        'start':[0,10,0],
+        'end':[100,110,-10],
+        'directions':['north','west'],
+        'road_height':1,
+        'road_width':10,
+            }
+    elem = roads.road(**rarg)
+    for ke in elem.__dict__.keys():
+        print('elem',ke,elem.__dict__[ke])
+    gritgeo.create_element(elem)
+
+def roady_b():
     r1 = {
         'start':[0,0,0], 
         'end':[0,100,10], 
@@ -85,6 +128,17 @@ def roady():
             }
     rargs = [r1]
     blgeo.create_element([roads.road(**rg) for rg in rargs])
+
+def roady_g():
+    r1 = {
+        'start':[0,0,0], 
+        'end':[0,100,10], 
+        'directions':['north','south'],
+        'road_height':2, 
+        'road_width':20, 
+            }
+    rargs = [r1]
+    gritgeo.create_element([roads.road(**rg) for rg in rargs])
 
 def road_directions():
     rargs = [
@@ -178,10 +232,15 @@ def road_directions():
     elems = [roads.road(**ra) for ra in rargs]
     blgeo.create_element(elems)
 
-def road_network():
+def road_network_b():
     rnarg = {}
     elem = roads.road_system(**rnarg)
     blgeo.create_element(elem)
+
+def road_network_g():
+    rnarg = {}
+    elem = roads.road_system(**rnarg)
+    gritgeo.create_element(elem)
 
 def afloor():
     elem = floors.floor()
@@ -217,7 +276,7 @@ def build():
     built = blg.building()
     blgeo.create_element(built)
 
-def buildfew():
+def buildfew_b():
     bargs = [{
         'position':[10,50,10], 
             }, {
@@ -226,10 +285,22 @@ def buildfew():
     built = [blg.building(**ba) for ba in bargs]
     blgeo.create_element(built)
 
-def city():
+def buildfew_g():
+    bargs = [{
+        'position':[10,50,10], 
+            }, {
+        'position':[-10,-10,0], 
+            }]
+    built = [blg.building(**ba) for ba in bargs]
+    gritgeo.create_element(built)
+
+def city_b():
     elem = cities.city()
     blgeo.create_elements(elem)
-    
+
+def city_g():
+    elem = cities.city()
+    gritgeo.create_elements(elem)
 
 
 

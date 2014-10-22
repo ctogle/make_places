@@ -2,9 +2,15 @@
 
 import os
 
-import bpy
-from bpy_extras.io_utils import unpack_list
-from bpy_extras.io_utils import unpack_face_list
+try:
+    import bpy
+    from bpy_extras.io_utils import unpack_list
+    from bpy_extras.io_utils import unpack_face_list
+except ImportError:
+    print 'bpy is not available!'
+    bpy = None
+    unpack_list = None
+    unpack_face_list = None
 
 
 
@@ -138,11 +144,19 @@ def create_material_solid(name, diffuse, specular, alpha):
     mat.ambient = 1
     return mat
 
-materials = {
-    #'acolor' : create_material_solid('amat', (0.5, 0.5, 0.0), (0.5,0.5,0), 1.0), 
-    #'imgtex' : create_material_image('animgtex', 'cubetexture.png'), 
-    'cubemat' : create_material_image('animgtex', 'cubetex.png'), 
-    'octagonmat' : create_material_image('animgtex', 'octagontex.png'), 
+if bpy:
+    materials = {
+        #'acolor' : create_material_solid('amat', (0.5, 0.5, 0.0), (0.5,0.5,0), 1.0), 
+        #'imgtex' : create_material_image('animgtex', 'cubetexture.png'), 
+        'cubemat' : create_material_image('animgtex', 'cubetex.png'), 
+        'octagonmat' : create_material_image('animgtex', 'octagontex.png'), 
+            }
+else:
+    materials = {
+        #'acolor' : create_material_solid('amat', (0.5, 0.5, 0.0), (0.5,0.5,0), 1.0), 
+        #'imgtex' : create_material_image('animgtex', 'cubetexture.png'), 
+        'cubemat' : ('animgtex', 'cubetex.png'), 
+        'octagonmat' : ('animgtex', 'octagontex.png'), 
             }
 
 def flatten(unflat):

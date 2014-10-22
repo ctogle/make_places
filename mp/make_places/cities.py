@@ -23,7 +23,7 @@ class block(element):
             width = kwargs['width']
             self.corners = self.find_corners(pos, length, width)
             children = self.make_buildings(*args, **kwargs)
-        kwargs['children'] = children
+        self._default_('children', children, **kwargs)
         element.__init__(self, *args, **kwargs)
 
     def find_corners(self, pos, length, width):

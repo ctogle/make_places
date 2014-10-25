@@ -1,4 +1,4 @@
-#import make_places.fundamental as fu
+import make_places.fundamental as fu
 
 import os
 
@@ -7,7 +7,7 @@ try:
     from bpy_extras.io_utils import unpack_list
     from bpy_extras.io_utils import unpack_face_list
 except ImportError:
-    print 'bpy is not available!'
+    print('bpy is not available!')
     bpy = None
     unpack_list = None
     unpack_face_list = None
@@ -50,12 +50,12 @@ def mesh_from_data(name, coords, uvs, faces, face_mats, mats):
     mesh.update()
     return mesh
 
-def create_primitive(*args):
+def create_primitive(*args, **kwargs):
     for ag in args:
-        if not type(ag) is type([]): create_prim(ag)
-        else: [create_prim(p) for p in ag]
+        if not type(ag) is type([]): create_prim(ag, **kwargs)
+        else: [create_prim(p, **kwargs) for p in ag]
     
-def create_prim(prim):
+def create_prim(prim, center = False, **kwargs):
     oname = prim.tag + '.000'
     mname = '.'.join([oname, 'mesh'])
     coords = prim.coords
@@ -63,19 +63,25 @@ def create_prim(prim):
     faces = prim.faces
     face_mats = prim.face_materials
     mats = prim.materials
-    prim.origin_to_centroid()
+    if center: prim.origin_to_centroid()
     loc = prim.position
 
     mesh = mesh_from_data(mname, coords, uvs, faces, face_mats, mats)
     obj = object_from_mesh(oname, mesh, loc, mats)
     object_to_scene(obj)
 
-def create_element(*args):
+def create_element(*args, **kwargs):
     for ag in args:
-        if not type(ag) is type([]): create_elem(ag)
-        else: [create_elem(e) for e in ag]
+        if not type(ag) is type([]): create_elem(ag,**kwargs)
+        else: [create_elem(e,**kwargs) for e in ag]
 
-def create_elem(elem):
+def create_elem(elem, center = True):
+    import make_places.scenegraph as sg
+    sgr = sg.sgraph(nodes = [elem])
+    sgr.make_scene_b(center = center)
+
+
+    return
     eelems = elem.children
     eprims = elem.primitives
     pos = elem.position
@@ -83,44 +89,21 @@ def create_elem(elem):
     rot = elem.rotation
     for ee in eelems:
         ee.scale(scl)
-        ee.rotate_z(rot)
+        ee.rotate_z(rot[2])
         ee.translate(pos)
         create_elem(ee)
     for ep in eprims:
         ep.scale(scl)
         ep.rotate_z(rot[2])
         ep.translate(pos)
-        create_prim(ep)
-
-
-
-
-
-
-def create_elements(elements):
-    [el.set_world_coords() for el in elements]
-    all_coords = [el.world_coords for el in elements]
-    all_faces = [el.world_faces for el in elements]
-    all_texfaces = [el.texfaces for el in elements]
-    all_mats = [el.materials for el in elements]
-    all_names = [el.name for el in elements]
-    #   if this is possible...
-    # build global verts from all_coords, 
-    #  and change all_faces to references to this
-    #  if the user specifies....
-    blend_in_geometry(all_names, all_coords, 
-        all_faces, all_texfaces, all_mats, 
-            len(elements))
+        create_prim(ep, center)
 
 texture_directory = os.path.join(
     '/home', 'cogle', 'dev', 'forblender',
     'make_places', 'mp', 'make_places', 'textures')
 def create_material_image(name, texture):
     mat = bpy.data.materials.new(name)
-
-    #imgpath = os.path.join(os.getcwd(),'textures',texture)
     imgpath = os.path.join(texture_directory,texture)
-    print('imgpath',imgpath)
     tex = bpy.data.textures.new(name, type = 'IMAGE')
     tex.image = bpy.data.images.load(imgpath)
     tex.use_alpha = True

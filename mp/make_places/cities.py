@@ -11,11 +11,23 @@ import random as rm
 
 class block(node):
 
+    bl_themes = {
+        #'suburbs' : (20,3,30,20), 
+        #'residential' : (10,10,60,60), 
+        #'park' : (3,1,10,10), 
+        #'commercial' : (20,20,100,100), 
+        'industrial' : (20,6,80,80), 
+            }
+    themes = [ke for ke in bl_themes.keys()]
+
     def __init__(self, *args, **kwargs):
-        self._default_('max_floor_count',30,**kwargs)
-        self._default_('max_building_length',100,**kwargs)
-        self._default_('max_building_width',100,**kwargs)
-        self._default_('building_count',10,**kwargs)
+        bth = rm.choice(self.themes)
+        self._default_('theme',bth,**kwargs)
+        blbc,blfc,blbl,blbw = self.bl_themes[self.theme]
+        self._default_('max_floor_count',blfc,**kwargs)
+        self._default_('max_building_length',blbl,**kwargs)
+        self._default_('max_building_width',blbw,**kwargs)
+        self._default_('building_count',blbc,**kwargs)
         if 'road' in kwargs.keys():
             rd = kwargs['road']
             children = self.make_buildings_from_road(*args, **kwargs)
@@ -41,7 +53,7 @@ class block(node):
         rd = kwargs['road']
         rdside = kwargs['side']
         corns = rd.segmented_vertices
-        print('segverts',corns)
+        #print('segverts',corns)
         corncnt = len(corns)
         zhat = [0,0,1]
         thats = [fu.normalize(fu.v1_v2(corns[dx],corns[dx-1])) 
@@ -183,6 +195,8 @@ class city(node):
             'industrial' : (20,6,80,80), 
                 }
         themes = [ke for ke in bl_themes.keys()]
+        print('theeeemes',bl_themes)
+        print('theeeemes',themes)
 
         roads = road_system_.roads
         bboxes = road_system_.get_bbox()

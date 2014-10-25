@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
-from make_places.fundamental import element
+#from make_places.fundamental import element
+from make_places.scenegraph import node
 from make_places.floors import floor
 from make_places.primitives import ucube
 from make_places.primitives import uoctagon
@@ -24,7 +25,7 @@ cardinal_norms = [
     [0,-1,0],fu.normalize([-1,-1,0]), 
     [-1,0,0],fu.normalize([-1,1,0])]
 
-class intersection(element):
+class intersection(node):
 
     def __init__(self, *args, **kwargs):
         kweys = kwargs.keys()
@@ -36,7 +37,7 @@ class intersection(element):
         self.road_height = rh
         segs = self.make_segments(*args, **kwargs)
         kwargs['primitives'] = segs
-        element.__init__(self, *args, **kwargs)
+        node.__init__(self, *args, **kwargs)
 
     def make_segments(self, *args, **kwargs):
         segs = []
@@ -50,93 +51,14 @@ class intersection(element):
     def get_bbox(self):
         corners = [[0,0,0],[50,0,0],[50,50,0],[0,50,0]]
         #fu.rotate_z_coords(corners,theta)
-        x,y,z = self.position
+        position = self.tform.true().position
+        x,y,z = position
         fu.translate_coords(corners,[x-25,y-25,z])
-        bboxes = [fu.bbox(position = self.position, 
+        bboxes = [fu.bbox(position = position, 
             corners = corners)]
         return bboxes
 
-'''#
-class ______intersection(element):
-    # each intersection is essentially an octagon
-    # when a direction and its opposite are None
-    #  the octagon can hide these outlets
-    # a road can hook up to the intersection at at orientation
-    #  defined by angle between road tangent and outlet normal
-    def __init__(self, *args, **kwargs):
-        self.clip_length = 25
-        self.outlets = kwargs['topology'][kwargs['topodex']]
-        #for card in cardinal_directions:
-        #    self.outlets[card] = None
-        kwargs['primitives'] = self.make_segments(*args, **kwargs)
-        #kwargs['children'] = self.make_segments(*args, **kwargs)
-        element.__init__(self, *args, **kwargs)
-
-    def get_bbox(self):
-        corners = [[0,0,0],[50,0,0],[50,50,0],[0,50,0]]
-        #fu.rotate_z_coords(corners,theta)
-        x,y,z = self.position
-        fu.translate_coords(corners,[x-25,y-25,z])
-        bboxes = [fu.bbox(position = self.position, 
-            corners = corners)]
-        return bboxes
-
-    def make_segments2(self, *args, **kwargs):
-        seg = unit_cube()
-        seg.scale([50,50,2])
-        seg.translate([-25,-25,-2])
-        segs.append(seg)
-        print('outlets',kwargs['position'],corners)
-        return segs
-
-    def make_segments(self, *args, **kwargs):
-        cl = self.clip_length
-        cls2 = float(cl)/sqrt(2.0)
-        card_corners = {
-            'north' : [0,cl,0], 
-            'northeast' : [cls2,cls2,0],  
-            'east' : [cl,0,0], 
-            'southeast' : [cls2,-1*cls2,0], 
-            'south' : [0,-1*cl,0], 
-            'southwest' : [-1*cls2,-1*cls2,0], 
-            'west' : [-1*cl,0,0], 
-            'northwest' : [-1*cls2,cls2,0], 
-                }
-        corners = []
-        for card in cardinal_directions:
-            if not self.outlets[card] is None:
-                corners.append((card,card_corners[card]))
-        self.corners = corners
-
-        w = 30.0
-        segs = []
-        for corn in corners:
-            ca = corn[0]
-            co = corn[1]
-            seg = unit_cube()
-            seg.scale([2,w,10])
-            cardx = cardinal_directions.index(ca)
-            cardn = cardinal_norms[cardx]
-            zhat = [0,0,1]
-            nnorm = fu.normalize(fu.cross(cardn,zhat))
-            ang_z = fu.angle_from_xaxis_xy(cardn)
-            seg.translate([
-                0.0, 
-                #-1.0*nnorm[0]*w/2.0,
-                -1.0*nnorm[1]*w/2.0,0])
-            seg.rotate_z(ang_z)
-            seg.translate(co)
-            segs.append(seg)
-
-        seg = unit_cube()
-        seg.scale([50,50,2])
-        seg.translate([-25,-25,-2])
-        segs.append(seg)
-        print('outlets',kwargs['position'],corners)
-        return segs
-'''#
-
-class road(element):
+class road(node):
     def __init__(self, *args, **kwargs):
         kweys = kwargs.keys()
         if 'road_width' in kweys: rw = kwargs['road_width']
@@ -149,7 +71,7 @@ class road(element):
         self.set_segmented_vertices(*args, **kwargs)
         segs = self.make_segments(*args, **kwargs)
         kwargs['primitives'] = segs
-        element.__init__(self, *args, **kwargs)
+        node.__init__(self, *args, **kwargs)
 
     def get_bbox(self):
         def make_corners(p1, p2):
@@ -201,9 +123,9 @@ class road(element):
 
         segdices = 3
         verts = [stp,enp]
-        #verts = self.clip_tips(verts,norms[0],norms[1])
+        verts = self.clip_tips(verts,norms[0],norms[1])
         #verts = self.add_tips(verts,norms[0],norms[1])
-        #verts = self.add_tips_OLD(verts,norms[0],norms[1])
+        verts = self.add_tips_OLD(verts,norms[0],norms[1])
         pitch = 0
         pitch_to_go = -1.0*fu.angle_between_xy(norms[0],fu.flip(norms[1]))
         zhat = [0,0,1]
@@ -245,6 +167,8 @@ class road(element):
                 newv = fu.midpoint(f,b)
                 newvs.insert(vdx+(len(newvs)-len(verts)),newv)
             verts = newvs[:]
+            #print('segmented rd vtx', verts, segdices)
+        
         #if segdices > 0: bend(verts)
         self.segmented_vertices = verts
         return verts
@@ -389,7 +313,7 @@ def spline_4p( t, p_1, p0, p1, p2 ):
         + t*((4 - 3*t)*t + 1) * p1
         + (t-1)*t*t         * p2 ) / 2
 
-class road_system(element):
+class road_system(node):
     def __init__(self, *args, **kwargs):
         try: self.linkmin = kwargs['linkmin']
         except KeyError: self.linkmin = 200
@@ -410,8 +334,8 @@ class road_system(element):
             kwargs['children'] =\
                 self.make_system_from_intersections(interargs)
         else:kwargs['children'] = self.make_primitives_web(*args, **kwargs)
-        kwargs['materials'] = ['imgtex']
-        element.__init__(self, *args, **kwargs)
+        #kwargs['materials'] = ['imgtex']
+        node.__init__(self, *args, **kwargs)
 
     def make_primitives_web(self, *args, **kwargs):
         def good_dir(tip, ang):
@@ -576,12 +500,18 @@ def north_check(topology,topo,seek_fov,linkmax):
     potentials = []
     ndists = []
     tthresh = 50
+    max_slope = 0.5
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
             if tpos[1] < pnpos[1]:
                 ndist = float(pnpos[1] - tpos[1])
+                
+                zdiff = abs(tpos[2] - pnpos[2])
+                slope = zdiff/abs(ndist)
+                if slope > max_slope: continue
+
                 if ndist < linkmax:
                     tdist = float(pnpos[0] - tpos[0])
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))
@@ -604,12 +534,16 @@ def south_check(topology,topo,seek_fov,linkmax):
     potentials = []
     ndists = []
     tthresh = 50
+    max_slope = 0.5
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
             if tpos[1] > pnpos[1]:
                 ndist = -1*float(pnpos[1] - tpos[1])
+                zdiff = abs(tpos[2] - pnpos[2])
+                slope = zdiff/abs(ndist)
+                if slope > max_slope: continue
                 if ndist < linkmax:
                     tdist = float(pnpos[0] - tpos[0])
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))
@@ -634,12 +568,16 @@ def east_check(topology,topo,seek_fov,linkmax):
     normdx = 0
     trandx = 1
     tthresh = 50
+    max_slope = 0.5
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
             if tpos[normdx] < pnpos[normdx]:
                 ndist = float(pnpos[normdx] - tpos[normdx])
+                zdiff = abs(tpos[2] - pnpos[2])
+                slope = zdiff/abs(ndist)
+                if slope > max_slope: continue
                 if ndist < linkmax:
                     tdist = float(pnpos[trandx] - tpos[trandx])
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))
@@ -664,12 +602,16 @@ def west_check(topology,topo,seek_fov,linkmax):
     normdx = 0
     trandx = 1
     tthresh = 50
+    max_slope = 0.5
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
             if tpos[normdx] > pnpos[normdx]:
                 ndist = -1*float(pnpos[normdx] - tpos[normdx])
+                zdiff = abs(tpos[2] - pnpos[2])
+                slope = zdiff/abs(ndist)
+                if slope > max_slope: continue
                 if ndist < linkmax:
                     tdist = float(pnpos[trandx] - tpos[trandx])
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))

@@ -1,10 +1,12 @@
 import make_places.fundamental as fu
+import make_places.scenegraph as sg
 import make_places.primitives as pr
 import make_places.cities as cities
 import make_places.buildings as blg
 import make_places.roads as roads
 import make_places.floors as floors
 import make_places.walls as walls
+import make_places.profiler as prf
 
 import make_places.blend_in as blgeo
 import make_places.gritty as gritgeo
@@ -65,7 +67,7 @@ def uelements_g():
     gritgeo.create_element(el1,el2)
 
 def uelement_child_b():
-    el1 = cube_oct_elem([2,4,1], [1,2,2], [0,0,np.pi/2])
+    el1 = cube_oct_elem([2,4,1], [1,2,2], [0,0,np.pi/6])
     el2 = cube_oct_elem([0,0,-1], [2,2,1], [0,0,np.pi/2], children = [el1])
     blgeo.create_element(el2)
 
@@ -140,98 +142,6 @@ def roady_g():
     rargs = [r1]
     gritgeo.create_element([roads.road(**rg) for rg in rargs])
 
-def road_directions():
-    rargs = [
-        #    {
-        #'start':[0,10,0],
-        #'end':[100,110,-10],
-        #'directions':['north','west'],
-        #'road_height':1,
-        #'road_width':10,
-        #    }, 
-        #    {
-        #'start':[0,10,0],
-        #'end':[-100,110,-10],
-        #'directions':['north','east'],
-        #'road_height':1,
-        #'road_width':10,
-        #    }, 
-        #    {
-        #'end':[0,10,10],
-        #'start':[-100,110,0],
-        #'directions':['east','north'],
-        #'road_height':1,
-        #'road_width':20,
-        #    }, 
-        #    {
-        #'end':[0,-10,10],
-        #'start':[-100,-110,0],
-        #'directions':['east','south'],
-        #'road_height':1,
-        #'road_width':20,
-        #    },
-        #    {
-        #'start':[0,-10,0],
-        #'end':[-100,-110,-10],
-        #'directions':['south','east'],
-        #'road_height':1,
-        #'road_width':20,
-        #    },
-        #    {
-        #'end':[0,10,10],
-        #'start':[-100,110,0],
-        #'directions':['south','west'],
-        #'road_height':1,
-        #'road_width':20,
-        #    },
-        #    {
-        #'start':[0,10,0],
-        #'end':[-100,110,-10],
-        #'directions':['west','south'],
-        #'road_height':1,
-        #'road_width':20,
-        #    },
-            {
-        'end':[0,10,10],
-        'start':[100,110,0],
-        'directions':['west','north'],
-        'road_height':1,
-        'road_width':20,
-            },
-        #    {
-        #'start':[0,10,0],
-        #'end':[100,110,-10],
-        #'directions':['east','south'],
-        #'road_height':1,
-        #'road_width':10,
-        #    }, 
-        #    {
-        #'end':[0,10,30],
-        #'start':[100,110,0],
-        #'directions':['south','east'],
-        #'road_height':1,
-        #'road_width':10,
-        #    }, 
-            {
-        'start':[0,0,0], 
-        'end':[-200,100,50],
-        'directions':['north', 'east'], 
-        'road_height':2, 
-        'road_width':30, 
-            }] 
-    '''#
-    rargs = [
-            {
-        'end':[0,10,10],
-        'start':[100,110,0],
-        'directions':['west','north'],
-        'road_height':1,
-        'road_width':20,
-            }] 
-    '''#
-    elems = [roads.road(**ra) for ra in rargs]
-    blgeo.create_element(elems)
-
 def road_network_b():
     rnarg = {}
     elem = roads.road_system(**rnarg)
@@ -277,99 +187,106 @@ def build():
     blgeo.create_element(built)
 
 def buildfew_b():
+    ang = np.pi/24
     bargs = [{
         'position':[10,50,10], 
             }, {
         'position':[-10,-10,0], 
+        'rotation':[0,0,ang], 
             }]
     built = [blg.building(**ba) for ba in bargs]
     blgeo.create_element(built)
 
 def buildfew_g():
+    ang = np.pi/6
     bargs = [{
         'position':[10,50,10], 
             }, {
         'position':[-10,-10,0], 
+        'rotation':[0,0,ang], 
             }]
     built = [blg.building(**ba) for ba in bargs]
     gritgeo.create_element(built)
 
+def profile_buildfew_g():
+    prf.profile_function(buildfew_g)
+
+def block_b():
+    iargs = [{
+        'position':[0,0,0], 
+            }, {
+        'position':[0,300,-10], 
+            }, {
+        'position':[300,100,10], 
+            }]
+    rsargs = {
+        'interargs':iargs, 
+            }
+    rsys = roads.road_system(**rsargs)
+    rd = rsys.roads[1]
+    b1 = {
+        'road':rd, 
+        'bboxes':rd.get_bbox(),
+        'side':'right',
+            }
+    b2 = {
+        'road':rd, 
+        'bboxes':rd.get_bbox(),
+        'side':'left',
+            }
+    bl1 = cities.block(**b1)
+    bl2 = cities.block(**b2)
+    blgeo.create_element(rsys,bl1,bl2)
+
+def block_g():
+    iargs = [{
+        'position':[0,0,0], 
+            }, {
+        'position':[0,300,-10], 
+            }, {
+        'position':[300,100,10], 
+            }]
+    rsargs = {
+        'interargs':iargs, 
+            }
+    rsys = roads.road_system(**rsargs)
+    rd = rsys.roads[1]
+    b1 = {
+        'road':rd, 
+        'bboxes':rd.get_bbox(),
+        'side':'right',
+            }
+    b2 = {
+        'road':rd, 
+        'bboxes':rd.get_bbox(),
+        'side':'left',
+            }
+    bl1 = cities.block(**b1)
+    bl2 = cities.block(**b2)
+    gritgeo.create_element(rsys,bl1,bl2)
+
+def profile_block_b():
+    prf.profile_function(block_b)
+
+def profile_block_g():
+    prf.profile_function(block_g)
+
 def city_b():
     elem = cities.city()
-    blgeo.create_elements(elem)
+    blgeo.create_element(elem)
 
 def city_g():
     elem = cities.city()
-    gritgeo.create_elements(elem)
+    gritgeo.create_element(elem)
+
+def profile_city_b():
+    prf.profile_function(city_b)
+
+def profile_city_g():
+    prf.profile_function(city_g)
 
 
 
-
-
-def intersect_bb():
-    #ucube3 = fu.element(materials = ['imgtex'], 
-    #    primitives = [pr.unit_cube()])
-    #ucube2 = fu.element(position = [0.5,0.5,0], 
-    #        primitives = [pr.unit_cube()])
-
-    #flcnt = 4
-    #ucube3 = blg.building(name = 'ucube3', 
-    #    position = [0,0,0],length = 40,width = 30,
-    #    floor_height = 0.4, wall_width = 0.4, wall_height = 4.0, 
-    #    floors = flcnt, rotation = [0,0,30])
-    #ucube2 = blg.building(name = 'ucube2', 
-    #    position = [5,5,0],length = 10,width = 10,
-    #    floor_height = 0.2, wall_width = 0.2, wall_height = 2.0, 
-    #    floors = flcnt, rotation = [0,0,0])
-
-    #ucube1 = roads.intersection(position = [20,20,20])
-    #ucube2 = roads.intersection(position = [30,20,20])
-
-    #flcnt = 3
-    #ucube1 = roads.road_system(interargs = [
-    rsys = roads.road_system(interargs = [
-        {'position':[0,0,0]}, 
-        {'position':[0,200,0]}, 
-    #    #{'position':[200,200,0]}, 
-        ])
-    #ucube2 = blg.building(name = 'ucube2', 
-    #    position = [0,50,0],length = 40,width = 40,
-    #    floor_height = 0.2, wall_width = 0.2, wall_height = 2.0, 
-    #    floors = flcnt, rotation = [0,0,0])
-    ucube1 = cities.city(road_system = rsys)
-    #ucube2 = cities.city()
-
-    elems = ucube1.children
-    #bldgs = fu.break_elements(ucube1.blocks)
-    #pieces = fu.break_elements(bldgs)
-    #elems = pieces + [rsys]
-    #elems = ucube3.children
-    #elems = [ucube3]
-    blgeo.create_elements(elems)
-
-def unit_cube():
-    ucube = [fu.element(primitives = [pr.unit_cube()])]
-    blgeo.create_elements(ucube)
-
-def make_building():
-    flcnt = 4
-    bldg = blg.building(name = 'building', 
-        position = [0,0,0],length = 40,width = 30,
-        floor_height = 0.4, wall_width = 0.4, wall_height = 4.0, 
-        floors = flcnt, rotation = [0,0,30])
-    elems = bldg.children
-    blgeo.create_elements(elems)
-
-def make_roads():
-    rsys = roads.road_system(
-        seeds = [[0,0,0], [100,0,20]], 
-        intersection_count = 2)
-    elems = rsys.children
-    blgeo.create_elements(elems)
-
-def make_city():
-    elements = cities.city().children
-    blgeo.create_elements(elements)
 
 
 

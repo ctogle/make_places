@@ -208,6 +208,9 @@ def buildfew_g():
     built = [blg.building(**ba) for ba in bargs]
     gritgeo.create_element(built)
 
+def profile_buildfew_g():
+    prf.profile_function(buildfew_g)
+
 def block_b():
     iargs = [{
         'position':[0,0,0], 
@@ -235,8 +238,38 @@ def block_b():
     bl2 = cities.block(**b2)
     blgeo.create_element(rsys,bl1,bl2)
 
+def block_g():
+    iargs = [{
+        'position':[0,0,0], 
+            }, {
+        'position':[0,300,-10], 
+            }, {
+        'position':[300,100,10], 
+            }]
+    rsargs = {
+        'interargs':iargs, 
+            }
+    rsys = roads.road_system(**rsargs)
+    rd = rsys.roads[1]
+    b1 = {
+        'road':rd, 
+        'bboxes':rd.get_bbox(),
+        'side':'right',
+            }
+    b2 = {
+        'road':rd, 
+        'bboxes':rd.get_bbox(),
+        'side':'left',
+            }
+    bl1 = cities.block(**b1)
+    bl2 = cities.block(**b2)
+    gritgeo.create_element(rsys,bl1,bl2)
+
 def profile_block_b():
     prf.profile_function(block_b)
+
+def profile_block_g():
+    prf.profile_function(block_g)
 
 def city_b():
     elem = cities.city()
@@ -249,6 +282,8 @@ def city_g():
 def profile_city_b():
     prf.profile_function(city_b)
 
+def profile_city_g():
+    prf.profile_function(city_g)
 
 
 

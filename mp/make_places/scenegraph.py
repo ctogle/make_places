@@ -1,6 +1,7 @@
 import make_places.fundamental as fu
 import make_places.primitives as pr
 import make_places.blend_in as blgeo
+import make_places.gritty as gritgeo
 
 from copy import deepcopy as dcopy
 import numpy as np
@@ -62,6 +63,10 @@ class sgraph(base):
         for nd in self.nodes:
             nd.make_b(center = center)
 
+    def make_scene_g(self, center = False):
+        for nd in self.nodes:
+            nd.make_g(center = center)
+
 class node(base):
     def translate(self, v):
         fu.translate_vector(self.tform.position, v)
@@ -104,7 +109,16 @@ class node(base):
         for ch in self.children:
             ch.make_b(*args, **kwargs)
 
-
+    def make_g(self, *args, **kwargs):
+        ttf = self.tform.true()
+        for pm in self.primitives:
+            tpm = dcopy(pm)
+            tpm.scale(ttf.scales)
+            tpm.rotate_z(ttf.rotation[2])
+            tpm.translate(ttf.position)
+            gritgeo.create_primitive(tpm, **kwargs)
+        for ch in self.children:
+            ch.make_g(*args, **kwargs)
 
 
 

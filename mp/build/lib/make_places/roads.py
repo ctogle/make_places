@@ -167,7 +167,7 @@ class road(node):
                 newv = fu.midpoint(f,b)
                 newvs.insert(vdx+(len(newvs)-len(verts)),newv)
             verts = newvs[:]
-            print('segmented rd vtx', verts, segdices)
+            #print('segmented rd vtx', verts, segdices)
         
         #if segdices > 0: bend(verts)
         self.segmented_vertices = verts

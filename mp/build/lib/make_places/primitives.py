@@ -5,14 +5,14 @@ import xml.etree.ElementTree
 import os
 
 
-#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
-mpdir = os.path.join('/home', 'cogle', 
-        'dev', 'forblender', 'make_places', 
-        'mp', 'make_places')
+mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
+    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
+#mpdir = os.path.join('/home', 'cogle', 
+#        'dev', 'forblender', 'make_places', 
+#        'mp', 'make_places')
 primitive_data_path = os.path.join(mpdir, 'primitive_data')
 xml_primitive_files = {}
-
+xml_library = {}
 class arbitrary_primitive(object):
 
     def __init__(self, *args, **kwargs):
@@ -63,19 +63,44 @@ class arbitrary_primitive(object):
         self.translate(fu.flip(pos))
 
     def write_as_xml(self):
-        if not self.modified:
-            #print 'this one was not modified'
+        if self.modified:
+            xlines, xfile = xml_from_primitive_data(self)
+            self.xml_representation = '\n'.join(xlines)
+        else:
             xml = os.path.join(mpdir, 
                 'primitive_data', self.xml_filename)
             with open(xml, 'r') as handle:
                 xlines = handle.readlines()
-        else:
-            xlines, xfile = xml_from_primitive_data(self)
+            self.xml_representation = '\n'.join(xlines)
+            
+        #if not self.modified:
+        #    #print 'this one was not modified'
+        #    xml = os.path.join(mpdir, 
+        #        'primitive_data', self.xml_filename)
+        #    with open(xml, 'r') as handle:
+        #        xlines = handle.readlines()
+        #    is_new = False
+
+        if self.xml_representation in xml_library.keys():
+            xfile,gcol,gfx,col = xml_library[self.xml_representation]
             self.xml_filename = xfile
-            self.gcol_filename = self.xml_filename.replace('mesh.xml','gcol')
-            self.gfxmesh_name = self.xml_filename.replace('.xml','')
-            self.colmesh_name = self.gcol_filename
-        return xlines
+            self.gcol_filename = gcol
+            self.gfxmesh_name = gfx
+            self.colmesh_name = col
+            is_new = False
+
+        else:
+            #xlines, xfile = xml_from_primitive_data(self)
+            self.xml_filename = xfile
+            gcol = self.xml_filename.replace('mesh.xml','gcol')
+            self.gcol_filename = gcol
+            gfx = self.xml_filename.replace('.xml','')
+            self.gfxmesh_name = gfx
+            col = self.gcol_filename
+            self.colmesh_name = col
+            xml_library[self.xml_representation] = (xfile,gcol,gfx,col)
+            is_new = True
+        return xlines, is_new
 
     def translate(self, vect):
         self.coords = fu.translate_coords(self.coords, vect)

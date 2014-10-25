@@ -12,10 +12,10 @@ add the necessary materials, and place the object in the world
 unmodified meshes can be placed in a dict and recycled
 '''#
 
-def create_primitive(*args):
+def create_primitive(*args, **kwargs):
     for ag in args:
-        if not type(ag) is type([]): create_prim(ag)
-        else: [create_prim(p) for p in ag]
+        if not type(ag) is type([]): create_prim(ag, **kwargs)
+        else: [create_prim(p, **kwargs) for p in ag]
     
 world_dir = os.path.join(
     'C:\\', 'Users', 'bartl_000', 
@@ -27,7 +27,7 @@ world_primitives = {}
 #    'Desktop', 'gritengine', 'grit_core', 
 #    'media', 'solemn', 'textures')
 textdir = '/solemn/textures'
-def create_prim(prim):
+def create_prim(prim, center = False, **kwargs):
     prim.origin_to_centroid()
     create_grit_mesh(prim)
     create_gcol(prim)
@@ -129,20 +129,21 @@ def write_map_lines(obj, location, name):
 executable_suffix = '.exe'
 def create_grit_mesh(prim, tangents = False, 
             use_ogre_xml_converter = True):
-    xml = prim.write_as_xml()
-    xdir = os.path.join(world_dir, prim.xml_filename)
-    with open(xdir,'w') as handle:
-        [handle.write(li) for li in xml]
-    if use_ogre_xml_converter:
-        converterpath = os.path.join(world_dir, 
-            'OgreXMLConverter' + executable_suffix)
-        args = [converterpath, "-e"]
-        if tangents:
-            args.append("-t")
-            args.append("-ts")
-            args.append("4")
-        args.append(xdir)
-        subprocess.call(args)
+    xml, is_new = prim.write_as_xml()
+    if is_new:
+        xdir = os.path.join(world_dir, prim.xml_filename)
+        with open(xdir,'w') as handle:
+            [handle.write(li) for li in xml]
+        if use_ogre_xml_converter:
+            converterpath = os.path.join(world_dir, 
+                'OgreXMLConverter' + executable_suffix)
+            args = [converterpath, "-e"]
+            if tangents:
+                args.append("-t")
+                args.append("-ts")
+                args.append("4")
+            args.append(xdir)
+            subprocess.call(args)
 
 def create_gcol(prim):
     filename = os.path.join(world_dir, prim.gcol_filename)
@@ -193,7 +194,13 @@ def create_element(*args):
         if not type(ag) is type([]): create_elem(ag)
         else: [create_elem(e) for e in ag]
 
-def create_elem(elem):
+def create_elem(elem, center = True):
+    import make_places.scenegraph as sg
+    sgr = sg.sgraph(nodes = [elem])
+    sgr.make_scene_g(center = center)
+
+
+    return
     eelems = elem.children
     eprims = elem.primitives
     pos = elem.position

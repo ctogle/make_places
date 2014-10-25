@@ -5,12 +5,11 @@ import xml.etree.ElementTree
 import os
 
 
-#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
-mpdir = os.path.join('/home', 'cogle', 
-        'dev', 'forblender', 'make_places', 
-        'mp', 'make_places')
+mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
+    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
 primitive_data_path = os.path.join(mpdir, 'primitive_data')
+#mpdir = os.path.join('/home', 'cogle', 
+#        'dev', 'forblender', 'make_places')
 xml_primitive_files = {}
 
 class arbitrary_primitive(object):
@@ -64,7 +63,7 @@ class arbitrary_primitive(object):
 
     def write_as_xml(self):
         if not self.modified:
-            #print 'this one was not modified'
+            print 'this one was not modified'
             xml = os.path.join(mpdir, 
                 'primitive_data', self.xml_filename)
             with open(xml, 'r') as handle:
@@ -164,7 +163,7 @@ def primitive_data_from_xml(xmlfile):
                 v3 = int(face.get('v3'))
                 faces.append([v1,v2,v3])
                 face_materials.append(len(materials)-1)
-    org = [0,0,0]
+    org = (0,0,0)
     sep = xmlfile.rfind(os.path.sep)
     xmlfile = xmlfile[sep+1:]
     xml_file_names.append(xmlfile)

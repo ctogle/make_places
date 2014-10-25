@@ -1,21 +1,18 @@
 import make_places.fundamental as fu
-#from make_places.fundamental import element
-from make_places.scenegraph import node
+from make_places.fundamental import element
 from make_places.primitives import unit_cube
 
-class floor(node):
+class floor(element):
 
     def __init__(self, *args, **kwargs):
-        #self._default_('position',[0,0,0],**kwargs)
-        #self._default_('tform',tform(),**kwargs)
+        self._default_('position',[0,0,0],**kwargs)
         self._default_('length',20,**kwargs)
         self._default_('width',20,**kwargs)
         self._default_('height',1,**kwargs)
         self._default_('gaps',[],**kwargs)
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self.primitives = self.make_primitives([0,0,0],
             self.length,self.width,self.height,self.gaps)
-        node.__init__(self, *args, **kwargs)
+        element.__init__(self, *args, **kwargs)
 
     def find_corners(self, pos, length, width):
         x = length/2.0
@@ -24,12 +21,7 @@ class floor(node):
         c2 = fu.translate_vector(pos[:],[x,-y,0])
         c3 = fu.translate_vector(pos[:],[x,y,0])
         c4 = fu.translate_vector(pos[:],[-x,y,0])
-        corners = [c1, c2, c3, c4]
-        ttf = self.tform
-        #ttf = self.tform.true()
-        fu.rotate_z_coords(corners, ttf.rotation[2])
-        fu.translate_coords(corners, ttf.position)
-        return corners
+        return [c1, c2, c3, c4]
 
     def make_primitives(self, pos, length, width, flheight, gaps = []):
         self.corners = self.find_corners(pos, length, width)

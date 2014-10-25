@@ -1,22 +1,24 @@
 import make_places.fundamental as fu
-#from make_places.fundamental import element
-from make_places.scenegraph import node
-import make_places.scenegraph as scg
+from make_places.fundamental import element
 from make_places.primitives import unit_cube
 
 import numpy as np
 
-class wall(node):
+class wall(element):
 
     def __init__(self, *args, **kwargs):
         self.v1 = args[0]
         self.v2 = args[1]
         v1, v2 = self.v1, self.v2
         self.v1_v2 = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
-        self._default_('length',fu.distance(v1,v2),**kwargs)
-        self._default_('wall_width',0.4,**kwargs)
-        self._default_('wall_height',4,**kwargs)
-        self._default_('gaps',[],**kwargs)
+        try: self.length = kwargs['length']
+        except KeyError: self.length = fu.magnitude(self.v1_v2)
+        try: self.width = kwargs['wall_width']
+        except KeyError: self.width = 0.4
+        try: self.height = kwargs['wall_height']
+        except KeyError: self.height = 4
+        try: self.gaps = kwargs['wall_gaps']
+        except KeyError: self.gaps = []
         try:
             if kwargs['gaped']:
                 self.gaps = self.gape_wall()
@@ -25,16 +27,12 @@ class wall(node):
             self.v1, self.v1, self.v2, self.gaps)
         pos = self.v1[:]
         kwargs['position'] = pos
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
-        #tform = scg.tform(position = pos)
-        #self._default_('tform',tform,**kwargs)
-        node.__init__(self, *args, **kwargs)
+        element.__init__(self, *args, **kwargs)
 
     def gape_wall(self):
         wlen = float(self.length)
         gwid = 4.0
-        #gcnt = int(wlen/(gwid*2))
-        gcnt = 1 if wlen > gwid*2 else 0
+        gcnt = int(wlen/(gwid*2))
         gaps = []
         if gcnt > 0: gspa = wlen/gcnt
         for gn in range(gcnt):
@@ -45,7 +43,7 @@ class wall(node):
     def make_wall_segment(self, pos, v1, v2):
         wall_ = unit_cube()
         length = fu.distance_xy(v1,v2)
-        wall_.scale([length, self.wall_width, self.wall_height])
+        wall_.scale([length, self.width, self.height])
         wall_.translate([length/2.0,0,0])
         ang_z = fu.angle_from_xaxis_xy(fu.v1_v2(v1,v2))
         wall_.rotate_z(ang_z)
@@ -71,28 +69,31 @@ class wall(node):
         for sgdx in range(len(frnts)):
             fr = frnts[sgdx]
             bk = backs[sgdx]
+            #spos = [fr[0]-v1[0],fr[1]-v1[1],fr[2]-v1[2]]
             spos = fu.v1_v2(v1,fr)
             wall_ = self.make_wall_segment(spos, fr, bk)
             prims.append(wall_)
         return prims
 
-class perimeter(node):
+class perimeter(element):
 
     def __init__(self, *args, **kwargs):
-        self._default_('floor',None,**kwargs)
-        if self.floor: corns = self.floor.corners
-        else: corns = kwargs['corners']
-        self._default_('corners',corns,**kwargs)
-        self._default_('wall_width', 0.4, **kwargs)
-        self._default_('wall_height', 4, **kwargs)
-        self._default_('wall_gaps',[[],[],[],[]],**kwargs) 
-        self._default_('gaped',False,**kwargs)
-        self.gapes = [self.gaped]*len(self.wall_gaps)
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
-        self._default_('children',self.make_walls(
-            self.corners,gapes = self.gapes,
-                gaps = self.wall_gaps), **kwargs)
-        node.__init__(self, *args, **kwargs)
+        try:
+            self.floor = kwargs['floor']
+            corners = self.floor.corners
+        except KeyError: corners = kwargs['corners']
+        try: self.width = kwargs['wall_width']
+        except KeyError: self.width = 0.4
+        try: self.height = kwargs['wall_height']
+        except KeyError: self.height = 4
+        try: self.gaps = kwargs['wall_gaps']
+        except KeyError: self.gaps = [[],[],[],[]]
+        try: self.gaped = kwargs['gaped']
+        except KeyError: self.gaped = False
+        self.gapes = [self.gaped]*len(self.gaps)
+        kwargs['children'] = self.make_walls(corners, 
+            gapes = self.gapes, gaps = self.gaps)
+        element.__init__(self, *args, **kwargs)
 
     def make_walls(self, corners, 
             gapes = [True,True,False,False], 
@@ -102,18 +103,18 @@ class perimeter(node):
         c2 = corners[1]
         c3 = corners[2]
         c4 = corners[3]
-        ww = self.wall_width
-        h = self.wall_height
-        walls.append(wall(c1, c2, parent = self, 
+        ww = self.width
+        h = self.height
+        walls.append(wall(c1, c2, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[0], gaped = gapes[0]))
-        walls.append(wall(c2, c3, parent = self, 
+        walls.append(wall(c2, c3, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[1], gaped = gapes[1]))
-        walls.append(wall(c3, c4, parent = self, 
+        walls.append(wall(c3, c4, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[2], gaped = gapes[2]))
-        walls.append(wall(c4, c1, parent = self, 
+        walls.append(wall(c4, c1, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[3], gaped = gapes[3]))
         return walls

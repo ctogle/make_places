@@ -207,7 +207,7 @@ class vertex(object):
         self.normal = normal
         self.uv = uv
 
-class element__________(object):
+class element(object):
 
     def _default_(self, *args, **kwargs):
         key = args[0]
@@ -215,14 +215,6 @@ class element__________(object):
         if key in kwargs.keys():init = kwargs[key]
         if not key in self.__dict__.keys():
             self.__dict__[key] = init
-
-    def __str__(self, *args, **kwargs):
-        print('element:',self)
-        print('at:',self.position)
-        print('oriented:',self.rotation)
-        print('scaled:',self.scales)
-        print('children:',self.children)
-        print('primitives:',self.primitives)
 
     def __init__(self, *args, **kwargs):
         self._default_('position',[0,0,0],**kwargs)
@@ -237,23 +229,56 @@ class element__________(object):
         for sdx in range(3):
             self.scales[sdx] *= vect[sdx]
 
-    def give_rotation_z(self, ang):
-        for ee in self.children:
-            ee.give_rotation_z(ang)
-        for pr in self.primitives:
-            #pr.translate(flip(pr.position))
-            pr.rotate_z(ang)
-            #pr.translate(pr.position)
-
-    def rotate_z(self, ang):
-        #translate_vector(self.rotation, vect)
-        self.rotation[2] += ang
+    def rotate_z(self, vect):
+        translate_vector(self.rotation, vect)
 
     def translate(self, vect):
         translate_vector(self.position, vect)
 
+
+
+
+
+
+
+    def set_world_coords(self, trans = None, 
+                  scls = None, rots = None):
+        def add_coords(coords, faces):
+            faces_offset = len(world_coords)
+            world_coords.extend(
+                translate_coords(
+                    rotate_z_coords(
+                        scale_coords(
+                            coords,scales),rot_z),translation))
+            world_faces.extend(
+                offset_faces(faces, faces_offset))
+        world_coords = []
+        world_faces = []
+        texfaces = []
+        if trans is None: translation = self.position
+        else: translation = trans
+        if scls is None: scales = self.scales
+        else: scales = scls
+        if rots is None: rot_z = self.rotation[2]
+        else: rot_z = rots[2]
+        for prim in self.primitives:
+            prim_coords = prim.model_coords
+            prim_faces = prim.model_faces
+            add_coords(prim_coords, prim_faces)
+            texfaces.extend(prim.texfaces)
+        for elem in self.children:
+            elem.set_world_coords()
+            elem_world_coords = elem.world_coords
+            elem_world_faces = elem.world_faces
+            elem_texfaces = elem.texfaces
+            add_coords(elem_world_coords, elem_world_faces)
+            texfaces.extend(elem_texfaces)
+            self.materials.extend(elem.materials)
+        self.world_coords = world_coords
+        self.world_faces = world_faces
+        self.texfaces = texfaces
+
     def get_bbox(self):
-        print('getbbox!', self)
         corners = [[0,0,0],[1,0,0],[1,1,0],[0,1,0]]
         scale_coords(corners,self.scales)
         rotate_z_coords(corners,self.rotation[2])
@@ -339,11 +364,14 @@ def check_corners(ibox,box):
 
 def get_norms(verts):
     norms = []
-    zhat = [0,0,1]
     for vdx in range(1, len(verts)):
         v1,v2 = verts[vdx-1],verts[vdx]
-        v1_v2_ = normalize(v1_v2(v1,v2))
-        norm = normalize(cross(v1_v2_,zhat))
+        if v1 == v2:
+            print('wtf vs', verts)
+        v1_v2_ = v1_v2(v1,v2)
+        zhat = [0,0,1]
+        #norm = normalize(cross(v1_v2_,zhat))
+        norm = normalize(cross(normalize(v1_v2_),zhat))
         norms.append(norm)
     return norms
 

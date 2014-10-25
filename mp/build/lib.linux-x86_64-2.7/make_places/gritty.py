@@ -21,7 +21,6 @@ world_dir = os.path.join(
     'C:\\', 'Users', 'bartl_000', 
     'Desktop', 'gritengine', 'grit_core', 
     'media', 'solemn', 'world')
-world_primitives = {}
 #textdir = os.path.join(
 #    'C:\\', 'Users', 'bartl_000', 
 #    'Desktop', 'gritengine', 'grit_core', 

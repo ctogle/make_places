@@ -1,18 +1,16 @@
-#from make_places.fundamental import element
-from make_places.scenegraph import node
+from make_places.fundamental import element
 import make_places.fundamental as fu
 from make_places.stairs import ramp
-from make_places.stairs import shaft
 from make_places.floors import floor
 from make_places.walls import wall
 from make_places.walls import perimeter
 
-class story(node):
+class story(element):
 
     def __init__(self, *args, **kwargs):
         self.floor_number = args[0]
         self._default_('shafts',[],**kwargs)
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self._default_('position',[0,0,0],**kwargs)
         self._default_('length',20,**kwargs)
         self._default_('width',20,**kwargs)
         self._default_('floor_height',1,**kwargs)
@@ -23,7 +21,7 @@ class story(node):
         ext_walls = self.make_exterior_walls(*args, **kwargs)
         #int_walls = self.make_interior_walls(*args, **kwargs)
         self.children = self.floor_ + ext_walls #+ int_walls
-        node.__init__(self, *args, **kwargs)
+        element.__init__(self, *args, **kwargs)
 
     def make_floor(self, *args, **kwargs):
         gaps = []
@@ -36,8 +34,7 @@ class story(node):
             'length':self.length, 
             'width':self.width, 
             'gaps':gaps,
-            'height':self.floor_height, 
-            'parent':self, 
+            'height':self.floor_height
                 }
         floor_ = floor(**flargs)
         return [floor_]
@@ -46,7 +43,6 @@ class story(node):
         #floor_pieces = kwargs['floor']
         floor_pieces = self.floor_
         peargs = [{
-            'parent':fl, 
             'floor':fl, 
             'gaped':self.ext_gaped, 
             #'gaped':True, 
@@ -71,7 +67,6 @@ class story(node):
                 ]
             shcorns = sh.corners
             kwargs['corners'] = shcorns
-            kwargs['parent'] = self
             comps.append(perimeter(**kwargs))
         return comps
 
@@ -82,15 +77,86 @@ class rooftop(story):
         self._default_('ext_gaped',False,**kwargs)
         story.__init__(self, *args, **kwargs)
 
-class building(node):
+class shaft(element):
+
+    def __init__(self, *args, **kwargs):
+        #self.building = kwargs['building']
+        self._default_('position',[0,0,0],**kwargs)
+        self._default_('length',10,**kwargs)
+        self._default_('width',10,**kwargs)
+        self._default_('wall_width',0.4,**kwargs)
+        self._default_('floor_height',0.5,**kwargs)
+        self._default_('wall_height',4,**kwargs)
+        self._default_('floors',2,**kwargs)
+        self._default_('direction','north',**kwargs)
+        l = self.length
+        w = self.width
+        self.corners = fu.find_corners(self.position, l, w)
+        m = 0.25
+        self.wall_gaps = [
+            [[m,l-2*m]], 
+            [[m,w-2*m]], 
+            [[m,l-2*m]],
+            [[m,w-2*m]],
+                ]
+        self.floor_gaps = [[self.position, l, w]]
+        self.bottom = 0
+        self.top = 'roof'
+        ramps = self.ramps(*args, **kwargs)
+        kwargs['children'] = ramps
+        element.__init__(self, *args, **kwargs)
+
+    def ramps(self, *args, **kwargs):
+        comps = []
+        ww = self.wall_width
+        floffset = self.floor_height + self.wall_height
+        flcnt = self.floors
+        topology = []
+
+        def get_pos_fb(odd):
+            bpos = [rl*odd-rl/2.0,0,0]
+            return bpos, rl, rw
+
+        def get_pos_rl(odd):
+            bpos = [0,rw*odd-rw/2.0,0]
+            return bpos, rl, rw
+
+        if self.direction == 'east':
+            sides = ['right','left']
+            rw, rl = [4, 8]
+            get_pos = get_pos_rl
+
+        elif self.direction == 'north':
+            sides = ['front','back']
+            rw, rl = [8, 4]
+            get_pos = get_pos_fb
+
+        for fdx in range(flcnt):
+            odd = fdx % 2
+            rpos, rl, rw = get_pos(odd)
+            rpos[2] += floffset * fdx
+            lside = sides[0] if odd else sides[1]
+            hside = sides[1] if odd else sides[0]
+            rparg = {
+                'position':rpos, 
+                'length':rl, 
+                'width':rw, 
+                'high_side':hside, 
+                'differential':floffset, 
+                    }
+            topology.append((lside,hside))
+            ramp_ = ramp(**rparg)
+            comps.append(ramp_)
+        self.topology = topology
+        return comps
+
+class building(element):
 
     def __init__(self, *args, **kwargs):
         self._default_('floors',5,**kwargs)
         self._default_('length',40,**kwargs)
         self._default_('width',30,**kwargs)
-        self._default_('tform',
-            self.def_tform(*args,**kwargs),**kwargs)
-        #self._default_('rotation',[0,0,0],**kwargs)
+        self._default_('rotation',[0,0,0],**kwargs)
         self._default_('materials',['imgtex'],**kwargs)
         self._default_('wall_height',4,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
@@ -101,14 +167,13 @@ class building(node):
         self.shafts = shafts
         stories = self.make_floors_from_shafts(*args, **kwargs)
         self.children = shafts + stories
-        node.__init__(self, *args, **kwargs)
+        element.__init__(self, *args, **kwargs)
 
     def make_shafts(self, *args, **kwargs):
         flcnt = self.floors
         if not self.roof_access: flcnt -= 1
         shargs = [{
-            'parent':self, 
-            'position':[0,0,0], 
+            'position':[2,-1,0], 
             'rotation':[0,0,0], 
             'wall_height':self.wall_height, 
             'floor_height':self.floor_height, 
@@ -131,18 +196,13 @@ class building(node):
         width = self.width
         pos = [0,0,0]
         c1, c2, c3, c4 = pos[:], pos[:], pos[:], pos[:]
-        c1[0] -= length/2.0
-        c1[1] -= width/2.0
-        c2[0] += length/2.0
-        c2[1] -= width/2.0
-        c3[0] += length/2.0
-        c3[1] += width/2.0
-        c4[0] -= length/2.0
-        c4[1] += width/2.0
+        c2[0] += length
+        c3[0] += length
+        c3[1] += width
+        c4[1] += width
         corncoords = [c1, c2, c3, c4]
-        zang = self.tform.rotation[2]
-        corncoords = fu.rotate_z_coords(corncoords,zang)
-        fu.translate_coords(corncoords,self.tform.position)
+        corncoords = fu.rotate_z_coords(corncoords,self.rotation[2])
+        fu.translate_coords(corncoords,self.position)
         return [c1, c2, c3, c4]
 
     def make_floors_from_shafts(self, *args, **kwargs):
@@ -160,7 +220,6 @@ class building(node):
             fl_pos = bpos[:]
             fl_pos[2] += stheight*fdx
             stargs = {
-                'parent':self, 
                 'name':stname, 
                 'position':fl_pos, 
                 'shafts':shafts, 
@@ -174,7 +233,6 @@ class building(node):
         fl_pos = bpos[:]
         fl_pos[2] += stheight*(flcnt)
         rfarg = {
-            'parent':self, 
             'name':roof_name, 
             'position':fl_pos, 
             'length':self.length, 

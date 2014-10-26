@@ -5,11 +5,11 @@ import xml.etree.ElementTree
 import os
 
 
-#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
-mpdir = os.path.join('/home', 'cogle', 
-        'dev', 'forblender', 'make_places', 
-        'mp', 'make_places')
+mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
+    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
+#mpdir = os.path.join('/home', 'cogle', 
+#        'dev', 'forblender', 'make_places', 
+#        'mp', 'make_places')
 primitive_data_path = os.path.join(mpdir, 'primitive_data')
 xml_primitive_files = {}
 xml_library = {}
@@ -112,6 +112,7 @@ class arbitrary_primitive(object):
 
     def rotate_z(self, ang_z):
         self.coords = fu.rotate_z_coords(self.coords, ang_z)
+        self.ncoords = fu.rotate_z_coords(self.ncoords, ang_z)
         self.modified = True
 
 xml_file_names = []

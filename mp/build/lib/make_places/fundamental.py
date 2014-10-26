@@ -35,11 +35,22 @@ def scale_coords(coords, vect):
             coo[dx] *= vect[dx]
     return coords
 
+def rotate_y_coords(coords, ang_y):
+    M_y = [
+        [cos(ang_y), 0,-sin(ang_y)], 
+        [         0, 1,          0], 
+        [sin(ang_y), 0, cos(ang_y)], 
+            ]
+    for coo in coords:
+        rot_coo = row_major_multiply(M_y, coo)
+        coo[:] = rot_coo
+    return coords
+
 def rotate_z_coords(coords, ang_z):
     M_z = [
-        [cos(ang_z), -sin(ang_z), 0], 
+        [cos(ang_z),-sin(ang_z), 0], 
         [sin(ang_z), cos(ang_z), 0], 
-        [0, 0, 1], 
+        [         0,          0, 1], 
             ]
     for coo in coords:
         rot_coo = row_major_multiply(M_z, coo)
@@ -58,7 +69,8 @@ def translate_vector(vect, tv):
 
 def normalize(vect):
     mag = magnitude(vect)
-    return [v/mag for v in vect]
+    if mag == 0: return [0,0,0]
+    return [np.round(v/mag,4) for v in vect]
 
 def v1_v2(v1, v2):
     v1_v2_ = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
@@ -148,7 +160,6 @@ def angle_between_xy(v1, v2):
     alpha1 = angle_from_xaxis_xy(v1)
     alpha2 = angle_from_xaxis_xy(v2)
     if alpha2 - alpha1 > PI/2:
-    #if alpha2 - alpha1 > np.pi/2:
         print('arpha', v1, v2, alpha1, alpha2)
     return alpha2 - alpha1
 
@@ -157,10 +168,28 @@ def angle_between(v1, v2):
     alpha2 = angle_from_xaxis(v2)
     return alpha2 - alpha1
 
+def angle_from_zaxis_xz(v1):
+    fakev1 = v1[:]
+    fakev1[1] = 0
+    return angle_from_zaxis(fakev1)
+
 def angle_from_xaxis_xy(v1):
     fakev1 = v1[:]
     fakev1[2] = 0
     return angle_from_xaxis(fakev1)
+
+def angle_from_zaxis(v1):
+    v1 = normalize(v1)
+    length = magnitude(v1)
+    z_hat = [0,0,1]
+    z_proj = dot(v1, z_hat)
+    sign = -1 if v1[1] < 0 else 1
+    if z_proj == 0:ang = sign*PI/2.0
+    elif z_proj < length and z_proj > -length:
+        ang = sign*np.arccos(z_proj)
+    elif z_proj < 0:ang = PI
+    else:ang = 0.0
+    return ang    
 
 def angle_from_xaxis(v1):
     v1 = normalize(v1)
@@ -168,18 +197,18 @@ def angle_from_xaxis(v1):
     x_hat = [1,0,0]
     x_proj = dot(v1, x_hat)
     sign = -1 if v1[1] < 0 else 1
-    if x_proj == 0:ang = sign*np.pi/2.0
+    if x_proj == 0:ang = sign*PI/2.0
     elif x_proj < length and x_proj > -length:
         ang = sign*np.arccos(x_proj)
-    elif x_proj < 0:ang = np.pi
+    elif x_proj < 0:ang = PI
     else:ang = 0.0
     return ang    
 
 def to_rad(deg):
-    return (np.pi/180.0)*deg
+    return (PI/180.0)*deg
 
 def to_deg(rad):
-    return (180.0/np.pi)*rad
+    return (180.0/PI)*rad
 
 def row_major_multiply(M, coo):
     rcoox = dot(M[0],coo)

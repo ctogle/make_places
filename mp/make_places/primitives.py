@@ -3,18 +3,24 @@ import make_places.fundamental as fu
 import xml.etree.ElementTree
 
 import os
+import numpy as np
+from numpy import linalg
+from numpy import matrix
+from math import sin
 
 
-mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
-#mpdir = os.path.join('/home', 'cogle', 
-#        'dev', 'forblender', 'make_places', 
-#        'mp', 'make_places')
+
+#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
+#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
+mpdir = os.path.join('/home', 'cogle', 
+        'dev', 'forblender', 'make_places', 
+        'mp', 'make_places')
 primitive_data_path = os.path.join(mpdir, 'primitive_data')
 xml_primitive_files = {}
 xml_library = {}
 class arbitrary_primitive(object):
 
+    _scale_uvs_ = False
     def __init__(self, *args, **kwargs):
         self.xml_filename = kwargs['xmlfilename']
         self.gcol_filename = self.xml_filename.replace('mesh.xml','gcol')
@@ -72,14 +78,6 @@ class arbitrary_primitive(object):
             with open(xml, 'r') as handle:
                 xlines = handle.readlines()
             self.xml_representation = '\n'.join(xlines)
-            
-        #if not self.modified:
-        #    #print 'this one was not modified'
-        #    xml = os.path.join(mpdir, 
-        #        'primitive_data', self.xml_filename)
-        #    with open(xml, 'r') as handle:
-        #        xlines = handle.readlines()
-        #    is_new = False
 
         if self.xml_representation in xml_library.keys():
             xfile,gcol,gfx,col = xml_library[self.xml_representation]
@@ -88,6 +86,7 @@ class arbitrary_primitive(object):
             self.gfxmesh_name = gfx
             self.colmesh_name = col
             is_new = False
+            print 'reusing an xml rep!', xfile
 
         else:
             #xlines, xfile = xml_from_primitive_data(self)
@@ -100,14 +99,41 @@ class arbitrary_primitive(object):
             self.colmesh_name = col
             xml_library[self.xml_representation] = (xfile,gcol,gfx,col)
             is_new = True
+            print 'new xml rep!', xfile
         return xlines, is_new
 
     def translate(self, vect):
         self.coords = fu.translate_coords(self.coords, vect)
         self.modified = True
 
+    def scale_uvs(self, vect):
+        x_hat = [1,0,0]
+        y_hat = [0,1,0]
+        z_hat = [0,0,1]
+        hats = [x_hat,y_hat,z_hat]
+        if vect == [1,1,1]: return
+        for vdx in range(len(self.coords)):
+            uv = self.uv_coords[vdx]
+            no = self.ncoords[vdx]
+            alpha = fu.angle_between(no, vect)
+            fact = fu.magnitude(vect)*sin(alpha)
+            proj = fu.cross(no,fu.normalize(fu.cross(vect,no)))
+            fu.scale_vector(proj,[fact,fact,fact])
+            b1 = fu.normalize(fu.rotate_z_coords(
+                [[no[0],no[1],0]], fu.PI/2.0)[0])
+            if fu.magnitude(b1) == 0: us,vs = vect[0],vect[1]
+            else:
+                b3 = fu.normalize(no[:])
+                b2 = fu.normalize(fu.cross(b3,b1))
+                m = matrix([b1,b2,b3]).transpose()
+                us,vs,ns = linalg.solve(m,proj)
+                us,vs,ns = abs(us),abs(vs),abs(ns)
+            uv[0] *= us
+            uv[1] *= vs
+
     def scale(self, vect):
         self.coords = fu.scale_coords(self.coords, vect)
+        if self._scale_uvs_: self.scale_uvs(vect)
         self.modified = True
 
     def rotate_z(self, ang_z):
@@ -221,6 +247,7 @@ class unit_cube(arbitrary_primitive):
         arbitrary_primitive.__init__(self, *args, **pcubedata)
         self.coords_by_face = self.find_faces()
         self.tag = '_cube_'
+        self._scale_uvs_ = True
 
     def find_faces(self):
         fronts = [v for v in self.coords if v[1] < 0.0]

@@ -132,14 +132,16 @@ if bpy:
     materials = {
         #'acolor' : create_material_solid('amat', (0.5, 0.5, 0.0), (0.5,0.5,0), 1.0), 
         #'imgtex' : create_material_image('animgtex', 'cubetexture.png'), 
-        'cubemat' : create_material_image('animgtex', 'cubetex.png'), 
+        #'cubemat' : create_material_image('animgtex', 'cubetex.png'), 
+        'cubemat' : create_material_image('animgtex', 'orangeboxtex.png'), 
         'octagonmat' : create_material_image('animgtex', 'octagontex.png'), 
             }
 else:
     materials = {
         #'acolor' : create_material_solid('amat', (0.5, 0.5, 0.0), (0.5,0.5,0), 1.0), 
         #'imgtex' : create_material_image('animgtex', 'cubetexture.png'), 
-        'cubemat' : ('animgtex', 'cubetex.png'), 
+        #'cubemat' : ('animgtex', 'cubetex.png'), 
+        'cubemat' : ('animgtex', 'orangeboxtex.png'), 
         'octagonmat' : ('animgtex', 'octagontex.png'), 
             }
 

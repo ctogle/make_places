@@ -152,9 +152,13 @@ def road_network_g():
     elem = roads.road_system(**rnarg)
     gritgeo.create_element(elem)
 
-def afloor():
+def afloor_b():
     elem = floors.floor()
     blgeo.create_element(elem)
+
+def afloor_g():
+    elem = floors.floor()
+    gritgeo.create_element(elem)
 
 def awall():
     v1,v2 = [10,10,0], [50,30,0]

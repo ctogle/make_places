@@ -24,8 +24,6 @@ class block(node):
         bth = rm.choice(self.themes)
         self._default_('theme',bth,**kwargs)
         blbc,blfc,blbl,blbw = self.bl_themes[self.theme]
-        print('theeeemes',self.bl_themes)
-        print('theeeemes',self.themes)
         self._default_('max_floor_count',blfc,**kwargs)
         self._default_('max_building_length',blbl,**kwargs)
         self._default_('max_building_width',blbw,**kwargs)

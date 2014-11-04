@@ -1,9 +1,14 @@
+import make_places.fundamental as fu
 
 
 
 
 
 import pdb, os, subprocess
+
+from math import cos
+from math import sin
+from math import tan
 
 '''#
 create_primitive should make an xml mesh, write the class def, 
@@ -21,25 +26,35 @@ world_dir = os.path.join(
     'C:\\', 'Users', 'bartl_000', 
     'Desktop', 'gritengine', 'grit_core', 
     'media', 'solemn', 'world')
-world_primitives = {}
+#world_primitives = {}
 #textdir = os.path.join(
 #    'C:\\', 'Users', 'bartl_000', 
 #    'Desktop', 'gritengine', 'grit_core', 
 #    'media', 'solemn', 'textures')
 textdir = '/solemn/textures'
-def create_prim(prim, center = False, **kwargs):
+def create_prim(prim, name = None, center = False, 
+        world_rotation = [0,0,0], rdist = 200, 
+                lodrdist = 2000, **kwargs):
     prim.origin_to_centroid()
-    create_grit_mesh(prim)
-    create_gcol(prim)
-    oname = prim.tag + get_grit_number()
+    # rotate coords backwards by world_rotation?
+    w_position = prim.position
+    w_rotation = world_rotation
+    is_new = create_grit_mesh(prim)
+    if is_new: create_gcol(prim)
+    gnum = get_grit_number(repeat = prim.is_lod)
+    if name is None: oname = prim.tag + gnum
+    else: oname = name + gnum
     mname = prim.gfxmesh_name
     cname = prim.colmesh_name
-    add_to_classes(oname, mname, cname)
-    add_to_map(oname, tuple(prim.position), oname)
+    if prim.is_lod: rdist = lodrdist
+    else: add_to_map(oname,tuple(w_position),tuple(w_rotation),oname)
+    add_to_classes(oname, mname, cname, rdist, 
+        has_lod = prim.has_lod, is_lod = prim.is_lod)
     add_to_materials(prim.materials)
 
 grit_numbers = [0]
-def get_grit_number():
+def get_grit_number(repeat = False):
+    if repeat: return str(grit_numbers[0] - 1)
     num = grit_numbers.pop(0)
     nex = num + 1
     grit_numbers.append(nex)
@@ -48,6 +63,7 @@ def get_grit_number():
 materials = {
     'cubemat' : ('animgtex', 'cubetex.png'), 
     'octagonmat' : ('animgtex', 'octagontex.png'), 
+    'ground' : ('animgtex', 'green.png'), 
         }
 def read_material_name(matline):
     if matline.startswith('material'):
@@ -57,73 +73,100 @@ def read_material_name(matline):
         matname = matline[st:en]
         return matname
 
+matlines = []
+used_mats = {}
 def add_to_materials(mats):
-    matfile = os.path.join(world_dir, 'materials.lua')
-    #texfiles = ['.'.join([ma,'png']) for ma in mats]
+    global matlines
     texfiles = [materials[ma][1] for ma in mats]
-    with open(matfile, 'r') as handle:
-        matlines = handle.readlines()
-    used_mats = [read_material_name(li) for li in matlines]
-    used_mats = [um for um in used_mats if not um is None]
+    #texfiles = ['.'.join([ma,'png']) for ma in mats]
+    #with open(matfile, 'r') as handle:
+    #    matlines = handle.readlines()
+    #used_mats = [read_material_name(li) for li in matlines]
+    #used_mats = [um for um in used_mats if not um is None]
     for tf, ma in zip(texfiles, mats):
-        if not ma in used_mats:
+        if not ma in used_mats.keys():
             margs = (ma,tf,)
             newmatlines = write_material(*margs)
             matlines += newmatlines
+            used_mats[ma] = newmatlines
+    #with open(matfile, 'w') as handle:
+    #    [handle.write(li) for li in matlines]
+
+def output_mats():
+    matfile = os.path.join(world_dir, 'materials.lua')
     with open(matfile, 'w') as handle:
-        [handle.write(li) for li in matlines]
+        handle.write(''.join(matlines))
 
 def write_material(matname, textfile):
     lines = ['\nmaterial "' + matname + '" {diffuseMap = "' + textdir + '/' + textfile + '"}\n']
     return lines
 
-def read_class_name(cline):
-    if cline.startswith('class'):
-        st = cline.find('"') + 1
-        cline = cline.replace('"','@',1)
-        en = cline.find('"')
-        cname = cline[st:en]
-        return cname
+classlines = []
+used_classes = {}
+def add_to_classes(clname,gmesh,cmesh,rd,
+        is_lod = False,has_lod = False):
+    global classlines
+    if clname in used_classes.keys() and not is_lod:
+        #clname += get_grit_number()
+        print 'clname should be made unique:', clname
+    clargs = (clname,gmesh,cmesh,rd,has_lod)
+    if is_lod: newclasslines = write_lod_class(*clargs)
+    else: newclasslines = write_class(*clargs)
+    classlines += newclasslines
+    used_classes[clname] = newclasslines
+    #else: print 'clname in used classes already:', clname
 
-def add_to_classes(clname,gmesh,cmesh):
+def output_classes():
     classfile = os.path.join(world_dir, 'classes.lua')
-    with open(classfile, 'r') as handle:
-        classlines = handle.readlines()
-    used_classes = [read_class_name(li) for li in classlines]
-    used_classes = [cl for cl in used_classes if not cl is None]
-    if not clname in used_classes:
-        clargs = (clname,gmesh,cmesh,)
-        newclasslines = write_class(*clargs)
-        classlines += newclasslines
     with open(classfile, 'w') as handle:
-        [handle.write(li) for li in classlines]
+        handle.write(''.join(classlines))
 
-def write_class(clname, gmesh, cmesh):
-    rd = 1000.0
+def write_class(clname, gmesh, cmesh, rd, lod):
+    lod = 'true' if lod else 'false'
     lines = [
         '\nclass "' + clname + '" (ColClass) {\n', 
         '    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
         '    colMesh = \'/solemn/world/' + cmesh + '\';\n'
-        '    renderingDistance = '+str(rd)+';\n', 
+        '    renderingDistance = ' + str(rd) + ';\n', 
         '    castShadows = true;\n',  
+        '    lod = ' + lod + ';\n',  
         '    receiveShadows = true;\n',  
         '    placementZOffset = false;\n',  
         '    placementRandomRotation = false;\n', 
         '}\n']
     return lines
 
-def add_to_map(obj,loc,name):
-    mapfile = os.path.join(world_dir, 'map.lua')
-    with open(mapfile, 'r') as handle:
-        maplines = handle.readlines()
-    mapargs = (obj,loc,name,)
+def write_lod_class(clname, gmesh, cmesh, rd, lod):
+    lodclname = 'lod_' + clname
+    lines = [
+        '\nclass "'+ lodclname + '" (BaseClass) {\n',
+        '    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
+        '    castShadows = false;\n', 
+        '    renderingDistance = ' + str(rd) + ';\n',
+        '}\n']
+    return lines
+
+maplines = []
+def add_to_map(obj,loc,rot,name):
+    global maplines
+    mapargs = (obj,loc,rot,name,)
     newmaplines = write_map_lines(*mapargs)
     maplines += newmaplines
-    with open(mapfile, 'w') as handle:
-        [handle.write(li) for li in maplines]
 
-def write_map_lines(obj, location, name):
-    lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat(1.0, 0.0, 0.0, 0.0), name="' + name + '" }\n']
+def output_map():
+    mapfile = os.path.join(world_dir, 'map.lua')
+    with open(mapfile, 'w') as handle:
+        handle.write(''.join(maplines))
+
+def write_map_lines(obj, location, rotation, name):
+    #print 'final world rotation!', rotation
+    zang = rotation[2]
+    #zang = fu.PI/2.0
+    #zang = 0
+    quat = (cos(zang/2.0),0,0,sin(zang/2.0))
+    #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat(1.0, 0.0, 0.0, 0.0), name="' + name + '" }\n']
+    lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
+    #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=euler' + rotation.__repr__() + ', name="' + name + '" }\n']
     return lines
 
 executable_suffix = '.exe'
@@ -138,12 +181,14 @@ def create_grit_mesh(prim, tangents = False,
             converterpath = os.path.join(world_dir, 
                 'OgreXMLConverter' + executable_suffix)
             args = [converterpath, "-e"]
+            args.append("-q")
             if tangents:
                 args.append("-t")
                 args.append("-ts")
                 args.append("4")
             args.append(xdir)
             subprocess.call(args)
+    return is_new
 
 def create_gcol(prim):
     filename = os.path.join(world_dir, prim.gcol_filename)
@@ -189,6 +234,45 @@ def create_gcol(prim):
     with open(gfile,'w') as handle:
         [handle.write(gli) for gli in glines]
 
+def reset_world_scripts():
+    global classlines, used_classes, maplines, used_mats, matlines
+    used_classes = {}
+    used_mats = {}
+
+    world_start = [
+        '\ninclude "materials.lua"\n', 
+        'include "classes.lua"\n\n']
+    maplines = world_start
+
+    mapfile = os.path.join(world_dir, 'map.lua')
+    with open(mapfile, 'w') as handle:
+        [handle.write(li) for li in world_start]
+
+    class_start = ['\n', '\n']
+    classlines = class_start
+    classfile = os.path.join(world_dir, 'classes.lua')
+    with open(classfile, 'w') as handle:
+        [handle.write(li) for li in class_start]
+
+    matfile = os.path.join(world_dir, 'materials.lua')
+    mats_start = ['\n']
+    with open(matfile, 'r') as handle:
+        for li in handle.readlines():
+            if not li.strip == '':
+                newmat = read_material_name(li)
+                if not newmat in used_mats.keys():
+                    used_mats[newmat] = li.replace('\n','')
+                    mats_start.append(li)
+    mats_start.append('\n')
+    matlines = mats_start
+    with open(matfile, 'w') as handle:
+        [handle.write(li) for li in mats_start]
+
+def output_world_scripts():
+    output_classes()
+    output_map()
+    output_mats()
+
 def create_element(*args):
     for ag in args:
         if not type(ag) is type([]): create_elem(ag)
@@ -198,24 +282,7 @@ def create_elem(elem, center = True):
     import make_places.scenegraph as sg
     sgr = sg.sgraph(nodes = [elem])
     sgr.make_scene_g(center = center)
-
-
-    return
-    eelems = elem.children
-    eprims = elem.primitives
-    pos = elem.position
-    scl = elem.scales
-    rot = elem.rotation
-    for ee in eelems:
-        ee.scale(scl)
-        ee.rotate_z(rot)
-        ee.translate(pos)
-        create_elem(ee)
-    for ep in eprims:
-        ep.scale(scl)
-        ep.rotate_z(rot[2])
-        ep.translate(pos)
-        create_prim(ep)
+    print 'creating node', elem
 
 
 

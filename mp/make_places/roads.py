@@ -1,11 +1,15 @@
 import make_places.fundamental as fu
+import make_places.primitives as pr
 #from make_places.fundamental import element
 from make_places.scenegraph import node
 from make_places.floors import floor
+from make_places.primitives import arbitrary_primitive
 from make_places.primitives import ucube
 from make_places.primitives import uoctagon
 #from make_places.primitives import unit_cube
+import make_places.pkler as pk
 
+import os, pdb
 import numpy as np
 import random as rm
 from math import sqrt
@@ -25,71 +29,149 @@ cardinal_norms = [
     [0,-1,0],fu.normalize([-1,-1,0]), 
     [-1,0,0],fu.normalize([-1,1,0])]
 
+class truck_primitive(arbitrary_primitive):
+    truckxml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml')
+
+    def __init__(self, *args, **kwargs):
+        ptruckdata = pr.primitive_data_from_xml(self.truckxml)
+        arbitrary_primitive.__init__(self, *args, **ptruckdata)
+        self.tag = '_truck_'
+        self._scale_uvs_ = False
+
+class truck(node):
+
+    def __init__(self, *args, **kwargs):
+        self.primitives = [truck_primitive()]
+        node.__init__(self, *args, **kwargs)
+
+clip_length = 25
 class intersection(node):
 
     def __init__(self, *args, **kwargs):
-        kweys = kwargs.keys()
-        if 'road_width' in kweys: rw = kwargs['road_width']
-        else: rw = 20
-        self.road_width = rw
-        if 'road_height' in kweys: rh = kwargs['road_height']
-        else: rh = 2
-        self.road_height = rh
-        segs = self.make_segments(*args, **kwargs)
-        kwargs['primitives'] = segs
+        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self._default_('road_width',20,**kwargs)
+        self._default_('road_height',2,**kwargs)
+        self.primitives = self.make_segments(*args, **kwargs)
+        self.children = self.place_vehicles()
         node.__init__(self, *args, **kwargs)
+
+    def find_corners(self):
+        v1 = [ clip_length, clip_length*tan(fu.to_rad(22.5)),0]
+        v2 = [ clip_length,-clip_length*tan(fu.to_rad(22.5)),0]
+        v3 = [-clip_length, clip_length*tan(fu.to_rad(22.5)),0]
+        v4 = [-clip_length,-clip_length*tan(fu.to_rad(22.5)),0]
+        v5 = [ clip_length*tan(fu.to_rad(22.5)), clip_length,0]
+        v6 = [-clip_length*tan(fu.to_rad(22.5)), clip_length,0]
+        v7 = [ clip_length*tan(fu.to_rad(22.5)),-clip_length,0]
+        v8 = [-clip_length*tan(fu.to_rad(22.5)),-clip_length,0]
+        corners = [v1, v2, v3, v4, v5, v6, v7, v8]
+        return corners
+
+    def terrain_points(self):
+        # i need the location of the octagon verts!
+        #rh2 = self.road_height/2.0
+        rh2 = 0.5
+        corners = self.find_corners()
+        corners = fu.dice_edges(corners, dices = 1)
+        position = self.tform.true().position
+        x,y,z = position
+        fu.translate_coords(corners,[x,y,z-rh2])
+        return corners
+
+    def place_vehicles(self, cnt = 2):
+        rotz1 = rm.randrange(12) * fu.to_rad(30.0)
+        rotz2 = rm.randrange(12) * fu.to_rad(30.0)
+        rotz3 = rm.randrange(12) * fu.to_rad(30.0)
+        trargs1 = {
+            'position':[0,0,0], 
+            'rotation':[0,0,rotz1], 
+            'parent':self, 
+                }
+        trargs2 = {
+            'position':[10,10,0], 
+            'rotation':[0,0,rotz2], 
+            'parent':self, 
+                }
+        trargs3 = {
+            'position':[-10,-10,0], 
+            'rotation':[0,0,rotz3], 
+            'parent':self, 
+                }
+        trk1 = truck(**trargs1)
+        trk2 = truck(**trargs2)
+        trk3 = truck(**trargs3)
+        return [trk1,trk2,trk3]
 
     def make_segments(self, *args, **kwargs):
         segs = []
-        rw = self.road_width
+        #rw = self.road_width
         rh = self.road_height
+        octang = 22.5
+        clipln = clip_length
+        octscl = clipln / cos(fu.to_rad(octang))
         uo = uoctagon()
-        uo.scale([rw,rw,rh])
+        uo.scale([octscl,octscl,rh])
+        uo.translate([0,0,-rh])
         segs.append(uo)
         return segs
         
     def get_bbox(self):
-        corners = [[0,0,0],[50,0,0],[50,50,0],[0,50,0]]
+        corners = self.find_corners()
+        #corners = [[0,0,0],[50,0,0],[50,50,0],[0,50,0]]
         #fu.rotate_z_coords(corners,theta)
         position = self.tform.true().position
         x,y,z = position
-        fu.translate_coords(corners,[x-25,y-25,z])
-        bboxes = [fu.bbox(position = position, 
-            corners = corners)]
+        fu.translate_coords(corners,[x,y,z])
+        bboxes = [fu.bbox(corners = corners)]
         return bboxes
 
 class road(node):
     def __init__(self, *args, **kwargs):
-        kweys = kwargs.keys()
-        if 'road_width' in kweys: rw = kwargs['road_width']
-        else: rw = 10
-        self.road_width = rw
-        if 'road_height' in kweys: rh = kwargs['road_height']
-        else: rh = 2
-        self.road_height = rh
-        self.clip_length = 25
+        self._default_('grit_renderingdistance',500,**kwargs)
+        self._default_('grit_lod_renderingdistance',2000,**kwargs)
+        self._default_('road_width', 10, **kwargs)
+        self._default_('road_height', 2, **kwargs)
+        self.clip_length = clip_length
         self.set_segmented_vertices(*args, **kwargs)
         segs = self.make_segments(*args, **kwargs)
-        kwargs['primitives'] = segs
+        self.primitives = segs
         node.__init__(self, *args, **kwargs)
 
+    def terrain_points(self):
+        tpts = []
+        verts = self.segmented_vertices
+        vcnt = len(verts)
+        for sgdx in range(1,vcnt):
+            p1,p2 = verts[sgdx-1],verts[sgdx]
+            tcorns = fu.translate_coords(
+                self.make_corners(p1,p2),[0,0,-0.5])
+            tcorns = fu.dice_edges(tcorns, dices = 1)
+            tpts.extend(tcorns)
+        #return fu.uniq(tpts)
+        return tpts
+
+    def make_corners(self, p1, p2):
+        widt = self.road_width
+        
+        p1_p2 = fu.v1_v2(p1,p2)
+        leng = fu.magnitude(p1_p2)
+        p1_p2 = fu.normalize(p1_p2)
+        
+        ang_z = fu.angle_from_xaxis(p1_p2)
+        corns = [[0,0,0],[leng,0,0],[leng,widt,0],[0,widt,0]]
+        fu.translate_coords(corns,[0,-widt/2.0,0])
+        fu.rotate_z_coords(corns,ang_z)
+        fu.translate_coords(corns,p1)
+        fu.translate_coords(corns[1:3],[0,0,p2[2]-p1[2]])
+        return corns
+
     def get_bbox(self):
-        def make_corners(p1, p2):
-            widt = self.road_width
-            leng = fu.distance(p1,p2)
-            p1_p2 = fu.normalize(fu.v1_v2(p1,p2))
-            ang_z = fu.angle_from_xaxis(p1_p2)
-            corns = [[0,0,0],[leng,0,0],[leng,widt,0],[0,widt,0]]
-            fu.translate_coords(corns,[0,-widt/2.0,0])
-            fu.rotate_z_coords(corns,ang_z)
-            fu.translate_coords(corns,p1)
-            return corns
         verts = self.segmented_vertices
         bboxes = []
         vcnt = len(verts)
         for sgdx in range(1,vcnt):            
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            corns = make_corners(p1,p2)
+            corns = self.make_corners(p1,p2)
             bboxes.append(fu.bbox(corners = corns))
         return bboxes
 
@@ -315,27 +397,71 @@ def spline_4p( t, p_1, p0, p1, p2 ):
 
 class road_system(node):
     def __init__(self, *args, **kwargs):
-        try: self.linkmin = kwargs['linkmin']
-        except KeyError: self.linkmin = 200
-        try: self.linkmax = kwargs['linkmax']
-        except KeyError: self.linkmax = 400
-        try: self.angs = kwargs['linkangles']
-        except KeyError: self.angs = [90*x for x in range(4)]
-        try: self.growth_tips = kwargs['growth_tips']
-        except KeyError: self.growth_tips = 5
+        self._default_('name','road_system',**kwargs)
+        self._default_('reuse',False,**kwargs)
+        self._default_('linkmin', 200, **kwargs)
+        self._default_('linkmax', 400, **kwargs)
+        self._default_('linkangles', 
+            [90*x for x in range(4)], **kwargs)
+        self._default_('growth_tips', 5, **kwargs)
         try: self.region_bounds = kwargs['region_bounds']
         except KeyError: self.region_bounds = [(0,1000),(0,1000)]
         try: self.seeds = kwargs['seeds']
         except KeyError: self.seeds = [[0,0,0],[1000,1000,0]]
         try: self.intercnt = kwargs['intersection_count']
         except KeyError: self.intercnt = 20
+        rwidth = 2*clip_length*tan(fu.to_rad(22.5))
+        self._default_('road_width', rwidth, **kwargs)
+        #kwargs['road_width'] = rwidth
+        children = self.reusing(*args, **kwargs)
+        if not children:children = self.children_from_kwargs(*args,**kwargs)
+        self.children = children
+        node.__init__(self, *args, **kwargs)
+
+    def children_from_kwargs(self, *args, **kwargs):
+        rwidth = self.road_width
         if 'interargs' in kwargs.keys():
             interargs = kwargs['interargs']
-            kwargs['children'] =\
-                self.make_system_from_intersections(interargs)
-        else:kwargs['children'] = self.make_primitives_web(*args, **kwargs)
-        #kwargs['materials'] = ['imgtex']
-        node.__init__(self, *args, **kwargs)
+            children = self.make_system_from_intersections(interargs,rwidth)
+        else: children = self.make_primitives_web(*args, **kwargs)
+        return children
+
+    # will be class specific
+    def children_from_reuse_file(self, info_file_name):
+        info_file_name = os.path.join(os.getcwd(),info_file_name)
+        self.reuse_data = pk.load_pkl(info_file_name)
+        #self.reuse_data = {'rargs':[],'iargs':[],'topology':None}
+        elements = []
+        self.roads = []
+        for ig in self.reuse_data['iargs']:
+            elements.append(intersection(**ig))
+        for rarg in self.reuse_data['rargs']:
+            newrd = road(**rarg)
+            self.roads.append(newrd)
+            elements.append(newrd)
+        self.topology = self.reuse_data['topology']
+        return elements
+
+    def output_reuse_file(self, info_file_name):
+        info_file_name = os.path.join(os.getcwd(),info_file_name)
+        pk.save_pkl(self.reuse_data, info_file_name)
+
+    def reusing(self, *args, **kwargs):
+        if not self.reuse or not self.name: return
+        info_file_name = '.'.join([self.name,'reusable','data','pkl'])
+        if not pk.file_exists(info_file_name):
+            chds = self.children_from_kwargs(*args, **kwargs)
+            self.output_reuse_file(info_file_name)
+            return chds
+        else:
+            chds = self.children_from_reuse_file(info_file_name)
+            return chds
+
+    def terrain_points(self):
+        #pts = [ch.tform.true().position for ch in self.children]
+        pts = []
+        [pts.extend(ch.terrain_points()) for ch in self.children]
+        return pts
 
     def make_primitives_web(self, *args, **kwargs):
         def good_dir(tip, ang):
@@ -343,8 +469,8 @@ class road_system(node):
             #link = rm.randrange(linkmin,linkmax)
             tippos = tip['position'][:]
             angrad = (np.pi/180.0)*ang
-            z_off_min = -50
-            z_off_max =  50
+            z_off_min = -25
+            z_off_max =  25
             z_offset = rm.randrange(z_off_min, z_off_max)
             offset = [link*cos(angrad),link*sin(angrad),z_offset]
             newtip = fu.translate_vector(tippos, offset)
@@ -383,7 +509,7 @@ class road_system(node):
         region_bounds = self.region_bounds
         linkmin, linkmax = self.linkmin,self.linkmax
         seeds = self.seeds
-        angs = self.angs
+        angs = self.linkangles
         intercnt = self.intercnt
         seedcnt = len(seeds)
         branches = []
@@ -404,9 +530,11 @@ class road_system(node):
                         })
                 branches[bdx].append(interargs[-1])
             else: print('cant place intersection!!')
-        return self.make_system_from_intersections(interargs)
+        #rwidth = kwargs['road_width']
+        rwidth = self.road_width
+        return self.make_system_from_intersections(interargs, rwidth)
 
-    def make_system_from_intersections(self, interargs):
+    def make_system_from_intersections(self, interargs, rwidth):
         elements = []
         topology = [{} for inter in interargs]
         for inter, topo in zip(interargs, topology):
@@ -416,16 +544,19 @@ class road_system(node):
             topo['roads'] = []
             topo['linkcnt'] = 0
 
+        self.reuse_data = {'rargs':[],'iargs':[],'topology':None}
         self.roads = []
         for tdx, topo in enumerate(topology):
-            topology[tdx] = find_neighbors(topology,topo)
+            topology[tdx] = find_neighbors(topology,topo,rwidth)
         rdbbs = []
         for tdx, topo in enumerate(topology):
             inter = topo['inter']
             inter['topology'] = topology
             inter['topodex'] = tdx
+            self.reuse_data['iargs'].append(inter)
             elements.append(intersection(**inter))
             for rarg in topo['roads']:
+                self.reuse_data['rargs'].append(rarg)
                 newrd = road(**rarg)
                 newbb = newrd.get_bbox()
                 if not fu.bbox.intersects(newbb[0],rdbbs,newbb):
@@ -435,6 +566,7 @@ class road_system(node):
                 else:
                     print('topology mistake from road intersection!')
         self.topology = topology
+        self.reuse_data['topology'] = topology
         return elements
 
     def make_primitives_from_blocks(self, *args, **kwargs):
@@ -634,7 +766,7 @@ neighbor_checks = {
     'south' : south_check, 
     'west' : west_check, 
         }
-def find_neighbors(topology,topo):
+def find_neighbors(topology,topo,rwidth):
     topoid = [t is topo for t in topology].index(True)
     seek_fov = 60
     maxlinks = 4
@@ -653,6 +785,7 @@ def find_neighbors(topology,topo):
             neighb[neighbdir] = topoid
             neighb['linkcnt'] += 1
             topo['roads'].append({
+                'road_width' : rwidth, 
                 'topology' : topology, 
                 'directions' : (card,neighbdir), 
                 'nodes' : (topoid,topodx)})

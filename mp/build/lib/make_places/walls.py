@@ -79,9 +79,11 @@ class wall(node):
 class perimeter(node):
 
     def __init__(self, *args, **kwargs):
+        self._default_('wall_offset',0,**kwargs)
         self._default_('floor',None,**kwargs)
         if self.floor: corns = self.floor.corners
         else: corns = kwargs['corners']
+        corns = self.add_corner_offset(corns)
         self._default_('corners',corns,**kwargs)
         self._default_('wall_width', 0.4, **kwargs)
         self._default_('wall_height', 4, **kwargs)
@@ -93,6 +95,18 @@ class perimeter(node):
             self.corners,gapes = self.gapes,
                 gaps = self.wall_gaps), **kwargs)
         node.__init__(self, *args, **kwargs)
+
+    def add_corner_offset(self, cns):
+        off = -self.wall_offset
+        cns[0][0] += off
+        cns[0][1] += off
+        cns[1][0] -= off
+        cns[1][1] += off
+        cns[2][0] -= off
+        cns[2][1] -= off
+        cns[3][0] += off
+        cns[3][1] -= off
+        return cns
 
     def make_walls(self, corners, 
             gapes = [True,True,False,False], 

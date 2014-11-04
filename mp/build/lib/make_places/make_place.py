@@ -6,6 +6,7 @@ import make_places.buildings as blg
 import make_places.roads as roads
 import make_places.floors as floors
 import make_places.walls as walls
+import make_places.terrain as terr
 import make_places.profiler as prf
 
 import make_places.blend_in as blgeo
@@ -86,6 +87,7 @@ def intersection_b():
     blgeo.create_element(elem)
 
 def intersection_g():
+    gritgeo.reset_world_scripts()
     iarg = {
         'position':[10,10,0], 
         'road_width':30, 
@@ -93,6 +95,7 @@ def intersection_g():
             }
     elem = roads.intersection(**iarg)
     gritgeo.create_element(elem)
+    gritgeo.output_world_scripts()
 
 def road_b():
     rarg = {
@@ -148,9 +151,44 @@ def road_network_b():
     blgeo.create_element(elem)
 
 def road_network_g():
+    gritgeo.reset_world_scripts()
     rnarg = {}
     elem = roads.road_system(**rnarg)
     gritgeo.create_element(elem)
+    gritgeo.output_world_scripts()
+
+def road_network_terrain_g():
+    gritgeo.reset_world_scripts()
+    iargs = [{
+        'position':[0,0,0], 
+            }, {
+        'position':[300,300,-10], 
+            }, {
+        'position':[150,300,20], 
+            }, {
+        'position':[150,450,-10], 
+            }, {
+        'position':[300,100,10], 
+            }]
+    rnarg = {
+        'interargs':iargs, 
+        'reuse':True, 
+            }
+    rsys = roads.road_system(**rnarg)
+    trarg = {
+        'splits':8,
+        'smooths':5,
+        'pts_of_interest':rsys.terrain_points(), 
+        #'pts_of_interest':[], 
+        'region_bounds':rsys.region_bounds, 
+            }
+    terra = terr.terrain(**trarg)
+    gritgeo.create_element(rsys,terra)
+    #gritgeo.create_element(terra)
+    gritgeo.output_world_scripts()
+
+def profile_road_network_terrain_g():
+    prf.profile_function(road_network_terrain_g)
 
 def afloor_b():
     elem = floors.floor()
@@ -186,9 +224,15 @@ def someshafts():
     sh2 = blg.shaft(position = [10,0,0], direction = 'east')
     blgeo.create_element(sh1,sh2)
 
-def build():
+def build_b():
     built = blg.building()
     blgeo.create_element(built)
+
+def build_g():
+    gritgeo.reset_world_scripts()
+    built = blg.building()
+    gritgeo.create_element(built)
+    gritgeo.output_world_scripts()
 
 def buildfew_b():
     ang = np.pi/24
@@ -202,6 +246,7 @@ def buildfew_b():
     blgeo.create_element(built)
 
 def buildfew_g():
+    gritgeo.reset_world_scripts()
     ang = np.pi/6
     bargs = [{
         'position':[10,50,10], 
@@ -211,6 +256,7 @@ def buildfew_g():
             }]
     built = [blg.building(**ba) for ba in bargs]
     gritgeo.create_element(built)
+    gritgeo.output_world_scripts()
 
 def profile_buildfew_g():
     prf.profile_function(buildfew_g)
@@ -243,6 +289,7 @@ def block_b():
     blgeo.create_element(rsys,bl1,bl2)
 
 def block_g():
+    gritgeo.reset_world_scripts()
     iargs = [{
         'position':[0,0,0], 
             }, {
@@ -256,9 +303,11 @@ def block_g():
     rsys = roads.road_system(**rsargs)
     rd = rsys.roads[1]
     b1 = {
+        'name':'block1',
         'road':rd, 
         'bboxes':rd.get_bbox(),
         'side':'right',
+        #'reuse':True,
             }
     b2 = {
         'road':rd, 
@@ -267,7 +316,14 @@ def block_g():
             }
     bl1 = cities.block(**b1)
     bl2 = cities.block(**b2)
-    gritgeo.create_element(rsys,bl1,bl2)
+    pts_of_int =\
+        rsys.terrain_points() +\
+        bl1.terrain_points() +\
+        bl2.terrain_points() +\
+        [[150,150,25]]
+    ter = terr.terrain(pts_of_interest = pts_of_int)
+    gritgeo.create_element(rsys,bl1,bl2,ter)
+    gritgeo.output_world_scripts()
 
 def profile_block_b():
     prf.profile_function(block_b)
@@ -280,14 +336,34 @@ def city_b():
     blgeo.create_element(elem)
 
 def city_g():
+    gritgeo.reset_world_scripts()
     elem = cities.city()
     gritgeo.create_element(elem)
+    gritgeo.output_world_scripts()
 
 def profile_city_b():
     prf.profile_function(city_b)
 
 def profile_city_g():
     prf.profile_function(city_g)
+
+def add_prims_g():
+    gritgeo.reset_world_scripts()
+    p1 = pr.ucube()
+    p1.translate([1,1,0])
+    p2 = pr.ucube()
+    p2.translate([-1,-1,0])
+    p3 = p1 + p2
+    gritgeo.create_primitive(p3)
+    gritgeo.output_world_scripts()
+
+def terrain_g():
+    gritgeo.reset_world_scripts()
+    ter = terr.terrain()
+    gritgeo.create_element(ter)
+    gritgeo.output_world_scripts()
+
+
 
 
 

@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+from make_places.fundamental import base
 import make_places.primitives as pr
 import make_places.blend_in as blgeo
 import make_places.gritty as gritgeo
@@ -9,14 +10,6 @@ import numpy as np
 
 
 
-
-class base(object):
-    def _default_(self, *args, **kwargs):
-        key = args[0]
-        init = args[1]
-        if key in kwargs.keys():init = kwargs[key]
-        if not key in self.__dict__.keys():
-            self.__dict__[key] = init
 
 class tform(base):
     def true(self):
@@ -93,32 +86,94 @@ class node(base):
             ch.tform.parent = self.tform
             self.children.append(ch)
 
+    def worldly_primitive(self, prim, ttf, **kwargs):
+        tpm = dcopy(prim)
+        tpm.scale(ttf.scales)
+        #tpm.rotate_z(ttf.rotation[2])
+        #kwargs['world_rotation'] = ttf.rotation
+        kwargs['world_rotation'] = [0,0,ttf.rotation[2]]
+        kwargs['name'] = self.name
+        kwargs['rdist'] = self.grit_renderingdistance
+        kwargs['lodrdist'] = self.grit_lod_renderingdistance
+        tpm.translate(ttf.position)
+        return tpm, kwargs
+
+    def worldly_children(self, **kwargs):
+        ttf = self.tform.true()
+        newpms = []
+        for pm in self.primitives:
+            tpm, kwargs = self.worldly_primitive(pm, ttf, **kwargs)
+            newpms.append(tpm)
+        for ch in self.children:
+            chpms = ch.worldly_children()
+            newpms.extend(chpms)
+        return newpms
+
+    def lod_worldly_children(self, **kwargs):
+        ttf = self.tform.true()
+        newpms = []
+        for pm in self.lod_primitives:
+            tpm, kwargs = self.worldly_primitive(pm, ttf, **kwargs)
+            newpms.append(tpm)
+        for ch in self.children:
+            chpms = ch.lod_worldly_children()
+            newpms.extend(chpms)
+        return newpms
+
+    def consume_children(self):
+        newpms = []
+        newlodpms = []
+        for ch in self.children:
+            old_rent = self.tform.parent
+            old_pos = self.tform.position
+            self.tform.parent = None
+            self.tform.position = [0,0,0]
+            newpms.extend(self.worldly_children())
+            newlodpms.extend(self.lod_worldly_children())
+            self.tform.parent = old_rent
+            self.tform.position = old_pos
+        self.primitives.extend(newpms)
+        if self.primitives:
+            final_prim = pr.sum_primitives(self.primitives)
+            self.primitives = [final_prim]
+        self.lod_primitives.extend(newlodpms)
+        if self.lod_primitives:
+            lod_final_prim = pr.sum_primitives(self.lod_primitives)
+            self.lod_primitives = [lod_final_prim]
+            if self.primitives: self.primitives[0].has_lod = True
+
+    def terrain_points(self):
+        return []
+
+    #if your xy position matches that of your parent, you can inherit your parents rotation in lua safely
     def __init__(self, *args, **kwargs):
+        self._default_('name',None,**kwargs)
+        self._default_('grit_renderingdistance',250,**kwargs)
+        self._default_('grit_lod_renderingdistance',2500,**kwargs)
+        self._default_('consumes_children',False,**kwargs)
         self._default_('children',[],**kwargs)
         self._default_('primitives',[],**kwargs)
+        self._default_('lod_primitives',[],**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
 
-    def make_b(self, *args, **kwargs):
+    def make_primitives_in_scene(self, scene_type, **kwargs):
         ttf = self.tform.true()
         for pm in self.primitives:
-            tpm = dcopy(pm)
-            tpm.scale(ttf.scales)
-            tpm.rotate_z(ttf.rotation[2])
-            tpm.translate(ttf.position)
-            blgeo.create_primitive(tpm, **kwargs)
-        for ch in self.children:
-            ch.make_b(*args, **kwargs)
+            tpm, kwargs = self.worldly_primitive(pm, ttf)
+            scene_type.create_primitive(tpm, **kwargs)
+        for pm in self.lod_primitives:
+            tpm, kwargs = self.worldly_primitive(pm, ttf)
+            tpm.is_lod = True
+            scene_type.create_primitive(tpm, **kwargs)
+
+    def make_b(self, *args, **kwargs):
+        for ch in self.children: ch.make_b(*args, **kwargs)
+        self.make_primitives_in_scene(blgeo)
 
     def make_g(self, *args, **kwargs):
-        ttf = self.tform.true()
-        for pm in self.primitives:
-            tpm = dcopy(pm)
-            tpm.scale(ttf.scales)
-            tpm.rotate_z(ttf.rotation[2])
-            tpm.translate(ttf.position)
-            gritgeo.create_primitive(tpm, **kwargs)
-        for ch in self.children:
-            ch.make_g(*args, **kwargs)
+        if self.consumes_children: self.consume_children()
+        else: [ch.make_g(*args, **kwargs) for ch in self.children]
+        self.make_primitives_in_scene(gritgeo)
 
 
 

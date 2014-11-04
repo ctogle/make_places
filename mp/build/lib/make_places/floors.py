@@ -10,11 +10,11 @@ class floor(node):
         #self._default_('tform',tform(),**kwargs)
         self._default_('length',20,**kwargs)
         self._default_('width',20,**kwargs)
-        self._default_('height',1,**kwargs)
+        self._default_('floor_height',1,**kwargs)
         self._default_('gaps',[],**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self.primitives = self.make_primitives([0,0,0],
-            self.length,self.width,self.height,self.gaps)
+            self.length,self.width,self.floor_height,self.gaps)
         node.__init__(self, *args, **kwargs)
 
     def find_corners(self, pos, length, width):

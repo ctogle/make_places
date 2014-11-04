@@ -1,6 +1,7 @@
 #from make_places.fundamental import element
 from make_places.scenegraph import node
 import make_places.fundamental as fu
+import make_places.primitives as pr
 from make_places.stairs import ramp
 from make_places.stairs import shaft
 from make_places.floors import floor
@@ -12,6 +13,9 @@ class story(node):
     def __init__(self, *args, **kwargs):
         self.floor_number = args[0]
         self._default_('shafts',[],**kwargs)
+        self._default_('consumes_children',True,**kwargs)
+        self._default_('grit_renderingdistance',100,**kwargs)
+        self._default_('grit_lod_renderingdistance',1000,**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('length',20,**kwargs)
         self._default_('width',20,**kwargs)
@@ -19,11 +23,31 @@ class story(node):
         self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
         self._default_('ext_gaped',True,**kwargs)
-        self.floor_ = self.make_floor(*args, **kwargs)
+        self.children = self.make_children(*args, **kwargs)
+        self.lod_primitives = self.make_lod(*args, **kwargs)
+        node.__init__(self, *args, **kwargs)
+
+    def make_lod(self, *args, **kwargs):
+        lod = pr.ucube()
+        l,w = self.length,self.width
+        h = self.wall_height + self.floor_height
+        fl = self.floor_[0]
+        zrot = 0
+        pos = fl.tform.position
+        lod.scale([l,w,h])
+        lod.rotate_z(zrot)
+        lod.translate(pos)
+        lod.is_lod = True
+
+        self.children[0].primitives[0].has_lod = True
+
+        return [lod]
+
+    def make_children(self, *args, **kwargs):
+        floor_ = self.make_floor(*args, **kwargs)
         ext_walls = self.make_exterior_walls(*args, **kwargs)
         #int_walls = self.make_interior_walls(*args, **kwargs)
-        self.children = self.floor_ + ext_walls #+ int_walls
-        node.__init__(self, *args, **kwargs)
+        return floor_ + ext_walls #+ int_walls
 
     def make_floor(self, *args, **kwargs):
         gaps = []
@@ -40,6 +64,7 @@ class story(node):
             'parent':self, 
                 }
         floor_ = floor(**flargs)
+        self.floor_ = [floor_]
         return [floor_]
 
     def make_exterior_walls(self, *args, **kwargs):
@@ -52,6 +77,7 @@ class story(node):
             #'gaped':True, 
             'wall_height':self.wall_height, 
             'wall_width':self.wall_width, 
+            'wall_offset':-self.wall_width/2.0, 
                 } for fl in floor_pieces]
         perims = [perimeter(**pe) for pe in peargs]
         return perims
@@ -100,12 +126,21 @@ class building(node):
         shafts = self.make_shafts(*args, **kwargs)
         self.shafts = shafts
         stories = self.make_floors_from_shafts(*args, **kwargs)
+        #foundation = self.make_foundation()
         self.children = shafts + stories
         node.__init__(self, *args, **kwargs)
+
+    def terrain_points(self):
+        tpts = self.find_corners()
+        fu.translate_coords(tpts,[0,0,-0.5])
+        tpts = fu.dice_edges(tpts, dices = 1)
+        tpts.append(fu.center_of_mass(tpts))
+        return tpts
 
     def make_shafts(self, *args, **kwargs):
         flcnt = self.floors
         if not self.roof_access: flcnt -= 1
+        if flcnt == 1: return []
         shargs = [{
             'parent':self, 
             'position':[0,0,0], 
@@ -141,8 +176,10 @@ class building(node):
         c4[1] += width/2.0
         corncoords = [c1, c2, c3, c4]
         zang = self.tform.rotation[2]
-        corncoords = fu.rotate_z_coords(corncoords,zang)
-        fu.translate_coords(corncoords,self.tform.position)
+        #corncoords = fu.rotate_z_coords(corncoords,zang)
+        fu.rotate_z_coords(corncoords,zang)
+        fu.translate_coords(corncoords,self.tform.position)#this doesnt need to be true()??!?!
+        #fu.translate_coords(corncoords,self.tform.true().position)#this doesnt need to be true()??!?!
         return [c1, c2, c3, c4]
 
     def make_floors_from_shafts(self, *args, **kwargs):
@@ -166,6 +203,7 @@ class building(node):
                 'shafts':shafts, 
                 'length':self.length, 
                 'width':self.width, 
+                'floor_height':self.floor_height, 
                 'wall_height':self.wall_height, 
                 'wall_width':ww, 
                     }
@@ -179,6 +217,7 @@ class building(node):
             'position':fl_pos, 
             'length':self.length, 
             'width':self.width, 
+            'floor_height':self.floor_height, 
             'shafts':shafts, 
             'wall_height':1, 
             'wall_width':ww, 

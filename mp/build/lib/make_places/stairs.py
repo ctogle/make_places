@@ -16,6 +16,8 @@ class ramp(floor):
 class shaft(node):
 
     def __init__(self, *args, **kwargs):
+        self._default_('grit_renderingdistance',100,**kwargs)
+        self._default_('consumes_children',True,**kwargs)
         #self.building = kwargs['building']
         #self._default_('position',[0,0,0],**kwargs)
         self._default_('length',10,**kwargs)

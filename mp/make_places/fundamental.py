@@ -7,7 +7,17 @@ from math import sqrt
 import numpy as np
 import random as rm
 
+import os, pdb
+
 PI = np.round(np.pi,8)
+
+class base(object):
+    def _default_(self, *args, **kwargs):
+        key = args[0]
+        init = args[1]
+        if key in kwargs.keys():init = kwargs[key]
+        if not key in self.__dict__.keys():
+            self.__dict__[key] = init
 
 def uniq(seq):
     ret = []
@@ -16,11 +26,15 @@ def uniq(seq):
             ret.append(sq)
     return ret
 
+def flatten(unflat_list):
+    return [item for sublist in unflat_list for item in sublist]
+
 def center_of_mass(coords):
     xs,ys,zs = zip(*coords)
-    xme = np.round(np.mean(xs),8)
-    yme = np.mean(ys)
-    zme = np.mean(zs)
+    #xme = np.round(np.mean(xs),8)
+    xme = np.mean(xs, dtype = np.float32)
+    yme = np.mean(ys, dtype = np.float32)
+    zme = np.mean(zs, dtype = np.float32)
     return [xme,yme,zme]
 
 def translate_coords(coords, vect):
@@ -67,10 +81,12 @@ def translate_vector(vect, tv):
         vect[dx] += tv[dx]
     return vect
 
+#should this happen in place?
 def normalize(vect):
     mag = magnitude(vect)
     if mag == 0: return [0,0,0]
-    return [np.round(v/mag,4) for v in vect]
+    return [v/mag for v in vect]
+    #return [np.round(v/mag,4) for v in vect]
 
 def v1_v2(v1, v2):
     v1_v2_ = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
@@ -90,6 +106,34 @@ def line_y_intersect(pt,m):
 def in_range(x, rng):
     in_ = x > min(rng) and x < max(rng)
     return in_
+
+def inside(pt, corners):
+    poly = [(c[0],c[1]) for c in corners]
+    x,y = pt[0],pt[1]
+    n = len(poly)
+    inside = False
+
+    p1x,p1y = poly[0]
+    for i in range(n+1):
+        p2x,p2y = poly[i % n]
+        if y > min(p1y,p2y):
+            if y <= max(p1y,p2y):
+                if x <= max(p1x,p2x):
+                    if p1y != p2y:
+                        xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+                    if p1x == p2x or x <= xints:
+                        inside = not inside
+        p1x,p1y = p2x,p2y
+
+    return inside
+
+###DONT TRUST THIS
+def pt_on_segment(pt,seg):
+    v1v2 = v1_v2(seg[0],pt)
+    v1v3 = v1_v2(seg[0],seg[1])
+    alpha = angle_between(v1v2,v1v3)
+    if abs(alpha) <= 0.01: return True
+    else: return False
 
 def segments_intersect(s1,s2):
     m1 = point_slope(s1[0][0],s1[1][0],s1[0][1],s1[1][1])
@@ -140,18 +184,19 @@ def distance(v1,v2):
     return magnitude(v1_v2(v1,v2))
 
 def magnitude(vect):
-    try:quad = sum([v**2 for v in vect])
-    except OverflowError:
-        print('toobig',vect)
-    return sqrt(quad)
+    return sqrt(dot(vect,vect))
 
 def cross(v1, v2):
-  return [v1[1]*v2[2]-v1[2]*v2[1], 
+  return [
+      v1[1]*v2[2]-v1[2]*v2[1], 
       v1[2]*v2[0]-v1[0]*v2[2], 
       v1[0]*v2[1]-v1[1]*v2[0]]
 
 def dot(v1, v2):
-    return sum([n*m for n, m in zip(v1, v2)])
+    xp = v1[0]*v2[0]
+    yp = v1[1]*v2[1]
+    zp = v1[2]*v2[2]
+    return xp + yp + zp
 
 def flip(v1):
     return [-1*v for v in v1]
@@ -224,11 +269,33 @@ def find_corners(pos, length, width):
     c4[1] += width
     return [c1, c2, c3, c4]
 
+def dice_edges(verts, dices = 3):
+    vcnt = len(verts)
+    for di in range(dices):
+        newpts = []
+        for tdx in range(1,vcnt):
+            pair = verts[tdx-1],verts[tdx]
+            mpt = midpoint(*pair)
+            newpts.extend([pair[0],mpt])
+        verts = newpts
+    return verts
+
 def offset_faces(faces, offset):
     for fa in faces:
         for fx in range(len(fa)):
             fa[fx] += offset
     return faces
+
+def find_closest_xy(one,bunch):
+    ds = [distance_xy(one,b) for b in bunch]
+    dx = ds.index(min(ds))
+    return bunch[dx],ds[dx],dx
+
+def find_in_radius(pt,verts,radius = 10):
+    in_ = []
+    for vt in verts:
+        if distance(pt,vt) < radius: in_.append(vt)
+    return in_
 
 class vertex(object):
     def __init__(self, pos, normal, uv):
@@ -236,79 +303,26 @@ class vertex(object):
         self.normal = normal
         self.uv = uv
 
-class element__________(object):
-
-    def _default_(self, *args, **kwargs):
-        key = args[0]
-        init = args[1]
-        if key in kwargs.keys():init = kwargs[key]
-        if not key in self.__dict__.keys():
-            self.__dict__[key] = init
-
-    def __str__(self, *args, **kwargs):
-        print('element:',self)
-        print('at:',self.position)
-        print('oriented:',self.rotation)
-        print('scaled:',self.scales)
-        print('children:',self.children)
-        print('primitives:',self.primitives)
-
+class bbox(base):
     def __init__(self, *args, **kwargs):
+        self._default_('corners',[],**kwargs)
         self._default_('position',[0,0,0],**kwargs)
-        self._default_('scales',[1,1,1],**kwargs)
-        self._default_('rotation',[0,0,0],**kwargs)
-        self._default_('name','__element__',**kwargs)
-        self._default_('primitives',[],**kwargs)
-        self._default_('children',[],**kwargs)
-        self._default_('materials',[],**kwargs)
-
-    def scale(self, vect):
-        for sdx in range(3):
-            self.scales[sdx] *= vect[sdx]
-
-    def give_rotation_z(self, ang):
-        for ee in self.children:
-            ee.give_rotation_z(ang)
-        for pr in self.primitives:
-            #pr.translate(flip(pr.position))
-            pr.rotate_z(ang)
-            #pr.translate(pr.position)
-
-    def rotate_z(self, ang):
-        #translate_vector(self.rotation, vect)
-        self.rotation[2] += ang
-
-    def translate(self, vect):
-        translate_vector(self.position, vect)
-
-    def get_bbox(self):
-        print('getbbox!', self)
-        corners = [[0,0,0],[1,0,0],[1,1,0],[0,1,0]]
-        scale_coords(corners,self.scales)
-        rotate_z_coords(corners,self.rotation[2])
-        translate_coords(corners,self.position)
-        bbox_ = bbox(position = self.position,
-            corners = corners, parent = self)
-        return bbox_
-
-class bbox(object):
-    def __init__(self, *args, **kwargs):
-        try: self.corners = kwargs['corners']
-        except KeyError:
-            x = args[0]
-            y = args[1]
-            z = args[2]
-            self.xbox = x
-            self.ybox = y
-            self.zbox = z
-            self.corners = []
+        #try: self.corners = kwargs['corners']
+        #except KeyError:
+        #    x = args[0]
+        #    y = args[1]
+        #    z = args[2]
+        #    self.xbox = x
+        #    self.ybox = y
+        #    self.zbox = z
+        #    self.corners = []
         #print('bbcorners',self.corners)
-        try: self.position = kwargs['position']
-        except KeyError: self.position = [0,0,0]
-        try: self.rotation = kwargs['rotation']
-        except KeyError: self.rotation = [0,0,0]
-        try: self.parent = kwargs['parent']
-        except KeyError: self.parent = None
+        #try: self.position = kwargs['position']
+        #except KeyError: self.position = [0,0,0]
+        #try: self.rotation = kwargs['rotation']
+        #except KeyError: self.rotation = [0,0,0]
+        #try: self.parent = kwargs['parent']
+        #except KeyError: self.parent = None
 
     def intersects(self,boxes,box):
         if not type(box) is type([]):box = [box]
@@ -319,15 +333,15 @@ class bbox(object):
                     return True
         return False
 
-def fall_inside(rng,x):
-    return rng[0] < x and rng[1] > x
+def fall_inside______________(rng,x):
+    return x > min(rng) and x < max(rng)
 
-def no_overlaps(rng1,rng2):
+def no_overlaps____________(rng1,rng2):
     if rng1[1] < rng2[0]: return True
     elif rng1[0] > rng2[1]: return True
     else: return False
 
-def check_norot(ibox,box):
+def check_norot__________(ibox,box):
     overs = []
     for key in ['xbox','ybox']:#,'zbox']:
         iboxv = ibox.get_world_axbox(key)
@@ -335,7 +349,7 @@ def check_norot(ibox,box):
         if not no_overlaps(iboxv, boxv):overs.append(key)
     return len(overs) == 2
 
-def segments_intersect2(s1,s2):
+def segments_intersect2_________________(s1,s2):
     def determ(v1,v2):
         return v1[0]*v2[1] - v1[1]*v2[0]
     a,b = s1
@@ -351,7 +365,7 @@ def segments_intersect2(s1,s2):
     pt = [n+m for n,m in zip(p,q)]
     return True,pt
 
-def check_corners(ibox,box):
+def check_corners_______________(ibox,box):
     icorns = ibox.corners
     corns = box.corners
     icorncnt = len(icorns)
@@ -408,20 +422,7 @@ def break_elements(elements):
     elements = [prep(el) for el in elements]
     return [item for sublist in elements for item in sublist]
 
-#def create_elements(elements):
-#    [el.set_world_coords() for el in elements]
-#    all_coords = [el.world_coords for el in elements]
-#    all_faces = [el.world_faces for el in elements]
-#    all_texfaces = [el.texfaces for el in elements]
-#    all_mats = [el.materials for el in elements]
-#    all_names = [el.name for el in elements]
-#    #   if this is possible...
-#    # build global verts from all_coords, 
-#    #  and change all_faces to references to this
-#    #  if the user specifies....
-#    blend_in_geometry(all_names, all_coords, 
-#        all_faces, all_texfaces, all_mats, 
-#            len(elements))
+
 
 
 

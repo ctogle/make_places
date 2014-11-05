@@ -19,7 +19,7 @@ def measure_time(func_name, func, *args, **kwargs):
     ret = func(*args, **kwargs)
     en = time.time()
     took = en-st
-    print 'function', func_name, 'ran in', np.round(took,3), 'seconds'
+    print('function', func_name, 'ran in', np.round(took,3), 'seconds')
     if ret is None: return took
     else: return ret
 

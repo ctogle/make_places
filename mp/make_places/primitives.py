@@ -10,11 +10,11 @@ from numpy import matrix
 from math import sin
 
 
-mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
-#mpdir = os.path.join('/home', 'cogle', 
-#        'dev', 'forblender', 'make_places', 
-#        'mp', 'make_places')
+#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
+#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
+mpdir = os.path.join('/home', 'cogle', 
+        'dev', 'forblender', 'make_places', 
+        'mp', 'make_places')
 primitive_data_path = os.path.join(mpdir, 'primitive_data')
 #xml_primitive_files = {}
 xml_library = {}
@@ -32,7 +32,7 @@ def load_xml_library():
             gfx = xfi.replace('.xml','')
             col = gcol
             xml_library[xml_rep] = (xfi,gcol,gfx,col)
-prf.measure_time('load xml library', load_xml_library)
+#prf.measure_time('load xml library', load_xml_library)
 
 class arbitrary_primitive(object):
 

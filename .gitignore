@@ -1,0 +1,7 @@
+
+*.swp
+*.pyc
+src/build/*
+src/dist/*
+src/make_places_blender.egg-info/*
+

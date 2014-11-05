@@ -125,6 +125,40 @@ class intersection(node):
         bboxes = [fu.bbox(corners = corners)]
         return bboxes
 
+def catmull_rom(P,T,tcnt):
+    spl = P[:1]
+    for j in range(1, len(P)-2):  # skip the ends
+        for t in range(tcnt):  # t: 0 .1 .2 .. .9
+            tt = float(t)/tcnt
+            tt = T[1] + tt*(T[2]-T[1])
+            p = spline([P[j-1], P[j], P[j+1], P[j+2]],
+                    [T[j-1], T[j], T[j+1], T[j+2]],tt)
+            spl.append(p)
+    spl.extend(P[-2:])
+    return spl
+
+def spline(p,time,t):
+    L01 = p[0] * (time[1] - t) / (time[1] - time[0]) + p[1] * (t - time[0]) / (time[1] - time[0])
+    L12 = p[1] * (time[2] - t) / (time[2] - time[1]) + p[2] * (t - time[1]) / (time[2] - time[1])
+    L23 = p[2] * (time[3] - t) / (time[3] - time[2]) + p[3] * (t - time[2]) / (time[3] - time[2])
+    L012 = L01 * (time[2] - t) / (time[2] - time[0]) + L12 * (t - time[0]) / (time[2] - time[0])
+    L123 = L12 * (time[3] - t) / (time[3] - time[1]) + L23 * (t - time[1]) / (time[3] - time[1])
+    C12 = L012 * (time[2] - t) / (time[2] - time[1]) + L123 * (t - time[1]) / (time[2] - time[1])
+    return C12
+
+def spline_4p(t, p_1, p0, p1, p2):
+    """ Catmull-Rom
+        (Ps can be numpy vectors or arrays too: colors, curves ...)
+    """
+        # wikipedia Catmull-Rom -> Cubic_Hermite_spline
+        # 0 -> p0,  1 -> p1,  1/2 -> (- p_1 + 9 p0 + 9 p1 - p2) / 16
+    # assert 0 <= t <= 1
+    return (
+          t*((2-t)*t - 1)   * p_1
+        + (t*t*(3*t - 5) + 2) * p0
+        + t*((4 - 3*t)*t + 1) * p1
+        + (t-1)*t*t         * p2 ) / 2
+
 class road(node):
     def __init__(self, *args, **kwargs):
         self._default_('grit_renderingdistance',500,**kwargs)
@@ -206,41 +240,35 @@ class road(node):
         segdices = 3
         verts = [stp,enp]
         verts = self.clip_tips(verts,norms[0],norms[1])
-        #verts = self.add_tips(verts,norms[0],norms[1])
-        verts = self.add_tips_OLD(verts,norms[0],norms[1])
+        verts = self.add_tips(verts,norms[0],norms[1])
         pitch = 0
         pitch_to_go = -1.0*fu.angle_between_xy(norms[0],fu.flip(norms[1]))
         zhat = [0,0,1]
         rdnorm = fu.cross(fu.normalize(fu.v1_v2(stp,enp)),zhat)
-        def gauss(x, alpha = 1.0, sigma = 1.0, xbarr = 0.0):
-            return alpha * np.exp(-1*((x - xbarr)**2/(2*sigma**2)))
 
-        def sine_clip(x, alpha, ang, dxrng):
-            sign = ang/abs(ang)
-            ang = sign * (ang % np.pi) if not ang == np.pi else np.pi
-            #print('ptg', fu.to_deg(ang))
-            dx = dxrng[1] - dxrng[0]
-            xd = (0.5 + x - dxrng[0])/dx
-            xrad = 2 * ang * xd
-            return sign * alpha * sin(xrad)# + self.road_width/2.0
+        def parameterize_time(points,time,alpha):
+            total = 0
+            for idx in range(1,4):
+                v1v2 = fu.v1_v2(points[idx-1],points[idx])
+                total += fu.magnitude(v1v2)**(2.0*alpha)
+                time[idx] = total
+            print('newtime',time)
 
         def bend(vs):
-            inner = vs[1+1:-1-1]
-            icnt = len(inner)
-            #xbar = icnt/2.0
-            #sig = icnt/(1.5)
-            #ndists = [x + 0.5 for x in range(icnt)]
-            #ndists = [gauss(x, 30, sig, xbar) for x in ndists]
-            seglen = fu.distance_xy(vs[-2],vs[1])/2.0
-            maxo = 0.4 * seglen * tan(pitch_to_go/2.0)
-            ndists = [sine_clip(x,maxo,pitch_to_go,[0,icnt]) 
-                                  for x in range(0,icnt)]
-            offsets = [fu.flip(rdnorm[:]) for v in inner]
-            [fu.scale_vector(off,[nd,nd,nd]) for 
-                off,nd in zip(offsets,ndists)]
-            for off,inn in zip(offsets,inner):
-                fu.translate_vector(inn,off)
-
+            tips = vs[:2] + vs[-2:]
+            cox,coy,coz = [list(i) for i in zip(*tips)]
+            tim = [0.0,1.0,2.0,3.0]
+            alpha = 1.0/2.0
+            parameterize_time(tips,tim,alpha)
+            #def param(t1,p1,p2):
+            #    t2 = t1 + abs(p2 - p1)**alpha
+            #    return t2
+            cox = catmull_rom(cox,tim,10)
+            coy = catmull_rom(coy,tim,10)
+            coz = catmull_rom(coz,tim,10)
+            new = [list(i) for i in zip(cox,coy,coz)]
+            return new
+        '''#
         for sgdx in range(segdices):
             vcnt = len(verts)
             newvs = verts[:]
@@ -250,12 +278,12 @@ class road(node):
                 newvs.insert(vdx+(len(newvs)-len(verts)),newv)
             verts = newvs[:]
             #print('segmented rd vtx', verts, segdices)
-        
-        #if segdices > 0: bend(verts)
+        '''#
+        if segdices > 0: verts = bend(verts)
         self.segmented_vertices = verts
         return verts
 
-    def add_tips_OLD(self,verts,n1,n2):
+    def add_tips(self,verts,n1,n2):
         clip = 25
         v1 = verts[0][:]
         v2 = verts[1][:]
@@ -264,50 +292,6 @@ class road(node):
         fu.translate_vector(v2,fu.scale_vector(n2[:],[cl2,cl2,cl2]))
         verts.extend([v1, v2])
         verts.append(verts.pop(-3))
-        return verts
-
-    def add_tips(self,verts,no1,no2):
-        clip = 25
-        n1 = no1[:]
-        n2 = no2[:]
-        v1 = verts[0][:]
-        v2 = verts[1][:]
-        print('n1n2',n1,n2)
-        if not n1 == fu.flip(n2):
-            v1_v2 = fu.v1_v2(v1,v2)
-            d = fu.magnitude(v1_v2)
-            alpha = abs(fu.angle_between_xy(v1_v2,n1))
-            gamma = abs(fu.angle_between_xy(fu.flip(v1_v2),n2))
-            print('alphgam',fu.to_deg(alpha),fu.to_deg(gamma))
-            eta = np.pi/2 - alpha - gamma
-            h = d * sin(alpha)
-            epsilon = d * cos(alpha) - h * tan(eta)
-            isect = fu.translate_vector(v1[:],
-                fu.scale_vector(n1[:],
-                    [epsilon,epsilon,epsilon]))
-        else: isect = fu.center_of_mass([v1,v2])
-        #isect = [0,100,0]
-        d1 = fu.distance_xy(v1,isect)
-        d2 = fu.distance_xy(v2,isect)
-        if d1 > d2:
-            cl1 = clip + d1 - d2
-            cl2 = clip
-        elif d2 > d1:
-            cl1 = clip
-            cl2 = clip + d2 - d1
-        else: cl1,cl2 = clip,clip
-        print('isect',isect)
-        print('cl1cl2',cl1,cl2,d1,d2)
-        print('v1v2',v1, v2)
-        fu.translate_vector(v1,fu.scale_vector(
-            fu.normalize(n1),[cl1,cl1,cl1]))
-        fu.translate_vector(v2,fu.scale_vector(
-            fu.normalize(n2),[cl2,cl2,cl2]))
-        verts.extend([v1, v2])
-        verts.append(verts.pop(-3))
-        print('verrrts')
-        for v in verts: print('vvv',v)
-        print('n1n2again',n1,n2)
         return verts
 
     def clip_tips(self,verts,n1,n2):
@@ -330,43 +314,31 @@ class road(node):
         angs = []
         for sgdx in range(1,vcnt):            
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            #tangs.append(fu.normalize(fu.v1_v2(p1,p2)))
-            dx = p2[0] - p1[0]
-            dy = p2[1] - p1[1]
-            dz = p2[2] - p1[2]
-            tangs.append(fu.normalize([dx,dy,dz]))
+            tangs.append(fu.normalize(fu.v1_v2(p1,p2)))
         tangs.append(self.ednorm)
         for tgdx in range(1,vcnt+1):
             t1,t2 = tangs[tgdx-1],tangs[tgdx]
             a12 = fu.angle_between_xy(t1,t2)
             sign = 0.0 if a12 == 0.0 else a12/abs(a12)
-            if abs(a12) > np.pi/2:
-                a12 = 0.0
+            #if abs(a12) > np.pi/2:
+            #    a12 = 0.0
             angs.append(sign * abs(a12))
-            #angs.append(sign * (abs(a12)%(np.pi/2.0)))
-
         for sgdx in range(1,vcnt):            
-            #t1,t2,t3 = tangs[sgdx-1],tangs[sgdx],tangs[sgdx+1]
             a1,a2 = angs[sgdx-1],angs[sgdx]
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            strip = self.make_segment(p1,p2,rw,rh,a1,a2)#t1,t2,t3)
-            #strip = self.make_segment(p1,p2,rw,rh,t1,t2,t3)
+            strip = self.make_segment(p1,p2,rw,rh,a1,a2)
             segments.append(strip)
         return segments
 
-    def make_segment(self, p1, p2, widt, depth, a1, a2):#t1, t2, t3):
-    #def make_segment(self, p1, p2, widt, depth, t1, t2, t3):
+    def make_segment(self, p1, p2, widt, depth, a1, a2):
         leng = fu.distance_xy(p1,p2)
         p1_p2 = fu.normalize(fu.v1_v2(p1,p2))
         zdiff = p2[2] - p1[2]
         ang_z = fu.angle_from_xaxis_xy(p1_p2)
-
         strip = ucube()
         strip.scale([leng,widt,depth])
         strip.translate([leng/2.0,0,-depth])
         strip.rotate_z(ang_z)
-        #theta1 = -1*fu.angle_between_xy(t1,t2)/2.0
-        #theta2 =    fu.angle_between_xy(t2,t3)/2.0
         theta1 = -1.0*a1/2.0
         theta2 =      a2/2.0
         strip.rotate_z_face(theta1, 'left')
@@ -375,25 +347,6 @@ class road(node):
         #print('th1th2', fu.to_deg(theta1), fu.to_deg(theta2))
         strip.translate(p1)
         return strip
-
-def connect_points(P):
-    for j in range( 1, len(P)-2 ):  # skip the ends
-        for t in range( 10 ):  # t: 0 .1 .2 .. .9
-            p = spline_4p( t/10, P[j-1], P[j], P[j+1], P[j+2] )
-    print('splinee!',p)
-
-def spline_4p( t, p_1, p0, p1, p2 ):
-    """ Catmull-Rom
-        (Ps can be numpy vectors or arrays too: colors, curves ...)
-    """
-    # wikipedia Catmull-Rom -> Cubic_Hermite_spline
-    # 0 -> p0,  1 -> p1,  1/2 -> (- p_1 + 9 p0 + 9 p1 - p2) / 16
-    # assert 0 <= t <= 1
-    return (
-          t*((2-t)*t - 1)   * p_1
-        + (t*t*(3*t - 5) + 2) * p0
-        + t*((4 - 3*t)*t + 1) * p1
-        + (t-1)*t*t         * p2 ) / 2
 
 class road_system(node):
     def __init__(self, *args, **kwargs):

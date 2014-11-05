@@ -45,7 +45,7 @@ class terrain_point(fu.base):
         global howmany
         if not len(self.neighbors) in [4,6,2]:
             howmany += 1
-            print 'howmany', howmany, len(self.neighbors), self.position
+            print('howmany', howmany, len(self.neighbors), self.position)
             pdb.set_trace()
         centroid = fu.center_of_mass([v.position for v in self.neighbors])
         wx,wy,wz = self.weights[0],self.weights[1],self.weights[2]
@@ -178,7 +178,7 @@ class terrain_triangle(fu.base):
             if not self.inside(uqvt.position):
                 uqvt.weights = [0,0,uqvt.weights[2]]
                 bpts += 1
-        print 'found',bpts,'boundary points in',len(all_verts),'points'
+        print('found',bpts,'boundary points in',len(all_verts),'points')
 
     def smooth(self, icnt, locs):
         tpoints = locs.values()

@@ -100,14 +100,14 @@ def intersection_g():
 def road_b():
     rarg = {
         'start':[0,10,0],
-        'end':[100,110,-10],
+        'end':[100,110,-50],
         'directions':['north','west'],
         'road_height':1,
         'road_width':10,
             }
     elem = roads.road(**rarg)
-    for ke in elem.__dict__.keys():
-        print('elem',ke,elem.__dict__[ke])
+    #for ke in elem.__dict__.keys():
+    #    print('elem',ke,elem.__dict__[ke])
     blgeo.create_element(elem)
 
 def road_g():
@@ -157,6 +157,33 @@ def road_network_g():
     gritgeo.create_element(elem)
     gritgeo.output_world_scripts()
 
+def road_network_terrain_b():
+    iargs = [{
+        'position':[0,0,0], 
+            }, {
+        'position':[300,300,-10], 
+            }, {
+        'position':[150,300,20], 
+            }, {
+        'position':[150,450,-10], 
+            }, {
+        'position':[300,100,10], 
+            }]
+    rnarg = {
+        'interargs':iargs, 
+        'reuse':True, 
+            }
+    rsys = roads.road_system(**rnarg)
+    trarg = {
+        'splits':8,
+        'smooths':5,
+        'pts_of_interest':rsys.terrain_points(), 
+        #'pts_of_interest':[], 
+        'region_bounds':rsys.region_bounds, 
+            }
+    terra = terr.terrain(**trarg)
+    blgeo.create_element(rsys,terra)
+
 def road_network_terrain_g():
     gritgeo.reset_world_scripts()
     iargs = [{
@@ -186,6 +213,9 @@ def road_network_terrain_g():
     gritgeo.create_element(rsys,terra)
     #gritgeo.create_element(terra)
     gritgeo.output_world_scripts()
+
+def profile_road_network_terrain_b():
+    prf.profile_function(road_network_terrain_b)
 
 def profile_road_network_terrain_g():
     prf.profile_function(road_network_terrain_g)

@@ -108,7 +108,7 @@ def add_to_classes(clname,gmesh,cmesh,rd,
     global classlines
     if clname in used_classes.keys() and not is_lod:
         #clname += get_grit_number()
-        print 'clname should be made unique:', clname
+        print('clname should be made unique:', clname)
     clargs = (clname,gmesh,cmesh,rd,has_lod)
     if is_lod: newclasslines = write_lod_class(*clargs)
     else: newclasslines = write_class(*clargs)
@@ -282,7 +282,7 @@ def create_elem(elem, center = True):
     import make_places.scenegraph as sg
     sgr = sg.sgraph(nodes = [elem])
     sgr.make_scene_g(center = center)
-    print 'creating node', elem
+    print('creating node', elem)
 
 
 

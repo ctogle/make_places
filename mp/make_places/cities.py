@@ -1,5 +1,5 @@
 import make_places.fundamental as fu
-#from make_places.fundamental import element
+import make_places.primitives as pr
 from make_places.scenegraph import node
 from make_places.fundamental import bbox
 from make_places.roads import road_system
@@ -169,7 +169,11 @@ class block(node):
         #rdpitch = np.pi/6
 
         def get_random():
-            blen = rm.randrange(max([int(maxblen/rmfact),minblen]),maxblen)
+            blen_bottom = max([int(maxblen/rmfact),minblen])
+            blen_top = maxblen
+            if blen_bottom == blen_top: blen_bottom -= 1
+            blen = rm.randrange(blen_bottom,blen_top)
+            #blen = rm.randrange(max([int(maxblen/rmfact),minblen]),maxblen)
             rmfactored = int(maxbwid/rmfact)
             widbottom = max([rmfactored,minbwid])
             bwid = min([rm.randrange(widbottom,maxbwid), blen*2])
@@ -268,10 +272,10 @@ class city(node):
         else:
             rsargs = {
                 'name':'road_system', 
-                #'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
-                'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
-                'region_bounds':[(-100,1000),(-100,1000)], 
-                'intersection_count':5, 
+                'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
+                #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
+                'region_bounds':[(-1000,1000),(-1000,1000)], 
+                'intersection_count':10, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
@@ -292,6 +296,13 @@ class city(node):
     def get_bbox(self):
         return self.road_system.get_bbox()
 
+class hashima(city):
+
+    hashimawallsxml = os.path.join(
+        pr.primitive_data_path, 'hashima_walls.mesh.xml')
+
+    def __init__(self, *args, **kwargs):
+        city.__init__(self, *args, **kwargs)
 
 
 

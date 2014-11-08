@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+from make_places.fundamental import base
 import make_places.profiler as prf
 
 import xml.etree.ElementTree
@@ -10,11 +11,11 @@ from numpy import matrix
 from math import sin
 
 
-#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
-mpdir = os.path.join('/home', 'cogle', 
-        'dev', 'forblender', 'make_places', 
-        'mp', 'make_places')
+mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
+    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
+#mpdir = os.path.join('/home', 'cogle', 
+#        'dev', 'forblender', 'make_places', 
+#        'mp', 'make_places')
 primitive_data_path = os.path.join(mpdir, 'primitive_data')
 #xml_primitive_files = {}
 xml_library = {}
@@ -32,9 +33,10 @@ def load_xml_library():
             gfx = xfi.replace('.xml','')
             col = gcol
             xml_library[xml_rep] = (xfi,gcol,gfx,col)
-#prf.measure_time('load xml library', load_xml_library)
+prf.measure_time('load xml library', load_xml_library)
 
-class arbitrary_primitive(object):
+#class arbitrary_primitive(object):
+class arbitrary_primitive(base):
 
     _scale_uvs_ = False
     def __init__(self, *args, **kwargs):
@@ -201,6 +203,12 @@ class arbitrary_primitive(object):
             uv[0] *= us
             uv[1] *= vs
 
+    def worldly_uvs(self, uv_ttf):
+        sx,sy,sz = uv_ttf.scales
+        for uvc in self.uv_coords:
+            uvc[0] /= sx
+            uvc[1] /= sy
+
     def scale(self, vect):
         self.coords = fu.scale_coords(self.coords, vect)
         if self._scale_uvs_: self.scale_uvs(vect)
@@ -224,7 +232,7 @@ def xml_from_primitive_data(prim):
         xfile = make_xml_name_unique(xfile)
     xml_file_names.append(xfile)
     xlines = []
-    (vertexes, faces) = prim.get_vertexes_faces()
+    (vertexes, faces) = prim.get_vertexes_faces()# THIS NEEDS TO RETURN PROPER FACES DICT FOR MATERIALS TO WORK!!!
     _32bitindices = prim.requires_32bit_indices()
     sig = 6
 
@@ -376,66 +384,7 @@ def sum_primitives(prims):
 
 
 
-class primitive(object):
 
-    def __init__(self, *args, **kwargs):
-        self.model_coords = kwargs['model_coords']
-        self.model_faces = kwargs['model_faces']
-        try: self.texfaces = kwargs['texfaces']
-        except KeyError: self.texfaces = []
-
-    def translate(self, vect):
-        self.model_coords = fu.translate_coords(self.model_coords, vect)
-
-    def scale(self, vect):
-        self.model_coords = fu.scale_coords(self.model_coords, vect)
-
-    def rotate_z(self, ang_z):
-        self.model_coords = fu.rotate_z_coords(self.model_coords, ang_z)
-
-
-
-
-
-
-
-class _____unit_cube(primitive):
-    def __init__(self):
-        coords = [
-            [0.0, 0.0, 0.0], 
-            [1.0, 0.0, 0.0], 
-            [1.0, 1.0, 0.0], 
-            [0.0, 1.0, 0.0], 
-            [0.0, 0.0, 1.0], 
-            [1.0, 0.0, 1.0], 
-            [1.0, 1.0, 1.0], 
-            [0.0, 1.0, 1.0], 
-                ]
-        faces = [
-            [0,3,2,1], [3,0,4,7], 
-            [0,1,5,4], [1,2,6,5], 
-            [2,3,7,6], [4,5,6,7], 
-                ]                                      
-        bottom = [[0.25,0.0], [0.5,0.0], [0.5,0.33], [0.25,0.33]]
-        left = [[0.0,0.33], [0.25,0.33], [0.25,0.66], [0.0,0.66]]
-        front = [[0.25,0.33], [0.5,0.33], [0.5,0.66], [0.25,0.66]]
-        right = [[0.5,0.33], [0.75,0.33], [0.75,0.66], [0.5,0.66]]
-        back = [[0.75,0.33], [1.0,0.33], [1.0,0.66], [0.75,0.66]]
-        top = [[0.25,0.66], [0.5,0.66], [0.5,1.0], [0.25,1.0]]
-        texfaces = [bottom, left, front, right, back, top]
-        self.bottom = faces[0]
-        self.top = faces[5]
-        self.front = faces[2]
-        self.back = faces[4]
-        self.left = faces[1]
-        self.right = faces[3]
-        primitive.__init__(self, model_coords = coords, 
-            model_faces = faces, texfaces = texfaces)
-
-    def translate_face(self, vect,  face = 'top'):
-        co = self.model_coords
-        face_coords = [co[dx] for dx in self.__dict__[face]]
-        fu.translate_coords(face_coords, vect)
 
 
 

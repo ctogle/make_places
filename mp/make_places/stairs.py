@@ -28,6 +28,7 @@ class shaft(node):
         self._default_('floors',2,**kwargs)
         self._default_('direction','north',**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         l = self.length
         w = self.width
         self.corners = fu.find_corners(self.tform.position, l, w)

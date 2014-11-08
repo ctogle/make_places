@@ -26,6 +26,7 @@ class wall(node):
         pos = self.v1[:]
         kwargs['position'] = pos
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         #tform = scg.tform(position = pos)
         #self._default_('tform',tform,**kwargs)
         node.__init__(self, *args, **kwargs)
@@ -91,6 +92,7 @@ class perimeter(node):
         self._default_('gaped',False,**kwargs)
         self.gapes = [self.gaped]*len(self.wall_gaps)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('children',self.make_walls(
             self.corners,gapes = self.gapes,
                 gaps = self.wall_gaps), **kwargs)

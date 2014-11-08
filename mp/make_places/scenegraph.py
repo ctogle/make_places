@@ -45,6 +45,9 @@ class tform(base):
             position = np, rotation = nr, scales = ns)
         return new
 
+class uv_tform(tform):
+    pass
+
 class sgraph(base):
     def __init__(self, *args, **kwargs):
         self._default_('nodes',[],**kwargs)
@@ -81,14 +84,29 @@ class node(base):
         return tform(parent = tpar, position = pos, 
             rotation = rot, scales = scl)
 
+    def def_uv_tform(self,*args,**kwargs):
+        def _def(ke,de):
+            if ke in kwargs.keys(): return kwargs[ke]
+            else: return de
+        pos = _def('uv_position',[0,0,0])
+        rot = _def('uv_rotation',[0,0,0])
+        scl = _def('uv_scales',[1,1,1])
+        if 'uv_parent' in kwargs.keys():
+            tpar = kwargs['uv_parent'].uv_tform
+        else: tpar = None
+        chi = _def('uv_children',[])
+        return uv_tform(parent = tpar, position = pos, 
+            rotation = rot, scales = scl)
+
     def add_child(self, *chil):
         for ch in chil:
             ch.tform.parent = self.tform
             self.children.append(ch)
 
-    def worldly_primitive(self, prim, ttf, **kwargs):
+    def worldly_primitive(self, prim, ttf, uv_ttf, **kwargs):
         tpm = dcopy(prim)
         tpm.scale(ttf.scales)
+        tpm.worldly_uvs(uv_ttf)
         #tpm.rotate_z(ttf.rotation[2])
         #kwargs['world_rotation'] = ttf.rotation
         kwargs['world_rotation'] = [0,0,ttf.rotation[2]]
@@ -100,9 +118,10 @@ class node(base):
 
     def worldly_children(self, **kwargs):
         ttf = self.tform.true()
+        uv_ttf = self.uv_tform.true()
         newpms = []
         for pm in self.primitives:
-            tpm, kwargs = self.worldly_primitive(pm, ttf, **kwargs)
+            tpm, kwargs = self.worldly_primitive(pm,ttf,uv_ttf,**kwargs)
             newpms.append(tpm)
         for ch in self.children:
             chpms = ch.worldly_children()
@@ -111,9 +130,10 @@ class node(base):
 
     def lod_worldly_children(self, **kwargs):
         ttf = self.tform.true()
+        uv_ttf = self.uv_tform.true()
         newpms = []
         for pm in self.lod_primitives:
-            tpm, kwargs = self.worldly_primitive(pm, ttf, **kwargs)
+            tpm, kwargs = self.worldly_primitive(pm,ttf,uv_ttf,**kwargs)
             newpms.append(tpm)
         for ch in self.children:
             chpms = ch.lod_worldly_children()
@@ -145,7 +165,7 @@ class node(base):
     def terrain_points(self):
         return []
 
-    #if your xy position matches that of your parent, you can inherit your parents rotation in lua safely
+    #if your xy position matches that of your parent, you can inherit your parents rotation in lua safely?
     def __init__(self, *args, **kwargs):
         self._default_('name',None,**kwargs)
         self._default_('grit_renderingdistance',250,**kwargs)
@@ -155,14 +175,48 @@ class node(base):
         self._default_('primitives',[],**kwargs)
         self._default_('lod_primitives',[],**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
+
+    # THIS IS INCOMPLETE
+    def ______________add__(self, other):
+        # change the origin of others children/prims to selfs
+        nargs = {
+            'name':self.name + other.name,
+            'grit_renderingdistance':self.grit_renderingdistance,
+            'grit_lod_renderdistance':self.grit_lod_renderingdistance,
+            'consumes_children':self.consumes_children, 
+            'children':self.children + other.children, 
+            'primitives':self.primitives + other.primitives, 
+            'lod_primitives':self.lod_primitives + other.lod_primitives, 
+            'tform':self.tform, 
+                }
+        return node(**nargs)
 
     def make_primitives_in_scene(self, scene_type, **kwargs):
         ttf = self.tform.true()
+        uv_ttf = self.uv_tform.true()
+
+        pcnt = len(self.primitives)
+        lodcnt = len(self.lod_primitives)
+        if pcnt < lodcnt:
+            self.primitives.extend([None]*(lodcnt-pcnt))
+        elif pcnt > lodcnt:
+            self.lod_primitives.extend([None]*(pcnt-lodcnt))
+        for pm,lpm in zip(self.primitives,self.lod_primitives):
+            if not pm is None:
+                tpm, kwargs = self.worldly_primitive(pm, ttf, uv_ttf)
+                scene_type.create_primitive(tpm, **kwargs)
+            if not lpm is None:
+                tpm, kwargs = self.worldly_primitive(lpm, ttf, uv_ttf)
+                tpm.is_lod = True
+                scene_type.create_primitive(tpm, **kwargs)
+
+        return
         for pm in self.primitives:
-            tpm, kwargs = self.worldly_primitive(pm, ttf)
+            tpm, kwargs = self.worldly_primitive(pm, ttf, uv_ttf)
             scene_type.create_primitive(tpm, **kwargs)
         for pm in self.lod_primitives:
-            tpm, kwargs = self.worldly_primitive(pm, ttf)
+            tpm, kwargs = self.worldly_primitive(pm, ttf, uv_ttf)
             tpm.is_lod = True
             scene_type.create_primitive(tpm, **kwargs)
 

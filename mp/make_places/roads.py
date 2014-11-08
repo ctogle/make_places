@@ -48,6 +48,8 @@ clip_length = 25
 class intersection(node):
 
     def __init__(self, *args, **kwargs):
+        self._default_('grit_renderingdistance',1000,**kwargs)
+        self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('road_width',20,**kwargs)
         self._default_('road_height',2,**kwargs)
@@ -70,7 +72,7 @@ class intersection(node):
     def terrain_points(self):
         # i need the location of the octagon verts!
         #rh2 = self.road_height/2.0
-        rh2 = 0.5
+        rh2 = 0.15
         corners = self.find_corners()
         corners = fu.dice_edges(corners, dices = 1)
         position = self.tform.true().position
@@ -159,12 +161,67 @@ def spline_4p(t, p_1, p0, p1, p2):
         + t*((4 - 3*t)*t + 1) * p1
         + (t-1)*t*t         * p2 ) / 2
 
+class road_segment_primitive(arbitrary_primitive):
+    roadxml = os.path.join(pr.primitive_data_path, 'road.mesh.xml')
+
+    def __init__(self, *args, **kwargs):
+        proaddata = pr.primitive_data_from_xml(self.roadxml)
+        arbitrary_primitive.__init__(self, *args, **proaddata)
+        self.coords_by_face = self.find_faces()
+        self.tag = '_road_'
+        self._scale_uvs_ = False
+
+    def find_faces(self):
+        fronts = [v for v in self.coords if v[1] < 0.0]
+        backs = [v for v in self.coords if v[1] > 0.0]
+        lefts = [v for v in self.coords if v[0] < 0.0]
+        rights = [v for v in self.coords if v[0] > 0.0]
+        bottoms = [v for v in self.coords if v[2] <= 0.0]
+        tops = [v for v in self.coords if v[2] > 0.0]
+        facedict = {
+            'front':fronts, 
+            'back':backs, 
+            'left':lefts,                                        
+            'right':rights, 
+            'top':tops, 
+            'bottom':bottoms, 
+                }
+        return facedict
+
+    def translate_face(self, vect, face = 'top'):
+        return
+        cfaces = self.coords_by_face
+        face_coords = cfaces[face]
+        fu.translate_coords(face_coords, vect)
+        self.calculate_normals()
+        self.modified = True
+
+    def rotate_z_face(self, ang_z, face = 'top'):
+        return
+        cfaces = self.coords_by_face
+        face_coords = cfaces[face]
+        foff = fu.center_of_mass(face_coords)
+        fu.translate_coords(face_coords, fu.flip(foff))
+        fu.rotate_z_coords(face_coords, ang_z)
+        fu.translate_coords(face_coords, foff)
+        self.calculate_normals()
+        self.modified = True
+
+#class road_segment(node):
+#
+#    def __init__(self, *args, **kwargs):
+#        self.primitives = [road_segment_primitive()]
+#        node.__init__(self, *args, **kwargs)
+
 class road(node):
     def __init__(self, *args, **kwargs):
+        kwargs['uv_scales'] = [1,1,1]
+        self._default_('uv_tform',
+            self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',500,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self._default_('road_width', 10, **kwargs)
-        self._default_('road_height', 2, **kwargs)
+        self._default_('road_height', 1, **kwargs)
         self.clip_length = clip_length
         self.set_segmented_vertices(*args, **kwargs)
         segs = self.make_segments(*args, **kwargs)
@@ -178,10 +235,13 @@ class road(node):
         for sgdx in range(1,vcnt):
             p1,p2 = verts[sgdx-1],verts[sgdx]
             tcorns = fu.translate_coords(
-                self.make_corners(p1,p2),[0,0,-0.5])
+                self.make_corners(p1,p2),[0,0,-0.1])
             tcorns = fu.dice_edges(tcorns, dices = 1)
             tpts.extend(tcorns)
+            tpts.append(fu.translate_vector(
+                fu.center_of_mass(tpts),[0,0,-0.5]))
         #return fu.uniq(tpts)
+        
         return tpts
 
     def make_corners(self, p1, p2):
@@ -237,14 +297,10 @@ class road(node):
         self.stnorm = norms[0]
         self.ednorm = fu.flip(norms[1])
 
-        segdices = 3
+        segdice = True
         verts = [stp,enp]
         verts = self.clip_tips(verts,norms[0],norms[1])
         verts = self.add_tips(verts,norms[0],norms[1])
-        pitch = 0
-        pitch_to_go = -1.0*fu.angle_between_xy(norms[0],fu.flip(norms[1]))
-        zhat = [0,0,1]
-        rdnorm = fu.cross(fu.normalize(fu.v1_v2(stp,enp)),zhat)
 
         def parameterize_time(points,time,alpha):
             total = 0
@@ -252,7 +308,6 @@ class road(node):
                 v1v2 = fu.v1_v2(points[idx-1],points[idx])
                 total += fu.magnitude(v1v2)**(2.0*alpha)
                 time[idx] = total
-            print('newtime',time)
 
         def bend(vs):
             tips = vs[:2] + vs[-2:]
@@ -260,26 +315,13 @@ class road(node):
             tim = [0.0,1.0,2.0,3.0]
             alpha = 1.0/2.0
             parameterize_time(tips,tim,alpha)
-            #def param(t1,p1,p2):
-            #    t2 = t1 + abs(p2 - p1)**alpha
-            #    return t2
             cox = catmull_rom(cox,tim,10)
             coy = catmull_rom(coy,tim,10)
             coz = catmull_rom(coz,tim,10)
             new = [list(i) for i in zip(cox,coy,coz)]
             return new
-        '''#
-        for sgdx in range(segdices):
-            vcnt = len(verts)
-            newvs = verts[:]
-            for vdx in range(1+1,vcnt-1):
-                f,b = verts[vdx-1],verts[vdx]
-                newv = fu.midpoint(f,b)
-                newvs.insert(vdx+(len(newvs)-len(verts)),newv)
-            verts = newvs[:]
-            #print('segmented rd vtx', verts, segdices)
-        '''#
-        if segdices > 0: verts = bend(verts)
+
+        if segdice: verts = bend(verts)
         self.segmented_vertices = verts
         return verts
 
@@ -335,7 +377,8 @@ class road(node):
         p1_p2 = fu.normalize(fu.v1_v2(p1,p2))
         zdiff = p2[2] - p1[2]
         ang_z = fu.angle_from_xaxis_xy(p1_p2)
-        strip = ucube()
+        #strip = ucube()
+        strip = road_segment_primitive()
         strip.scale([leng,widt,depth])
         strip.translate([leng/2.0,0,-depth])
         strip.rotate_z(ang_z)
@@ -344,8 +387,27 @@ class road(node):
         strip.rotate_z_face(theta1, 'left')
         strip.translate_face([0,0,zdiff], 'right')
         strip.rotate_z_face(theta2, 'right')
+
+        '''#
+        sidedepth = 0.4
+        sidewidth = 2
+        sidel = ucube()
+        sidel.scale([leng,sidewidth,sidedepth])
+        sidel.translate([leng/2.0,0,0])
+        sidel.rotate_z(ang_z)
+        sidel.translate([leng/2.0,widt/2.0-sidewidth/2.0,0])
+        theta1 = -1.0*a1/2.0
+        theta2 =      a2/2.0
+        #sidel.rotate_z_face(theta1, 'left')
+        sidel.translate_face([0,0,zdiff], 'right')
+        #sidel.rotate_z_face(theta2, 'right')
+
         #print('th1th2', fu.to_deg(theta1), fu.to_deg(theta2))
         strip.translate(p1)
+        sidel.translate(p1)
+
+        strip += sidel
+        '''#
         return strip
 
 class road_system(node):

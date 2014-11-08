@@ -20,7 +20,8 @@ unmodified meshes can be placed in a dict and recycled
 def create_primitive(*args, **kwargs):
     for ag in args:
         if not type(ag) is type([]): create_prim(ag, **kwargs)
-        else: [create_prim(p, **kwargs) for p in ag]
+        elif ag is None: return
+        else: [create_prim(p, **kwargs) for p in ag if not p is None]
     
 world_dir = os.path.join(
     'C:\\', 'Users', 'bartl_000', 
@@ -64,6 +65,21 @@ materials = {
     'cubemat' : ('animgtex', 'cubetex.png'), 
     'octagonmat' : ('animgtex', 'octagontex.png'), 
     'ground' : ('animgtex', 'green.png'), 
+    'grass' : ('animgtex', 'grass.png'), 
+    'concrete' : ('animgtex', 'concrete.png'), 
+    
+    'rubber' : ('animgtex', 'rubber.png'), 
+    #'bumper' : ('animgtex', 'bumper.png'), 
+    'bumper' : ('animgtex', 'rubber.png'), 
+    'light' : ('animgtex', 'light.png'), 
+    'glass' : ('animgtex', 'glass.png'), 
+    'metal' : ('animgtex', 'metal.png'), 
+    #'metal2' : ('animgtex', 'metal2.png'), 
+    'metal2' : ('animgtex', 'metal.png'), 
+    
+    #'grass2' : ('animgtex', 'grass.dds'), 
+    'road' : ('animgtex', 'road.png'), 
+    #material "Road" {vertexDiffuse=true, diffuseMap="textures/road.dds", normalMap="textures/road_N.dds", glossMap="textures/road_S.tga"  }
         }
 def read_material_name(matline):
     if matline.startswith('material'):
@@ -77,13 +93,19 @@ matlines = []
 used_mats = {}
 def add_to_materials(mats):
     global matlines
-    texfiles = [materials[ma][1] for ma in mats]
+    texfiles = []
+    for ma in mats:
+        if ma in materials.keys(): texfiles.append(ma)
+        else:
+            texfiles.append(None)
+            print('material is assumed already present',ma)
     #texfiles = ['.'.join([ma,'png']) for ma in mats]
     #with open(matfile, 'r') as handle:
     #    matlines = handle.readlines()
     #used_mats = [read_material_name(li) for li in matlines]
     #used_mats = [um for um in used_mats if not um is None]
     for tf, ma in zip(texfiles, mats):
+        if tf is None: continue
         if not ma in used_mats.keys():
             margs = (ma,tf,)
             newmatlines = write_material(*margs)
@@ -240,7 +262,8 @@ def reset_world_scripts():
     used_mats = {}
 
     world_start = [
-        '\ninclude "materials.lua"\n', 
+        '\ninclude "materials_constant.lua"\n', 
+        'include "materials.lua"\n', 
         'include "classes.lua"\n\n']
     maplines = world_start
 

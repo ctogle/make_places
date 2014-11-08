@@ -42,11 +42,11 @@ class terrain_point(fu.base):
         return new
 
     def relax(self,xstr = 1.0,ystr = 1.0,zstr = 1.0):
-        global howmany
-        if not len(self.neighbors) in [4,6,2]:
-            howmany += 1
-            print('howmany', howmany, len(self.neighbors), self.position)
-            pdb.set_trace()
+        #global howmany
+        #if not len(self.neighbors) in [4,6,2]:
+        #    howmany += 1
+        #    print('howmany', howmany, len(self.neighbors), self.position)
+        #    #pdb.set_trace()
         centroid = fu.center_of_mass([v.position for v in self.neighbors])
         wx,wy,wz = self.weights[0],self.weights[1],self.weights[2]
         move = fu.scale_vector(
@@ -85,8 +85,9 @@ class terrain_triangle(fu.base):
         newt3.neighbors.extend([newt1,newt2])
         return newt1,newt2,newt3
 
-    def fix_topology(self, locs = {}):
-        tempkeys = locs.keys()
+    def fix_topology(self, locs = {}, lockeys = None):
+        if lockeys is None: tempkeys = locs.keys()
+        else: tempkeys = lockeys
         if not self.children:
             for vdx,v in enumerate(self.verts):
                 str_v = v._str
@@ -101,27 +102,9 @@ class terrain_triangle(fu.base):
                     self.verts[vdx] = keep
         else:
             for ch in self.children:
-                locs = ch.fix_topology(locs = locs)
-        return locs
-    '''#
-    def fix_topology(self, locs = {}):
-        tempkeys = locs.keys()
-        if not self.children: return locs
-        for ch in self.children:
-            locs = ch.fix_topology(locs = locs)
-            for vdx,v in enumerate(ch.verts):
-                str_v = v._str
-                if not str_v in tempkeys:
-                    locs[str_v] = v
-                    tempkeys.append(str_v)
-                else:
-                    keep = locs[str_v]
-                    locnes = [n._str for n in keep.neighbors]
-                    [keep.neighbors.append(n) for n in 
-                        v.neighbors if not n._str in locnes]
-                    ch.verts[vdx] = keep
-        return locs
-    '''#
+                locs, tempkeys = ch.fix_topology(
+                    locs = locs, lockeys = tempkeys)
+        return locs, tempkeys
 
     def split(self, vcnt, controls, locs = None):
         if locs is None: locs = {}
@@ -174,9 +157,11 @@ class terrain_triangle(fu.base):
     def fix_bounds(self, locs):
         all_verts = locs.values()
         bpts = 0
+        self.boundary_points = []
         for uqvt in all_verts:
             if not self.inside(uqvt.position):
                 uqvt.weights = [0,0,uqvt.weights[2]]
+                self.boundary_points.append(uqvt)
                 bpts += 1
         print('found',bpts,'boundary points in',len(all_verts),'points')
 
@@ -188,14 +173,28 @@ class terrain_triangle(fu.base):
                 movement += tp.relax()
         return movement
 
-    def mesh(self):
+    def meshes(self, lod = False):
+        if lod:
+            lod_meshes = [
+                ch.mesh(depth = 0, max_depth = self.splits - 3) 
+                    for ch in self.children]
+            #for lod in lod_meshes: lod.is_lod = True
+            return lod_meshes
+        else:
+            meshes = [ch.mesh() for ch in self.children]
+            for nonlod in meshes: nonlod.has_lod = True
+            return meshes
+
+    def mesh(self, depth = None, max_depth = None):
         verts = []
         nverts = []
         faces = []
         face_materials = []
         uvs = []
         materials = ['ground']
-        data = self.face_data()
+        #materials = ['grass']
+        #materials = ['grass2']
+        data = self.face_data(depth, max_depth)
         for fdx,fdat in enumerate(data):
             newverts = [dcopy(f.position) for f in fdat]
             v1v2 = fu.v1_v2(newverts[0],newverts[1])
@@ -220,16 +219,24 @@ class terrain_triangle(fu.base):
             'xmlfilename' : xmlfile, 
                 }
         new = arbitrary_primitive(**pwargs)
+        new.phys_materials = ['/common/pmat/Grass']
+        #new.phys_materials = ['/common/pmat/Stone']
         new.modified = True
         return new
 
     def count_vertices(self):
         return 3**(self.splits+1)
 
-    def face_data(self):
+    def face_data(self, depth = None, max_depth = None):
         data = []
+        if not depth is None:
+            if depth == max_depth:
+                data.append(self.verts)
+                return data
+            else: depth += 1
         if self.children:
-            [data.extend(ch.face_data()) for ch in self.children]
+            [data.extend(ch.face_data(depth,max_depth)) 
+                for ch in self.children]
         else: data.append(self.verts)
         return data
 
@@ -254,8 +261,8 @@ def bisect(tv1,tv2,vcnt,controls,tolerance = 25,big_tolerance = 250):
     else: newtv = [n for n in tv1.neighbors if n in tv2.neighbors][0]
     return newtv
 
-def make_terrain(initial_tps,locs = {},splits = 2,smooths = 25, 
-                pts_of_interest = [[250,250,25],[500,250,-25]]):
+def make_terrain(initial_tps,splits = 2,smooths = 25, 
+        pts_of_interest = [[250,250,25],[500,250,-25]],locs = None):
     pts_of_interest = fu.uniq(pts_of_interest)
     t1 = terrain_point(position = initial_tps[0])
     t2 = terrain_point(position = initial_tps[1])
@@ -265,7 +272,7 @@ def make_terrain(initial_tps,locs = {},splits = 2,smooths = 25,
     t3.neighbors = [t1,t2]
     init_verts = [t1,t2,t3]
     terra = terrain_triangle(verts = init_verts)
-    #locs = {}
+    if locs is None: locs = {}
     for ivt in init_verts: locs[ivt._str] = ivt
     for sp in range(splits):
         vcnt = terra.count_vertices()
@@ -273,11 +280,11 @@ def make_terrain(initial_tps,locs = {},splits = 2,smooths = 25,
     prf.measure_time('fix bounds', terra.fix_bounds, locs)
     prf.measure_time('fix closest', terra.fix_closest, pts_of_interest, locs)
     prf.measure_time('smooth terrain', terra.smooth, smooths, locs)
-    return terra.mesh()
+    return terra, locs
 
 class terrain(node):
     def __init__(self, *args, **kwargs):
-        self._default_('grit_renderingdistance',1000,**kwargs)
+        self._default_('grit_renderingdistance',500,**kwargs)
         self._default_('grit_lod_renderingdistance',10000,**kwargs)
         self._default_('pts_of_interest',[],**kwargs)
         self._default_('splits',4,**kwargs)
@@ -289,20 +296,81 @@ class terrain(node):
         t2 = [rb[0][1],rb[1][0],0]
         t3 = [rb[0][0],rb[1][1],0]
         t4 = [rb[0][1],rb[1][1],0]
-        
+    
+        xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
+        mrng = max([xrng,yrng])
+        hrad = mrng
+        center = fu.center_of_mass([t1,t2,t3,t4])
+        hverts = []
+        for ang in [0,60,120,180,240,300]:
+            pt = [hrad,0,0]
+            fu.rotate_z_coords([pt],fu.to_rad(ang))
+            hverts.append(pt)
+        fu.translate_coords(hverts,center)
+        hverts.insert(0,center)
+        pieces = []
+        ptlocs = []
+        for trdx in range(6):
+            c2dx = trdx+1
+            c3dx = trdx+2
+            if c3dx == 7: c3dx = 1
+            c1 = hverts[0]
+            c2 = hverts[c2dx]
+            c3 = hverts[c3dx]
+            terr,locs = make_terrain((c1,c2,c3),self.splits,self.smooths,self.pts_of_interest)
+            pieces.append(terr)
+            ptlocs.append(locs)
+        self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
+        node.__init__(self, *args, **kwargs)
+        '''#
         #r = 1000
         #t1 = [-r,0,0]
         #t3 = [r,0,0]
         #y = (4*r)/sqrt(3)
         #t2 = [0,-y,0]
         #fu.translate_coords([t1,t2,t3],[250,250,0])
-        locs = {}
-        terr1 = make_terrain((t1,t2,t3),locs,self.splits,self.smooths,self.pts_of_interest)
-        locs = {}
-        terr2 = make_terrain((t2,t4,t3),locs,self.splits,self.smooths,self.pts_of_interest)
-        self.primitives = [terr1,terr2]
+        terr1,locs1 = make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
+        terr2,locs2 = make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
+        pieces = [terr1,terr2]
+        ptlocs = [locs1,locs2]
+        self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
         #self.primitives[0].translate([0,0,-100])
         node.__init__(self, *args, **kwargs)
+        '''#
+
+    def stitch(self, pieces, locs):
+        p1,p2,p3,p4,p5,p6 = pieces
+        pairs = [(p1,p2),(p2,p3),(p3,p4),(p4,p5),(p5,p6),(p6,p1)]
+        all_pieces = []
+        for p1,p2 in pairs:
+            print('stitching',p1,p2)
+            b1,b2 = p1.boundary_points,p2.boundary_points
+            for bp1 in b1:
+                for bp2 in b2:
+                    if bp1._str == bp2._str:
+                        midz = (bp1.position[2]+bp2.position[2])/2.0
+                        bp1.position[2] = midz
+                        bp2.position[2] = midz
+                        bp1.neighbors.extend(bp2.neighbors)
+                        alln = fu.uniq(bp1.neighbors)
+                        bp1.neighbors = alln
+                        bp2.neighbors = alln
+            pieces = [p1,p2]
+            [pc.smooth(25,lc) for pc,lc in zip(pieces,locs)]
+            for bp1 in b1:
+                for bp2 in b2:
+                    if bp1._str == bp2._str:
+                        midz = (bp1.position[2]+bp2.position[2])/2.0
+                        bp1.position[2] = midz
+                        bp2.position[2] = midz
+            all_pieces.extend(pieces)
+
+        all_pieces = fu.uniq(all_pieces)
+        meshpieces = []
+        lod_meshpieces = []
+        [meshpieces.extend(p.meshes()) for p in all_pieces]
+        [lod_meshpieces.extend(p.meshes(lod = True)) for p in all_pieces]
+        return meshpieces, lod_meshpieces
     
 
 

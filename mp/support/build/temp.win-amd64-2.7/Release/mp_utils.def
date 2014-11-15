@@ -1,0 +1,3 @@
+LIBRARY mp_utils.pyd
+EXPORTS
+initmp_utils

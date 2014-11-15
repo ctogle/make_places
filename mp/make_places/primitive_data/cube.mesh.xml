@@ -124,7 +124,7 @@
         </vertexbuffer>
     </sharedgeometry>
     <submeshes>
-        <submesh material="concrete" usesharedvertices="true" use32bitindexes="false" operationtype="triangle_list">
+        <submesh material="cubemat" usesharedvertices="true" use32bitindexes="false" operationtype="triangle_list">
             <faces>
                 <face v1="0" v2="1" v3="2" />
                 <face v1="0" v2="2" v3="3" />

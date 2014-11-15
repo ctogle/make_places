@@ -26,12 +26,15 @@ def create_primitive(*args, **kwargs):
 world_dir = os.path.join(
     'C:\\', 'Users', 'bartl_000', 
     'Desktop', 'gritengine', 'grit_core', 
-    'media', 'solemn', 'world')
+    'media', 'solemn', 'newworld')
+#    'media', 'solemn', 'world')
+
 #world_primitives = {}
 #textdir = os.path.join(
 #    'C:\\', 'Users', 'bartl_000', 
 #    'Desktop', 'gritengine', 'grit_core', 
 #    'media', 'solemn', 'textures')
+
 textdir = '/solemn/textures'
 def create_prim(prim, name = None, center = False, 
         world_rotation = [0,0,0], rdist = 200, 
@@ -98,7 +101,8 @@ def add_to_materials(mats):
         if ma in materials.keys(): texfiles.append(ma)
         else:
             texfiles.append(None)
-            print('material is assumed already present',ma)
+            #print('material is assumed already present',ma)
+
     #texfiles = ['.'.join([ma,'png']) for ma in mats]
     #with open(matfile, 'r') as handle:
     #    matlines = handle.readlines()
@@ -120,7 +124,8 @@ def output_mats():
         handle.write(''.join(matlines))
 
 def write_material(matname, textfile):
-    lines = ['\nmaterial "' + matname + '" {diffuseMap = "' + textdir + '/' + textfile + '"}\n']
+    #lines = ['\nmaterial "' + matname + '" {diffuseMap = "' + textdir + '/' + textfile + '"}\n']
+    lines = ['\nmaterial \'' + matname + '\' {diffuseMap = \'' + textfile + '\'}\n']
     return lines
 
 classlines = []
@@ -147,8 +152,10 @@ def write_class(clname, gmesh, cmesh, rd, lod):
     lod = 'true' if lod else 'false'
     lines = [
         '\nclass "' + clname + '" (ColClass) {\n', 
-        '    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
-        '    colMesh = \'/solemn/world/' + cmesh + '\';\n'
+        #'    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
+        #'    colMesh = \'/solemn/world/' + cmesh + '\';\n'
+        '    gfxMesh = `' + gmesh + '`;\n'
+        '    colMesh = `' + cmesh + '`;\n'
         '    renderingDistance = ' + str(rd) + ';\n', 
         '    castShadows = true;\n',  
         '    lod = ' + lod + ';\n',  
@@ -162,7 +169,8 @@ def write_lod_class(clname, gmesh, cmesh, rd, lod):
     lodclname = 'lod_' + clname
     lines = [
         '\nclass "'+ lodclname + '" (BaseClass) {\n',
-        '    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
+        #'    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
+        '    gfxMesh = `' + gmesh + '`;\n'
         '    castShadows = false;\n', 
         '    renderingDistance = ' + str(rd) + ';\n',
         '}\n']
@@ -187,6 +195,7 @@ def write_map_lines(obj, location, rotation, name):
     #zang = 0
     quat = (cos(zang/2.0),0,0,sin(zang/2.0))
     #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat(1.0, 0.0, 0.0, 0.0), name="' + name + '" }\n']
+    #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
     lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
     #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=euler' + rotation.__repr__() + ', name="' + name + '" }\n']
     return lines
@@ -262,9 +271,12 @@ def reset_world_scripts():
     used_mats = {}
 
     world_start = [
-        '\ninclude "materials_constant.lua"\n', 
-        'include "materials.lua"\n', 
-        'include "classes.lua"\n\n']
+        #'\ninclude "materials_constant.lua"\n', 
+        #'include "materials.lua"\n', 
+        #'include "classes.lua"\n\n']
+        '\ninclude \'materials_constant.lua\'\n', 
+        'include \'materials.lua\'\n', 
+        'include \'classes.lua\'\n\n']
     maplines = world_start
 
     mapfile = os.path.join(world_dir, 'map.lua')

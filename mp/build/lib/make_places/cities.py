@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
 import make_places.primitives as pr
+import make_places.scenegraph as sg
 from make_places.scenegraph import node
 from make_places.fundamental import bbox
 from make_places.roads import road_system
@@ -15,11 +16,11 @@ import os
 class block(node):
 
     bl_themes = {
-        'suburbs' : (20,3,30,30), 
-        'residential' : (10,10,70,70), 
+        'suburbs' : (30,3,30,30), 
+        'residential' : (20,10,70,70), 
         #'park' : (3,1,10,10), 
         'commercial' : (20,20,100,100), 
-        'industrial' : (20,6,60,60), 
+        'industrial' : (30,6,60,60), 
             }
     themes = [ke for ke in bl_themes.keys()]
 
@@ -83,6 +84,9 @@ class block(node):
         [pts.extend(bg.terrain_points()) for bg in self.buildings]
         return pts
 
+    def get_bbox(self):
+        return self.bboxes
+
     def find_corners(self, pos, length, width):
         c1, c2, c3, c4 = pos[:], pos[:], pos[:], pos[:]
         c2[0] += length
@@ -120,7 +124,8 @@ class block(node):
                     'position':bpos, 
                     'length':blen, 
                     'width':bwid, 
-                    'floor_height':1.0, 
+                    'floor_height':0.5, 
+                    'ceiling_height':0.5, 
                     'wall_width':0.4, 
                     'wall_height':4.0, 
                     'floors':flcnt, 
@@ -131,6 +136,7 @@ class block(node):
                 bboxes.extend(buildings[-1].get_bbox())
         self.buildings = buildings
         self.reuse_data = reuse_data
+        self.bboxes = bboxes
         return buildings
 
     def get_building_position_from_road(self, 
@@ -179,7 +185,7 @@ class block(node):
             bwid = min([rm.randrange(widbottom,maxbwid), blen*2])
 
             #sidesoff = blen if rdrtside else 0
-            sidesoff = 0
+            sidesoff = 0.0
             easement = int((bwid+0.5)/2.0)*easementsign +\
                 rm.randrange(2,15 +int(blen/2.0))*easementsign + sidebase
             #easement = int((bwid+0.5)/2.0)*easementsign + sidebase
@@ -188,7 +194,7 @@ class block(node):
                 fu.scale_vector(segnorm[:],[easement,easement,easement])),
                 fu.scale_vector(segtang[:],[sidesoff,sidesoff,sidesoff]))
             #base = [50,50,0]
-            bhei = 10
+            bhei = 10.0
             #stry = rm.randrange(int(-1.0*blen), int(seglen + blen))
             stry = rm.randrange(0, int(seglen))
             #stry = seglen/2
@@ -232,10 +238,8 @@ class block(node):
 class city(node):
 
     def __init__(self, *args, **kwargs):
-        self._default_('tform',
-            self.def_tform(*args,**kwargs),**kwargs)
-        chils = self.make_primitives(*args, **kwargs)
-        self._default_('children',chils,**kwargs)
+        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self.children = self.make_city_parts(*args,**kwargs)
         node.__init__(self, *args, **kwargs)
 
     def make_blocks_from_roads(self, *args, **kwargs):
@@ -258,42 +262,48 @@ class city(node):
             blocks.append(elements[-1])
             blcnt += 1
         self.blocks = blocks
+        self.bboxes = bboxes
         return elements
 
     def make_terrain(self, *args, **kwargs):
-        kwargs['splits'] = 8
+        kwargs['parent'] = self
+        kwargs['splits'] = 7
         kwargs['smooths'] = 1
-        ter = terrain(parent = self, **kwargs)
+        kwargs['bboxes'] = self.bboxes
+        ter = terrain(**kwargs)
         return [ter]
 
-    def make_primitives(self, *args, **kwargs):
+    def make_road_system(self, *args, **kwargs):
         if 'road_system' in kwargs.keys():
-            road_system_ = kwargs['road_system']
+            road_sys = kwargs['road_system']
         else:
             rsargs = {
                 'name':'road_system', 
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':10, 
+                'intersection_count':20, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
                     }
-            road_system_ = road_system(**rsargs)
-        self.road_system = road_system_
-        blocks = self.make_blocks_from_roads(road_system_)
+            road_sys = road_system(**rsargs)
+        self.road_system = road_sys
+        return road_sys
 
-        pts_of_int = road_system_.terrain_points()
+    def make_city_parts(self, *args, **kwargs):
+        road_sys = self.make_road_system(*args, **kwargs)
+        blocks = self.make_blocks_from_roads(road_sys)
+        pts_of_int = road_sys.terrain_points()
         for bl in blocks: pts_of_int.extend(bl.terrain_points())
-
         terra = self.make_terrain(pts_of_interest = pts_of_int, 
-                region_bounds = road_system_.region_bounds)
-
-        parts = [road_system_] + blocks + terra
+                region_bounds = road_sys.region_bounds)
+        parts = road_sys + blocks + terra
         return parts
 
     def get_bbox(self):
+        print 'citys bbox requested!!!'
+        pdb.set_trace()
         return self.road_system.get_bbox()
 
 class hashima(city):
@@ -304,7 +314,27 @@ class hashima(city):
     def __init__(self, *args, **kwargs):
         city.__init__(self, *args, **kwargs)
 
+    def make_city_parts(self, *args, **kwargs):
 
+        walls = pr.primitive_data_from_xml(self.hashimawallsxml)
+        wallnode = sg.node(name = 'walls_of_hashima', 
+            primitives = [walls])
+
+        #kwargs['parent'] = wallnode
+        # decide interargs from walls
+        # set block themes from location on island
+        # somehow generate terrain to fit wall
+
+        #road_sys = self.make_road_system(*args, **kwargs)
+        #blocks = self.make_blocks_from_roads(road_sys)
+        #pts_of_int = road_sys.terrain_points()
+        #for bl in blocks: pts_of_int.extend(bl.terrain_points())
+        #terra = self.make_terrain(pts_of_interest = pts_of_int, 
+        #        region_bounds = road_sys.region_bounds)
+        #parts = road_sys + blocks + terra
+
+        parts = [wallnode]
+        return parts
 
 
 

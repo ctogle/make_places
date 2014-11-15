@@ -105,6 +105,7 @@ class node(base):
 
     def worldly_primitive(self, prim, ttf, uv_ttf, **kwargs):
         tpm = dcopy(prim)
+        #tpm = prim
         tpm.scale(ttf.scales)
         tpm.worldly_uvs(uv_ttf)
         #tpm.rotate_z(ttf.rotation[2])
@@ -165,6 +166,12 @@ class node(base):
     def terrain_points(self):
         return []
 
+    def assign_material(self, mat, propagate = True):
+        if propagate:
+            for ch in self.children: ch.assign_material(mat)
+        for p in self.primitives: p.assign_material(mat)
+        for p in self.lod_primitives: p.assign_material(mat)
+
     #if your xy position matches that of your parent, you can inherit your parents rotation in lua safely?
     def __init__(self, *args, **kwargs):
         self._default_('name',None,**kwargs)
@@ -210,15 +217,6 @@ class node(base):
                 tpm, kwargs = self.worldly_primitive(lpm, ttf, uv_ttf)
                 tpm.is_lod = True
                 scene_type.create_primitive(tpm, **kwargs)
-
-        return
-        for pm in self.primitives:
-            tpm, kwargs = self.worldly_primitive(pm, ttf, uv_ttf)
-            scene_type.create_primitive(tpm, **kwargs)
-        for pm in self.lod_primitives:
-            tpm, kwargs = self.worldly_primitive(pm, ttf, uv_ttf)
-            tpm.is_lod = True
-            scene_type.create_primitive(tpm, **kwargs)
 
     def make_b(self, *args, **kwargs):
         for ch in self.children: ch.make_b(*args, **kwargs)

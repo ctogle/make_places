@@ -34,8 +34,8 @@ class wall(node):
     def gape_wall(self):
         wlen = float(self.length)
         gwid = 4.0
-        #gcnt = int(wlen/(gwid*2))
-        gcnt = 1 if wlen > gwid*2 else 0
+        gcnt = int(wlen/(gwid*2))
+        #gcnt = 1 if wlen > gwid*2 else 0
         gaps = []
         if gcnt > 0: gspa = wlen/gcnt
         for gn in range(gcnt):

@@ -1,0 +1,10 @@
+Metadata-Version: 1.0
+Name: make-places
+Version: 1.0
+Summary: make_places python pkg
+Home-page: UNKNOWN
+Author: ctogle
+Author-email: cogle@vt.edu
+License: MIT License
+Description: procedural city generation
+Platform: UNKNOWN

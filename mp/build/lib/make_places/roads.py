@@ -38,16 +38,30 @@ class truck_primitive(arbitrary_primitive):
         self.tag = '_truck_'
         self._scale_uvs_ = False
 
-class truck(node):
+class car_batch(node):
 
     def __init__(self, *args, **kwargs):
-        self.primitives = [truck_primitive()]
+        self._default_('cargs',[],**kwargs)
+        self._default_('consumes_children',True,**kwargs)
+        self._default_('grit_renderingdistance',100,**kwargs)
+        self._default_('grit_lod_renderingdistance',2000,**kwargs)
+        self.primitives = self.make_batch(self.cargs)
         node.__init__(self, *args, **kwargs)
+
+    def make_batch(self, cargs):
+        cars = []
+        for cgs in cargs:
+            new = truck_primitive()
+            new.rotate_z(cgs['rotation'][2])
+            new.translate(cgs['position'])
+            cars.append(new)
+        return cars
 
 clip_length = 25
 class intersection(node):
 
     def __init__(self, *args, **kwargs):
+        #self._default_('consumes_children',True,**kwargs)
         self._default_('grit_renderingdistance',1000,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
@@ -87,22 +101,18 @@ class intersection(node):
         trargs1 = {
             'position':[0,0,0], 
             'rotation':[0,0,rotz1], 
-            'parent':self, 
                 }
         trargs2 = {
             'position':[10,10,0], 
             'rotation':[0,0,rotz2], 
-            'parent':self, 
                 }
         trargs3 = {
             'position':[-10,-10,0], 
             'rotation':[0,0,rotz3], 
-            'parent':self, 
                 }
-        trk1 = truck(**trargs1)
-        trk2 = truck(**trargs2)
-        trk3 = truck(**trargs3)
-        return [trk1,trk2,trk3]
+        trk_batch = car_batch(parent = self, 
+            cargs = [trargs1,trargs2,trargs3])
+        return [trk_batch]
 
     def make_segments(self, *args, **kwargs):
         segs = []
@@ -148,19 +158,6 @@ def spline(p,time,t):
     C12 = L012 * (time[2] - t) / (time[2] - time[1]) + L123 * (t - time[1]) / (time[2] - time[1])
     return C12
 
-def spline_4p(t, p_1, p0, p1, p2):
-    """ Catmull-Rom
-        (Ps can be numpy vectors or arrays too: colors, curves ...)
-    """
-        # wikipedia Catmull-Rom -> Cubic_Hermite_spline
-        # 0 -> p0,  1 -> p1,  1/2 -> (- p_1 + 9 p0 + 9 p1 - p2) / 16
-    # assert 0 <= t <= 1
-    return (
-          t*((2-t)*t - 1)   * p_1
-        + (t*t*(3*t - 5) + 2) * p0
-        + t*((4 - 3*t)*t + 1) * p1
-        + (t-1)*t*t         * p2 ) / 2
-
 class road_segment_primitive(arbitrary_primitive):
     roadxml = os.path.join(pr.primitive_data_path, 'road.mesh.xml')
 
@@ -189,7 +186,6 @@ class road_segment_primitive(arbitrary_primitive):
         return facedict
 
     def translate_face(self, vect, face = 'top'):
-        return
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
         fu.translate_coords(face_coords, vect)
@@ -197,7 +193,6 @@ class road_segment_primitive(arbitrary_primitive):
         self.modified = True
 
     def rotate_z_face(self, ang_z, face = 'top'):
-        return
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
         foff = fu.center_of_mass(face_coords)
@@ -207,42 +202,65 @@ class road_segment_primitive(arbitrary_primitive):
         self.calculate_normals()
         self.modified = True
 
-#class road_segment(node):
-#
-#    def __init__(self, *args, **kwargs):
-#        self.primitives = [road_segment_primitive()]
-#        node.__init__(self, *args, **kwargs)
-
 class road(node):
     def __init__(self, *args, **kwargs):
         kwargs['uv_scales'] = [1,1,1]
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
-        self._default_('grit_renderingdistance',500,**kwargs)
+        self._default_('grit_renderingdistance',1000,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self._default_('road_width', 10, **kwargs)
         self._default_('road_height', 1, **kwargs)
         self.clip_length = clip_length
         self.set_segmented_vertices(*args, **kwargs)
+        self.set_corners(self.segmented_vertices)
         segs = self.make_segments(*args, **kwargs)
-        self.primitives = segs
+        litter = self.litter(segs)
+        self.primitives = segs + litter
         node.__init__(self, *args, **kwargs)
+
+    def litter(self, segs):
+        lit = []
+        return lit
 
     def terrain_points(self):
         tpts = []
+        
+        for corns in self.corners:
+            tcorns = fu.translate_coords(corns[:],[0,0,-0.25])
+            tcorns = fu.dice_edges(tcorns, dices = 1)
+            mcorns = [tcorns[3],tcorns[7]]
+            fu.translate_coords(mcorns,[0,0,-0.25])
+            tpts.extend([tc for tc in tcorns if not tc in tpts])
+            
+        return tpts
+        
+        '''#
         verts = self.segmented_vertices
         vcnt = len(verts)
         for sgdx in range(1,vcnt):
             p1,p2 = verts[sgdx-1],verts[sgdx]
             tcorns = fu.translate_coords(
-                self.make_corners(p1,p2),[0,0,-0.1])
+                self.make_corners(p1,p2),[0,0,-0.25])
             tcorns = fu.dice_edges(tcorns, dices = 1)
             tpts.extend(tcorns)
-            tpts.append(fu.translate_vector(
-                fu.center_of_mass(tpts),[0,0,-0.5]))
+            #tpts.append(fu.translate_vector(
+            #    fu.center_of_mass(tpts),[0,0,-1.5]))
+            tpts.append(fu.center_of_mass(tpts))
+            mcorns = [tpts[3],tpts[7],tpts[8]]
+            fu.translate_coords(mcorns,[0,0,-0.25])
         #return fu.uniq(tpts)
-        
         return tpts
+        '''#
+
+    def set_corners(self, verts):
+        corners = []
+        vcnt = len(verts)
+        for sgdx in range(1,vcnt):            
+            p1,p2 = verts[sgdx-1],verts[sgdx]
+            corns = self.make_corners(p1,p2)
+            corners.append(corns)
+        self.corners = corners
 
     def make_corners(self, p1, p2):
         widt = self.road_width
@@ -252,20 +270,16 @@ class road(node):
         p1_p2 = fu.normalize(p1_p2)
         
         ang_z = fu.angle_from_xaxis(p1_p2)
-        corns = [[0,0,0],[leng,0,0],[leng,widt,0],[0,widt,0]]
-        fu.translate_coords(corns,[0,-widt/2.0,0])
+        corns = [[0,-widt/2.0,0],[leng,-widt/2.0,0],
+                [leng,widt/2.0,0],[0,widt/2.0,0]]
         fu.rotate_z_coords(corns,ang_z)
         fu.translate_coords(corns,p1)
         fu.translate_coords(corns[1:3],[0,0,p2[2]-p1[2]])
         return corns
 
     def get_bbox(self):
-        verts = self.segmented_vertices
         bboxes = []
-        vcnt = len(verts)
-        for sgdx in range(1,vcnt):            
-            p1,p2 = verts[sgdx-1],verts[sgdx]
-            corns = self.make_corners(p1,p2)
+        for corns in self.corners:
             bboxes.append(fu.bbox(corners = corns))
         return bboxes
 
@@ -362,14 +376,15 @@ class road(node):
             t1,t2 = tangs[tgdx-1],tangs[tgdx]
             a12 = fu.angle_between_xy(t1,t2)
             sign = 0.0 if a12 == 0.0 else a12/abs(a12)
-            #if abs(a12) > np.pi/2:
-            #    a12 = 0.0
+            if abs(a12) > np.pi/2:
+                a12 = 0.0
             angs.append(sign * abs(a12))
         for sgdx in range(1,vcnt):            
             a1,a2 = angs[sgdx-1],angs[sgdx]
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            strip = self.make_segment(p1,p2,rw,rh,a1,a2)
-            segments.append(strip)
+            strips = self.make_segment(p1,p2,rw,rh,a1,a2)
+            #segments.append(strip)
+            segments.extend(strips)
         return segments
 
     def make_segment(self, p1, p2, widt, depth, a1, a2):
@@ -380,6 +395,7 @@ class road(node):
         #strip = ucube()
         strip = road_segment_primitive()
         strip.scale([leng,widt,depth])
+        strip.scale_uvs([leng/widt,1,1])
         strip.translate([leng/2.0,0,-depth])
         strip.rotate_z(ang_z)
         theta1 = -1.0*a1/2.0
@@ -387,28 +403,8 @@ class road(node):
         strip.rotate_z_face(theta1, 'left')
         strip.translate_face([0,0,zdiff], 'right')
         strip.rotate_z_face(theta2, 'right')
-
-        '''#
-        sidedepth = 0.4
-        sidewidth = 2
-        sidel = ucube()
-        sidel.scale([leng,sidewidth,sidedepth])
-        sidel.translate([leng/2.0,0,0])
-        sidel.rotate_z(ang_z)
-        sidel.translate([leng/2.0,widt/2.0-sidewidth/2.0,0])
-        theta1 = -1.0*a1/2.0
-        theta2 =      a2/2.0
-        #sidel.rotate_z_face(theta1, 'left')
-        sidel.translate_face([0,0,zdiff], 'right')
-        #sidel.rotate_z_face(theta2, 'right')
-
-        #print('th1th2', fu.to_deg(theta1), fu.to_deg(theta2))
         strip.translate(p1)
-        sidel.translate(p1)
-
-        strip += sidel
-        '''#
-        return strip
+        return [strip]
 
 class road_system(node):
     def __init__(self, *args, **kwargs):
@@ -419,12 +415,9 @@ class road_system(node):
         self._default_('linkangles', 
             [90*x for x in range(4)], **kwargs)
         self._default_('growth_tips', 5, **kwargs)
-        try: self.region_bounds = kwargs['region_bounds']
-        except KeyError: self.region_bounds = [(0,1000),(0,1000)]
-        try: self.seeds = kwargs['seeds']
-        except KeyError: self.seeds = [[0,0,0],[1000,1000,0]]
-        try: self.intercnt = kwargs['intersection_count']
-        except KeyError: self.intercnt = 20
+        self._default_('region_bounds',[(0,1000),(0,1000)],**kwargs)
+        self._default_('seeds',[[0,0,0],[1000,1000,0]],**kwargs)
+        self._default_('intersection_count',20,**kwargs)
         rwidth = 2*clip_length*tan(fu.to_rad(22.5))
         self._default_('road_width', rwidth, **kwargs)
         #kwargs['road_width'] = rwidth
@@ -525,7 +518,7 @@ class road_system(node):
         linkmin, linkmax = self.linkmin,self.linkmax
         seeds = self.seeds
         angs = self.linkangles
-        intercnt = self.intercnt
+        intercnt = self.intersection_count
         seedcnt = len(seeds)
         branches = []
         for idx in range(seedcnt):
@@ -579,6 +572,11 @@ class road_system(node):
                     self.roads.append(newrd)
                     elements.append(newrd)
                 else:
+                    newrd = highway(**rarg)
+                    newbb = newrd.get_bbox()
+                    rdbbs.extend(newbb)
+                    self.roads.append(newrd)
+                    elements.append(newrd)
                     print('topology mistake from road intersection!')
         self.topology = topology
         self.reuse_data['topology'] = topology
@@ -629,6 +627,26 @@ class road_system(node):
             rdboxes = rd.get_bbox()
             bboxes.extend(rdboxes)
         return bboxes
+
+class highway(road):
+
+    def make_segments(self, *args, **kwargs):
+        sverts = self.segmented_vertices
+        for sv in sverts[1:-1]: fu.translate_vector(sv,[0,0,20])
+        rdsegs = road.make_segments(self, *args, **kwargs)
+        return rdsegs
+
+    def make_leg(self, v):
+        leg = pr.ucube()
+        leg.scale([5,5,20])
+        leg.translate(v)
+        return leg
+
+    def make_segment(self, p1, p2, widt, depth, a1, a2):
+        rs = road.make_segment(self,p1,p2,widt,depth,a1,a2)
+        leg = self.make_leg(p1)
+        rs.append(leg)
+        return rs
 
 def pick_closest(pots,ndists):
     if pots:

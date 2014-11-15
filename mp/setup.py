@@ -1,43 +1,23 @@
+from setuptools import setup,Extension
 
-
-
-#!python33
-from os.path import isfile, join
-import glob
-import os
-import re
-
-from setuptools import setup#, Extension
-#from distutils.core import setup
-
-import pdb
-
-core_modules = [
-	'make_places.blend_in', 
-	'make_places.buildings', 
-	'make_places.cities', 
-	'make_places.floors', 
-	'make_places.fundamental', 
-	'make_places.make_place', 
-	'make_places.primitives', 
-	'make_places.roads', 
-	'make_places.stairs', 
-	'make_places.walls', 
-				]
+core_modules = []
+#ext_modules = [Extension('mp_utils', ['make_places_utils.pyx'])]
+ext_modules = []
 
 setup(
-	name="make_places_blender",
-	version = '1.0',
-	description = "blender_extension pkg",
-	author = "ctogle",
-	author_email = "cogle@vt.edu",
-	license = "MIT License",
-	long_description = '', 
-	#scripts = ['../modular.py'], 
-	zip_safe = False, 
-	packages = ['make_places'], 
-	py_modules = core_modules, 
-	)
+    name="make_places",
+    version = '1.0',
+    description = "make_places python pkg",
+    author = "ctogle",
+    author_email = "cogle@vt.edu",
+    license = "MIT License",
+    long_description = 'procedural city generation', 
+    #scripts = ['../modular.py'], 
+    zip_safe = False, 
+    packages = ['make_places'], 
+    py_modules = core_modules, 
+    ext_modules = ext_modules, 
+    )
 
 
 

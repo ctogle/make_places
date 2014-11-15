@@ -16,14 +16,15 @@ class ramp(floor):
 class shaft(node):
 
     def __init__(self, *args, **kwargs):
-        self._default_('grit_renderingdistance',100,**kwargs)
+        self._default_('grit_renderingdistance',100.0,**kwargs)
         self._default_('consumes_children',True,**kwargs)
         #self.building = kwargs['building']
         #self._default_('position',[0,0,0],**kwargs)
-        self._default_('length',10,**kwargs)
-        self._default_('width',10,**kwargs)
+        self._default_('length',10.0,**kwargs)
+        self._default_('width',10.0,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
         self._default_('floor_height',0.5,**kwargs)
+        self._default_('ceiling_height',0.5,**kwargs)
         self._default_('wall_height',4,**kwargs)
         self._default_('floors',2,**kwargs)
         self._default_('direction','north',**kwargs)
@@ -49,30 +50,30 @@ class shaft(node):
     def ramps(self, *args, **kwargs):
         comps = []
         ww = self.wall_width
-        floffset = self.floor_height + self.wall_height
+        floffset = self.ceiling_height+self.floor_height+self.wall_height
         flcnt = self.floors
         topology = []
 
         def get_pos_fb(odd):
-            bpos = [rl*odd-rl/2.0,0,0]
+            bpos = [rl*odd-rl/2.0,0.0,0.0]
             return bpos, rl, rw
 
         def get_pos_rl(odd):
-            bpos = [0,rw*odd-rw/2.0,0]
+            bpos = [0.0,rw*odd-rw/2.0,0.0]
             return bpos, rl, rw
 
         if self.direction == 'east':
             sides = ['right','left']
-            rw, rl = [4, 8]
+            rw, rl = [4.0, 8.0]
             get_pos = get_pos_rl
 
         elif self.direction == 'north':
             sides = ['front','back']
-            rw, rl = [8, 4]
+            rw, rl = [8.0, 4.0]
             get_pos = get_pos_fb
 
         for fdx in range(flcnt):
-            odd = fdx % 2
+            odd = fdx % 2.0
             rpos, rl, rw = get_pos(odd)
             rpos[2] += floffset * fdx
             lside = sides[0] if odd else sides[1]

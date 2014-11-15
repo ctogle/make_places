@@ -20,16 +20,20 @@ def ucube_b():
     blgeo.create_primitive(pcube)
 
 def ucube_g():
+    gritgeo.reset_world_scripts()
     pcube = pr.ucube()
     gritgeo.create_primitive(pcube)
+    gritgeo.output_world_scripts()
 
 def uoctagon_b():
     poct = pr.uoctagon()
     blgeo.create_primitive(poct)
 
 def uoctagon_g():
+    gritgeo.reset_world_scripts()
     poct = pr.uoctagon()
     gritgeo.create_primitive(poct)
+    gritgeo.output_world_scripts()
 
 def ulineup_b():
     pcube = pr.ucube()
@@ -39,11 +43,13 @@ def ulineup_b():
     blgeo.create_primitive(pcube,poct)
 
 def ulineup_g():
+    gritgeo.reset_world_scripts()
     pcube = pr.ucube()
     poct = pr.uoctagon()
     pcube.translate([1,0,0])
     poct.translate([-1,0,0])
     gritgeo.create_primitive(pcube,poct)
+    gritgeo.output_world_scripts()
 
 def cube_oct_elem(pos, scl, rot, children = []):
     uc = pr.ucube()
@@ -52,7 +58,8 @@ def cube_oct_elem(pos, scl, rot, children = []):
     uc.translate([1,0,0])
     uo.translate([-1,0,0])
     eprims = [uc, uo]
-    elem = fu.element(children = children, 
+    #elem = fu.element(children = children, 
+    elem = sg.node(children = children, 
         position = pos, scales = scl, 
         rotation = rot, primitives = eprims)
     return elem
@@ -63,9 +70,11 @@ def uelements_b():
     blgeo.create_element(el1,el2)
 
 def uelements_g():
+    gritgeo.reset_world_scripts()
     el1 = cube_oct_elem([-2,-2,2], [2,2,1], [0,0,np.pi/2])
     el2 = cube_oct_elem([2,2,-2], [3,3,2], [0,0,3*(np.pi/2)])
     gritgeo.create_element(el1,el2)
+    gritgeo.output_world_scripts()
 
 def uelement_child_b():
     el1 = cube_oct_elem([2,4,1], [1,2,2], [0,0,np.pi/6])
@@ -73,9 +82,11 @@ def uelement_child_b():
     blgeo.create_element(el2)
 
 def uelement_child_g():
+    gritgeo.reset_world_scripts()
     el1 = cube_oct_elem([2,4,1], [1,2,2], [0,0,np.pi/2])
     el2 = cube_oct_elem([0,0,-1], [2,2,1], [0,0,np.pi/2], children = [el1])
     gritgeo.create_element(el2)
+    gritgeo.output_world_scripts()
 
 def intersection_b():
     iarg = {
@@ -121,6 +132,19 @@ def roady_g():
     gritgeo.create_element([roads.road(**rg) for rg in rargs])
     gritgeo.output_world_scripts()
 
+def highway_g():
+    gritgeo.reset_world_scripts()
+    r1 = {
+        'start':[0,0,0], 
+        'end':[0,100,10], 
+        'directions':['north','south'],
+        'road_height':2, 
+        'road_width':20, 
+            }
+    rargs = [r1]
+    gritgeo.create_element([roads.highway(**rg) for rg in rargs])
+    gritgeo.output_world_scripts()
+
 def road_network_b():
     rnarg = {}
     elem = roads.road_system(**rnarg)
@@ -147,7 +171,7 @@ def road_network_terrain_b():
             }]
     rnarg = {
         'interargs':iargs, 
-        'reuse':True, 
+        'reuse':False, 
             }
     rsys = roads.road_system(**rnarg)
     trarg = {
@@ -156,6 +180,7 @@ def road_network_terrain_b():
         'pts_of_interest':rsys.terrain_points(), 
         #'pts_of_interest':[], 
         'region_bounds':rsys.region_bounds, 
+        #'bboxes':
             }
     terra = terr.terrain(**trarg)
     blgeo.create_element(rsys,terra)
@@ -171,16 +196,16 @@ def road_network_terrain_g():
             }, {
         'position':[150,450,-10], 
             }, {
-        'position':[300,100,10], 
+        'position':[300,100,20], 
             }]
     rnarg = {
         'interargs':iargs, 
-        'reuse':True, 
+        'reuse':False, 
             }
     rsys = roads.road_system(**rnarg)
     trarg = {
         'splits':7,
-        'smooths':5,
+        'smooths':2,
         'pts_of_interest':rsys.terrain_points(), 
         #'pts_of_interest':[], 
         'region_bounds':rsys.region_bounds, 
@@ -201,34 +226,72 @@ def afloor_b():
     blgeo.create_element(elem)
 
 def afloor_g():
+    gritgeo.reset_world_scripts()
     elem = floors.floor()
     gritgeo.create_element(elem)
+    gritgeo.output_world_scripts()
 
-def awall():
+def awall_b():
     v1,v2 = [10,10,0], [50,30,0]
     v3,v4 = [0,0,0], [0,30,0]
     w1 = walls.wall(v1,v2)
     w2 = walls.wall(v3,v4,gaped = True)
     blgeo.create_element(w1,w2)
 
-def abox():
+def awall_g():
+    gritgeo.reset_world_scripts()
+    v1,v2 = [10,10,0], [50,30,0]
+    v3,v4 = [0,0,0], [0,30,0]
+    w1 = walls.wall(v1,v2)
+    w2 = walls.wall(v3,v4,gaped = True)
+    gritgeo.create_element(w1,w2)
+    gritgeo.output_world_scripts()
+
+def abox_b():
     fl = floors.floor()
     pe = walls.perimeter(floor = fl)
     elems = [fl,pe]
     blgeo.create_element(elems)
 
-def astory():
+def abox_g():
+    gritgeo.reset_world_scripts()
+    fl = floors.floor(position = [2,2,2])
+    pe = walls.perimeter(floor = fl)
+    elems = [fl,pe]
+    gritgeo.create_element(elems)
+    gritgeo.output_world_scripts()
+
+def astory_b():
     st = blg.story(1, position = [1,1,1])
     blgeo.create_element(st)
 
-def ashaft():
+def astory_g():
+    gritgeo.reset_world_scripts()
+    st = blg.story(1, position = [2,2,2])
+    gritgeo.create_element(st)
+    gritgeo.output_world_scripts()
+
+def ashaft_b():
     sh = blg.shaft()
     blgeo.create_element(sh)
 
-def someshafts():
+def ashaft_g():
+    gritgeo.reset_world_scripts()
+    sh = blg.shaft()
+    gritgeo.create_element(sh)
+    gritgeo.output_world_scripts()
+
+def someshafts_b():
     sh1 = blg.shaft(position = [-10,0,0],direction = 'north')
     sh2 = blg.shaft(position = [10,0,0], direction = 'east')
     blgeo.create_element(sh1,sh2)
+
+def someshafts_g():
+    gritgeo.reset_world_scripts()
+    sh1 = blg.shaft(position = [-10,0,0],direction = 'north')
+    sh2 = blg.shaft(position = [10,0,0], direction = 'east')
+    blgeo.create_element(sh1,sh2)
+    gritgeo.output_world_scripts()
 
 def build_b():
     built = blg.building()
@@ -327,7 +390,12 @@ def block_g():
         bl1.terrain_points() +\
         bl2.terrain_points() +\
         [[150,150,25]]
-    ter = terr.terrain(pts_of_interest = pts_of_int, splits = 5)
+    #corners = [[0,0,0],[200,0,0],[200,200,0],[0,200,0]]
+    #bboxes = [fu.bbox(corners = corners)]
+    bboxes = rsys.get_bbox() + bl1.get_bbox() + bl2.get_bbox()
+    ter = terr.terrain(
+        pts_of_interest = pts_of_int, 
+        splits = 5, bboxes = bboxes)
     gritgeo.create_element(rsys,bl1,bl2,ter)
     gritgeo.output_world_scripts()
 

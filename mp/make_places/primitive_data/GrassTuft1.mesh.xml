@@ -1,0 +1,102 @@
+<mesh>
+    <sharedgeometry vertexcount="12">
+        <vertexbuffer positions="true" normals="true" colours_diffuse="true" texture_coord_dimensions_0="float2" tangents="true" texture_coords="1">
+            <vertex>
+                <position x="-0.160537" y="-0.0695495" z="0.000387453" />
+                <normal x="-0.0548907" y="-0.998202" z="-0.0240868" />
+                <colour_diffuse value="0.619608 0.619608 0.631373 1" />
+                <texcoord u="0.113716" v="1" />
+                <tangent x="0.998491" y="-0.0549168" z="0.000421934" />
+            </vertex>
+            <vertex>
+                <position x="0.159415" y="-0.0622296" z="0.00038743" />
+                <normal x="0.0226803" y="-0.991361" z="-0.129182" />
+                <colour_diffuse value="0.631373 0.631373 0.639216 1" />
+                <texcoord u="0.821844" v="1" />
+                <tangent x="0.999738" y="0.022872" z="-9.37926e-008" />
+            </vertex>
+            <vertex>
+                <position x="0.158682" y="-0.0927522" z="0.234493" />
+                <normal x="-0.0548907" y="-0.998202" z="-0.0240868" />
+                <colour_diffuse value="0.619608 0.619608 0.631373 1" />
+                <texcoord u="0.821844" v="0" />
+                <tangent x="0.998492" y="-0.0548962" z="-0.000431222" />
+            </vertex>
+            <vertex>
+                <position x="-0.159008" y="-0.0504598" z="0.234493" />
+                <normal x="-0.131523" y="-0.987964" z="0.0814205" />
+                <colour_diffuse value="0.6 0.603922 0.627451 1" />
+                <texcoord u="0.113716" v="0" />
+                <tangent x="0.991255" y="-0.131961" z="4.4407e-008" />
+            </vertex>
+            <vertex>
+                <position x="-0.0188092" y="0.139985" z="0.000387438" />
+                <normal x="-0.914688" y="-0.404157" z="0.00195015" />
+                <colour_diffuse value="0.501961 0.501961 0.54902 1" />
+                <texcoord u="0.113716" v="1" />
+                <tangent x="0.404158" y="-0.914689" z="-2.57979e-005" />
+            </vertex>
+            <vertex>
+                <position x="0.129425" y="-0.144822" z="0.000387423" />
+                <normal x="-0.884108" y="-0.460154" z="-0.0813139" />
+                <colour_diffuse value="0.529412 0.529412 0.564706 1" />
+                <texcoord u="0.821844" v="1" />
+                <tangent x="0.461683" y="-0.887045" z="-3.80934e-008" />
+            </vertex>
+            <vertex>
+                <position x="0.105503" y="-0.14023" z="0.234493" />
+                <normal x="-0.914688" y="-0.404157" z="0.00195015" />
+                <colour_diffuse value="0.501961 0.501961 0.54902 1" />
+                <texcoord u="0.821844" v="0" />
+                <tangent x="0.404158" y="-0.914689" z="2.96455e-005" />
+            </vertex>
+            <vertex>
+                <position x="0.00328074" y="0.137906" z="0.234493" />
+                <normal x="-0.935202" y="-0.343713" z="0.0851927" />
+                <colour_diffuse value="0.47451 0.47451 0.537255 1" />
+                <texcoord u="0.113716" v="0" />
+                <tangent x="0.344967" y="-0.938615" z="-1.39287e-007" />
+            </vertex>
+            <vertex>
+                <position x="-0.154298" y="-0.118384" z="0.000387445" />
+                <normal x="0.819531" y="-0.572988" z="-0.0072929" />
+                <colour_diffuse value="0.529412 0.529412 0.576471 1" />
+                <texcoord u="0.113716" v="1" />
+                <tangent x="0.573003" y="0.819554" z="-0.000141728" />
+            </vertex>
+            <vertex>
+                <position x="0.0567987" y="0.132754" z="0.00038743" />
+                <normal x="0.760573" y="-0.639309" z="0.113193" />
+                <colour_diffuse value="0.494118 0.494118 0.556863 1" />
+                <texcoord u="0.821844" v="1" />
+                <tangent x="0.643444" y="0.765493" z="6.71117e-008" />
+            </vertex>
+            <vertex>
+                <position x="0.0303666" y="0.142758" z="0.234493" />
+                <normal x="0.819531" y="-0.572988" z="-0.0072929" />
+                <colour_diffuse value="0.529412 0.529412 0.576471 1" />
+                <texcoord u="0.821844" v="0" />
+                <tangent x="0.573004" y="0.819552" z="0.000149394" />
+            </vertex>
+            <vertex>
+                <position x="-0.127575" y="-0.132336" z="0.234493" />
+                <normal x="0.860138" y="-0.493838" z="-0.127615" />
+                <colour_diffuse value="0.556863 0.556863 0.592157 1" />
+                <texcoord u="0.113716" v="0" />
+                <tangent x="0.497909" y="0.867229" z="-1.20878e-007" />
+            </vertex>
+        </vertexbuffer>
+    </sharedgeometry>
+    <submeshes>
+        <submesh material="GrassTuft1" usesharedvertices="true" use32bitindexes="false" operationtype="triangle_list">
+            <faces count="6">
+                <face v1="0" v2="1" v3="2" />
+                <face v1="2" v2="3" v3="0" />
+                <face v1="4" v2="5" v3="6" />
+                <face v1="6" v2="7" v3="4" />
+                <face v1="8" v2="9" v3="10" />
+                <face v1="10" v2="11" v3="8" />
+            </faces>
+        </submesh>
+    </submeshes>
+</mesh>

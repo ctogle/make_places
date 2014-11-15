@@ -1,4 +1,4 @@
-#from make_places.blend_in import blend_in_geometry
+#import mp_utils as mpu
 
 from math import cos
 from math import sin
@@ -18,6 +18,13 @@ class base(object):
         if key in kwargs.keys():init = kwargs[key]
         if not key in self.__dict__.keys():
             self.__dict__[key] = init
+
+#def uniq(seq):
+#    # Not order preserving
+#    keys = {}
+#    for e in seq:
+#        keys[e] = 1
+#    return keys.keys()
 
 def uniq(seq):
     ret = []
@@ -174,11 +181,10 @@ def midpoint(p1,p2):
     return [me(x,y) for x,y in zip(p1,p2)]
 
 def distance_xy(v1,v2):
-    fakev1 = v1[:]
-    fakev2 = v2[:]
-    fakev1[2] = 0
-    fakev2[2] = 0
-    return magnitude(v1_v2(fakev1,fakev2))
+    dx = v2[0] - v1[0]
+    dy = v2[1] - v1[1]
+    ds = sqrt(dx**2 + dy**2)
+    return ds
 
 def distance(v1,v2):
     return magnitude(v1_v2(v1,v2))
@@ -277,6 +283,7 @@ def dice_edges(verts, dices = 3):
             pair = verts[tdx-1],verts[tdx]
             mpt = midpoint(*pair)
             newpts.extend([pair[0],mpt])
+        newpts.extend([newpts[-1],midpoint(newpts[-1],verts[0])])
         verts = newpts
     return verts
 
@@ -287,6 +294,7 @@ def offset_faces(faces, offset):
     return faces
 
 def find_closest_xy(one,bunch):
+    #ds = [mpu.distance_xy(one,b) for b in bunch]
     ds = [distance_xy(one,b) for b in bunch]
     dx = ds.index(min(ds))
     return bunch[dx],ds[dx],dx
@@ -307,22 +315,6 @@ class bbox(base):
     def __init__(self, *args, **kwargs):
         self._default_('corners',[],**kwargs)
         self._default_('position',[0,0,0],**kwargs)
-        #try: self.corners = kwargs['corners']
-        #except KeyError:
-        #    x = args[0]
-        #    y = args[1]
-        #    z = args[2]
-        #    self.xbox = x
-        #    self.ybox = y
-        #    self.zbox = z
-        #    self.corners = []
-        #print('bbcorners',self.corners)
-        #try: self.position = kwargs['position']
-        #except KeyError: self.position = [0,0,0]
-        #try: self.rotation = kwargs['rotation']
-        #except KeyError: self.rotation = [0,0,0]
-        #try: self.parent = kwargs['parent']
-        #except KeyError: self.parent = None
 
     def intersects(self,boxes,box):
         if not type(box) is type([]):box = [box]
@@ -333,60 +325,17 @@ class bbox(base):
                     return True
         return False
 
-def fall_inside______________(rng,x):
-    return x > min(rng) and x < max(rng)
-
-def no_overlaps____________(rng1,rng2):
-    if rng1[1] < rng2[0]: return True
-    elif rng1[0] > rng2[1]: return True
-    else: return False
-
-def check_norot__________(ibox,box):
-    overs = []
-    for key in ['xbox','ybox']:#,'zbox']:
-        iboxv = ibox.get_world_axbox(key)
-        boxv = box.__dict__[key]
-        if not no_overlaps(iboxv, boxv):overs.append(key)
-    return len(overs) == 2
-
-def segments_intersect2_________________(s1,s2):
-    def determ(v1,v2):
-        return v1[0]*v2[1] - v1[1]*v2[0]
-    a,b = s1
-    c,d = s2
-    det = determ(v1_v2(a,b),v1_v2(d,c))
-    if det == 0.0: return False,None
-    t = determ(v1_v2(a,c),v1_v2(d,c)) / det
-    u = determ(v1_v2(a,b),v1_v2(a,c)) / det
-    if (t < 0 or u < 0 or t > 1 or u > 1):
-        return False,None
-    p = [n*(1-t) for n in a]
-    q = [n*t for n in b]
-    pt = [n+m for n,m in zip(p,q)]
-    return True,pt
-
-def check_corners_______________(ibox,box):
-    icorns = ibox.corners
-    corns = box.corners
-    icorncnt = len(icorns)
-    corncnt = len(corns)
-    edges = [[corns[edx-1],corns[edx]] for edx in range(1,corncnt)]
-    iedges = [[icorns[edx-1],icorns[edx]] for edx in range(1,icorncnt)]
-    for edge in edges:
-        for iedge in iedges:
-            bad,pt = segments_intersect2(edge,iedge)
-            if bad:
-                print('found isect',pt,icorns,corns)
-                return True
-    return False
-
 def get_norms(verts):
     norms = []
-    zhat = [0,0,1]
+    #zhat = [0,0,1]
     for vdx in range(1, len(verts)):
         v1,v2 = verts[vdx-1],verts[vdx]
-        v1_v2_ = normalize(v1_v2(v1,v2))
-        norm = normalize(cross(v1_v2_,zhat))
+        #v1_v2_ = normalize(v1_v2(v1,v2))
+        #norm = normalize(cross(v1_v2_,zhat))
+        dx = v2[0] - v1[0]
+        dy = v2[1] - v1[1]
+        dv = sqrt(dx**2 + dy**2)
+        norm = [dy/dv,-dx/dv,0]
         norms.append(norm)
     return norms
 

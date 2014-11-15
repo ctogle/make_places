@@ -8,22 +8,26 @@ from make_places.floors import floor
 from make_places.walls import wall
 from make_places.walls import perimeter
 
+import random as rm
+
 import pdb
 
 class story(node):
 
     def __init__(self, *args, **kwargs):
         self.floor_number = args[0]
+        self._default_('add_ceiling',True,**kwargs)
         self._default_('shafts',[],**kwargs)
-        #self._default_('consumes_children',True,**kwargs)
-        self._default_('consumes_children',False,**kwargs)
-        self._default_('grit_renderingdistance',100,**kwargs)
-        self._default_('grit_lod_renderingdistance',1000,**kwargs)
+        self._default_('consumes_children',True,**kwargs)
+        #self._default_('consumes_children',False,**kwargs)
+        self._default_('grit_renderingdistance',100.0,**kwargs)
+        self._default_('grit_lod_renderingdistance',1000.0,**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
-        self._default_('length',20,**kwargs)
-        self._default_('width',20,**kwargs)
-        self._default_('floor_height',1,**kwargs)
+        self._default_('length',20.0,**kwargs)
+        self._default_('width',20.0,**kwargs)
+        self._default_('floor_height',0.5,**kwargs)
+        self._default_('ceiling_height',0.5,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
         self._default_('ext_gaped',True,**kwargs)
@@ -34,10 +38,12 @@ class story(node):
     def make_lod(self, *args, **kwargs):
         lod = pr.ucube()
         l,w = self.length,self.width
-        h = self.wall_height + self.floor_height
+        h = self.wall_height + self.floor_height + self.ceiling_height
         fl = self.floor_[0]
         zrot = 0
+        #pos = fl.tform.position[0]
         pos = fl.tform.position
+        pos[2] -= self.floor_height
         lod.scale([l,w,h])
         lod.rotate_z(zrot)
         lod.translate(pos)
@@ -49,11 +55,22 @@ class story(node):
 
     def make_children(self, *args, **kwargs):
         floor_ = self.make_floor(*args, **kwargs)
+        if self.add_ceiling:ceiling = self.make_ceiling(*args, **kwargs)
+        else:ceiling = []
         ext_walls = self.make_exterior_walls(*args, **kwargs)
         #int_walls = self.make_interior_walls(*args, **kwargs)
-        return floor_ + ext_walls #+ int_walls
+        return floor_ + ceiling + ext_walls #+ int_walls
 
     def make_floor(self, *args, **kwargs):
+        #if 'stories_below' in kwargs.keys() and kwargs['stories_below']:
+        #    below = kwargs['stories_below'][-1]
+        #    flleng = below.length
+        #    flwidt = below.width
+        #else:
+        #    flleng = self.length
+        #    flwidt = self.width
+        flleng = self.length
+        flwidt = self.width
         gaps = []
         if self.floor_number > 0:
             for sh in self.shafts:
@@ -61,8 +78,8 @@ class story(node):
         flpos = [0,0,0]
         flargs = {
             'position':flpos, 
-            'length':self.length, 
-            'width':self.width, 
+            'length':flleng, 
+            'width':flwidt, 
             'gaps':gaps,
             'height':self.floor_height, 
             'parent':self, 
@@ -71,14 +88,34 @@ class story(node):
         self.floor_ = [floor_]
         return [floor_]
 
+    def make_ceiling(self, *args, **kwargs):
+        flleng = self.length
+        flwidt = self.width
+        gaps = []
+        if self.floor_number > 0:
+            for sh in self.shafts:
+                gaps.extend(sh.floor_gaps)
+        czpos = self.wall_height+self.ceiling_height+self.floor_height
+        flpos = [0,0,czpos]
+        flargs = {
+            'position':flpos, 
+            'length':flleng, 
+            'width':flwidt, 
+            'gaps':gaps,
+            'height':self.ceiling_height, 
+            'parent':self, 
+                }
+        ceil = floor(**flargs)
+        self.ceiling = [ceil]
+        return [ceil]
+
     def make_exterior_walls(self, *args, **kwargs):
         #floor_pieces = kwargs['floor']
         floor_pieces = self.floor_
         peargs = [{
-            'parent':fl, 
+            'parent':self, 
             'floor':fl, 
             'gaped':self.ext_gaped, 
-            #'gaped':True, 
             'wall_height':self.wall_height, 
             'wall_width':self.wall_width, 
             'wall_offset':-self.wall_width/2.0, 
@@ -117,6 +154,7 @@ class rooftop(story):
 
     def __init__(self, *args, **kwargs):
         self._default_('wall_height',1,{})
+        self._default_('add_ceiling',False,**kwargs)
         self._default_('ext_gaped',False,**kwargs)
         story.__init__(self, *args, **kwargs)
 
@@ -137,23 +175,27 @@ class building(node):
         self._default_('width',30,**kwargs)
         self._default_('tform',
             self.def_tform(*args,**kwargs),**kwargs)
-        kwargs['uv_scales'] = [10,10,10]
+        kwargs['uv_scales'] = [8,8,8]
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('materials',['imgtex'],**kwargs)
         self._default_('wall_height',4,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
         self._default_('floor_height',1,**kwargs)
+        self._default_('ceiling_height',1,**kwargs)
         self._default_('building_name','__abldg__',**kwargs)
         self._default_('roof_access',True,**kwargs)
         shafts = self.make_shafts(*args, **kwargs)
         self.shafts = shafts
         stories = self.make_floors_from_shafts(*args, **kwargs)
         foundation = self.make_foundation()
+        
         story_batches = self.batch_stories(foundation+stories)
-        #self.children = shafts + story_batches + foundation
+        #story_batches = foundation + stories
+        
         self.children = shafts + story_batches
         node.__init__(self, *args, **kwargs)
+        self.assign_material('concrete')
 
     def make_foundation(self):
         shafts = self.shafts
@@ -162,7 +204,7 @@ class building(node):
         ww = self.wall_width
         basement_floor_height = self.floor_height
         basement_wall_height = self.wall_height
-        #basement_wall_height = 2
+        #basement_wall_height = 10
         baheight = basement_floor_height + basement_wall_height
         bapos = fu.translate_vector(bpos[:],[0,0,-baheight])
         baargs = {
@@ -180,7 +222,7 @@ class building(node):
         found = [basement(-1, **baargs)]
         return found
 
-    def batch_stories(self, stories, max_best_number = 6):
+    def batch_stories(self, stories, max_best_number = 10):
         stcnt = len(stories)
         stheight = self.wall_height + self.floor_height
         best_number = int(((self.length+self.width)/2.0)/stheight)
@@ -237,6 +279,7 @@ class building(node):
             'rotation':[0,0,0], 
             'wall_height':self.wall_height, 
             'floor_height':self.floor_height, 
+            'floor_height':self.ceiling_height, 
             'length':8, 
             'width':8, 
             'bottom':0, 
@@ -254,7 +297,7 @@ class building(node):
     def find_corners(self):
         length = self.length
         width = self.width
-        pos = [0,0,0]
+        pos = [0.0,0.0,0.0]
         c1, c2, c3, c4 = pos[:], pos[:], pos[:], pos[:]
         c1[0] -= length/2.0
         c1[1] -= width/2.0
@@ -275,41 +318,67 @@ class building(node):
     def make_floors_from_shafts(self, *args, **kwargs):
         shafts = self.shafts
         bname = self.building_name
-        bpos = [0,0,0]
-        stheight = self.wall_height + self.floor_height
+        bpos = [0.0,0.0,0.0]
+        #stheight = self.wall_height + self.floor_height
         ww = self.wall_width
         l,w = self.length,self.width
 
         floors = []
         flcnt = self.floors
+        fllengs = [self.length]*flcnt
+        flwidts = [self.width]*flcnt
+        flheits = [self.floor_height]*flcnt
+        clheits = [self.ceiling_height]*flcnt
+        flwlhts = [self.wall_height]*flcnt
+        hthresh = rm.randrange(int(flcnt/2.0),int(7.0*(flcnt+1)/8.0))
+        lfactor = rm.choice([0.5,0.6,0.7,0.8,0.9])
+        wfactor = rm.choice([0.5,0.6,0.7,0.8,0.9])
+        fllengs = [l if fdx < hthresh else lfactor*l 
+                    for fdx,l in enumerate(fllengs)]
+        flwidts = [w if fdx < hthresh else wfactor*w 
+                    for fdx,w in enumerate(flwidts)]
+        #fllengs = [l if flcnt < flcnt/2.0 else 0.75*l for l in fllengs]
+        #flwidts = [w if flcnt < flcnt/2.0 else 0.75*w for w in flwidts]
+        #pdb.set_trace()
+        bump = 0.0
         for fdx in range(flcnt):
             stname = bname + '_story_' + str(fdx)
+            fheight = flheits[fdx]
+            cheight = clheits[fdx]
+            wheight = flwlhts[fdx]
             fl_pos = bpos[:]
-            fl_pos[2] += stheight*fdx
+            fl_pos[2] += bump
+            stheight = wheight + fheight + cheight
+            bump += stheight
             stargs = {
                 'parent':self, 
                 'uv_parent':self, 
                 'name':stname, 
                 'position':fl_pos, 
                 'shafts':shafts, 
-                'length':self.length, 
-                'width':self.width, 
-                'floor_height':self.floor_height, 
-                'wall_height':self.wall_height, 
+                'length':fllengs[fdx], 
+                'width':flwidts[fdx], 
+                'floor_height':fheight, 
+                'wall_height':wheight, 
                 'wall_width':ww, 
+                'stories_below':floors, 
                     }
             floors.append(story(fdx, **stargs))
         roof_name = bname + '_roof_'
         fl_pos = bpos[:]
-        fl_pos[2] += stheight*(flcnt)
+        #fl_pos[2] += stheight*(flcnt)
+        fl_pos[2] += bump
         rfarg = {
             'parent':self, 
             'uv_parent':self, 
             'name':roof_name, 
             'position':fl_pos, 
-            'length':self.length, 
-            'width':self.width, 
-            'floor_height':self.floor_height, 
+            'length':fllengs[-1], 
+            'width':flwidts[-1], 
+            #'length':self.length, 
+            #'width':self.width, 
+            #'floor_height':self.floor_height, 
+            'floor_height':flheits[-1], 
             'shafts':shafts, 
             'wall_height':1, 
             'wall_width':ww, 
@@ -320,7 +389,6 @@ class building(node):
                 for gap in sh.floor_gaps:
                     topgap = gap[:]
                     rfarg['gaps'].append(topgap)
-        #roof = rooftop(flcnt - 1, **rfarg)
         roof = rooftop(flcnt, **rfarg)
         floors.append(roof)
         return floors

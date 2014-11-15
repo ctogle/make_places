@@ -2,6 +2,7 @@ import make_places.fundamental as fu
 from make_places.scenegraph import node
 from make_places.primitives import arbitrary_primitive
 import make_places.profiler as prf
+import make_places.veg as veg
 
 from math import sqrt
 from copy import deepcopy as dcopy
@@ -175,13 +176,28 @@ class terrain_triangle(fu.base):
 
     def meshes(self, lod = False):
         if lod:
-            lod_meshes = [
-                ch.mesh(depth = 0, max_depth = self.splits - 3) 
-                    for ch in self.children]
-            #for lod in lod_meshes: lod.is_lod = True
+            #lod_meshes = [self.mesh(depth = 0,max_depth = self.splits-3)]
+            #return lod_meshes
+            
+            lod_meshes = []
+            for ch in self.children:
+                for subch in ch.children:
+                    lod_meshes.append(subch.mesh(
+                        depth = 0, max_depth = self.splits - 3))
+            
+            #lod_meshes = [
+            #    ch.mesh(depth = 0, max_depth = self.splits - 3) 
+            #        for ch in self.children]
+            
             return lod_meshes
         else:
-            meshes = [ch.mesh() for ch in self.children]
+            meshes = []
+            for ch in self.children:
+                for subch in ch.children:
+                    meshes.append(subch.mesh())
+            
+            #meshes = [ch.mesh() for ch in self.children]
+            #meshes = [self.mesh()]
             for nonlod in meshes: nonlod.has_lod = True
             return meshes
 
@@ -191,12 +207,13 @@ class terrain_triangle(fu.base):
         faces = []
         face_materials = []
         uvs = []
-        materials = ['ground']
+        #materials = ['ground']
         #materials = ['grass']
-        #materials = ['grass2']
+        materials = ['grass2']
         data = self.face_data(depth, max_depth)
         for fdx,fdat in enumerate(data):
-            newverts = [dcopy(f.position) for f in fdat]
+            #newverts = [dcopy(f.position) for f in fdat]
+            newverts = [f.position[:] for f in fdat]
             v1v2 = fu.v1_v2(newverts[0],newverts[1])
             v1v3 = fu.v1_v2(newverts[0],newverts[2])
             newnorml = [fu.normalize(fu.cross(v1v2,v1v3)) for f in fdat]
@@ -284,12 +301,16 @@ def make_terrain(initial_tps,splits = 2,smooths = 25,
 
 class terrain(node):
     def __init__(self, *args, **kwargs):
+        kwargs['uv_scales'] = [0.1,0.1,0.1]
+        self._default_('uv_tform',
+            self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',500,**kwargs)
         self._default_('grit_lod_renderingdistance',10000,**kwargs)
         self._default_('pts_of_interest',[],**kwargs)
         self._default_('splits',4,**kwargs)
         self._default_('smooths',50,**kwargs)
         self._default_('region_bounds',[(0,1000),(0,1000)],**kwargs)
+        self._default_('bboxes',[],**kwargs)
     
         rb = self.region_bounds
         t1 = [rb[0][0],rb[1][0],0]
@@ -297,50 +318,109 @@ class terrain(node):
         t3 = [rb[0][0],rb[1][1],0]
         t4 = [rb[0][1],rb[1][1],0]
     
-        xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
-        mrng = max([xrng,yrng])
-        hrad = mrng
-        center = fu.center_of_mass([t1,t2,t3,t4])
-        hverts = []
-        for ang in [0,60,120,180,240,300]:
-            pt = [hrad,0,0]
-            fu.rotate_z_coords([pt],fu.to_rad(ang))
-            hverts.append(pt)
-        fu.translate_coords(hverts,center)
-        hverts.insert(0,center)
-        pieces = []
-        ptlocs = []
-        for trdx in range(6):
-            c2dx = trdx+1
-            c3dx = trdx+2
-            if c3dx == 7: c3dx = 1
-            c1 = hverts[0]
-            c2 = hverts[c2dx]
-            c3 = hverts[c3dx]
-            terr,locs = make_terrain((c1,c2,c3),self.splits,self.smooths,self.pts_of_interest)
-            pieces.append(terr)
-            ptlocs.append(locs)
-        self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
+        #hexagonal = True
+        hexagonal = False
+        if hexagonal:
+            xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
+            mrng = max([xrng,yrng])
+            hrad = mrng
+            center = fu.center_of_mass([t1,t2,t3,t4])
+            hverts = []
+            for ang in [0,60,120,180,240,300]:
+                pt = [hrad,0,0]
+                fu.rotate_z_coords([pt],fu.to_rad(ang))
+                hverts.append(pt)
+            fu.translate_coords(hverts,center)
+            hverts.insert(0,center)
+            pieces = []
+            ptlocs = []
+            bounds = []
+            for trdx in range(6):
+                c2dx = trdx+1
+                c3dx = trdx+2
+                if c3dx == 7: c3dx = 1
+                c1 = hverts[0]
+                c2 = hverts[c2dx]
+                c3 = hverts[c3dx]
+                terr,locs = make_terrain((c1,c2,c3),
+                    self.splits,self.smooths,self.pts_of_interest)
+                #bounds.extend(terr.boundary_points)
+                self.pts_of_interest.extend(
+                    [v.position for v in terr.boundary_points])
+                pieces.append(terr)
+                ptlocs.append(locs)
+            self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
+
+        else:
+            #r = 1000
+            #t1 = [-r,0,0]
+            #t3 = [r,0,0]
+            #y = (4*r)/sqrt(3)
+            #t2 = [0,-y,0]
+            #fu.translate_coords([t1,t2,t3],[250,250,0])
+            fu.translate_coords([t1],[-50,-50,0])
+            fu.translate_coords([t2],[ 50,-50,0])
+            fu.translate_coords([t3],[ 50, 50,0])
+            fu.translate_coords([t4],[-50, 50,0])
+            terr1,locs1 = make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
+            terr2,locs2 = make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
+            pieces = [terr1,terr2]
+            ptlocs = [locs1,locs2]
+            self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
+
+        #vegetate = True
+        vegetate = False
+        if vegetate:
+            self.children = prf.measure_time(
+                'vegetate',self.vegetate,pieces)
         node.__init__(self, *args, **kwargs)
-        '''#
-        #r = 1000
-        #t1 = [-r,0,0]
-        #t3 = [r,0,0]
-        #y = (4*r)/sqrt(3)
-        #t2 = [0,-y,0]
-        #fu.translate_coords([t1,t2,t3],[250,250,0])
-        terr1,locs1 = make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
-        terr2,locs2 = make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
-        pieces = [terr1,terr2]
-        ptlocs = [locs1,locs2]
-        self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
-        #self.primitives[0].translate([0,0,-100])
-        node.__init__(self, *args, **kwargs)
-        '''#
+        self.assign_material('grass2', propagate = False)
+        #self.assign_material('ground')
+
+    def vegetate(self, terras):
+        vchildren = []
+        bboxes = self.bboxes
+        for ter in terras:
+            fdat = ter.face_data()
+            vcargs = []
+            fcnt = len(fdat)
+            for fdx in range(fcnt):
+                if rm.choice([0,1,1,1]):
+                    verts = [v.position for v in fdat[fdx]]
+                    vegbox = fu.bbox(corners = verts)
+                    if not vegbox.intersects(bboxes, vegbox):
+                        nvcarg = (verts,None,[fdx])
+                        vcargs.append(nvcarg)
+
+            # stitch the nvcargs together based on how contiguous they are
+            dx = 0
+            vccnt = len(vcargs)
+            vcmax = 4
+            fewer = []
+            while dx < vccnt:
+                left = vccnt - dx
+                if left >= vcmax: vc_this_round = vcmax
+                else: vc_this_round = left % vcmax
+                relev = vcargs[dx:dx+vc_this_round]
+                reverts = [r[0] for r in relev]
+                refaces = range(vc_this_round)
+                fewer.append((reverts,[],refaces))
+                dx += vc_this_round
+
+            for varg in fewer:
+                vchild = veg.vegetate(*varg)
+                vchildren.append(vchild)
+
+        return vchildren
 
     def stitch(self, pieces, locs):
-        p1,p2,p3,p4,p5,p6 = pieces
-        pairs = [(p1,p2),(p2,p3),(p3,p4),(p4,p5),(p5,p6),(p6,p1)]
+        if len(pieces) == 6:
+            p1,p2,p3,p4,p5,p6 = pieces
+            pairs = [(p1,p2),(p2,p3),(p3,p4),(p4,p5),(p5,p6),(p6,p1)]
+        elif len(pieces) == 2:
+            p1,p2 = pieces
+            pairs = [(p1,p2),(p2,p1)]
+
         all_pieces = []
         for p1,p2 in pairs:
             print('stitching',p1,p2)
@@ -356,16 +436,18 @@ class terrain(node):
                         bp1.neighbors = alln
                         bp2.neighbors = alln
             pieces = [p1,p2]
-            [pc.smooth(25,lc) for pc,lc in zip(pieces,locs)]
+            [pc.smooth(5,lc) for pc,lc in zip(pieces,locs)]
             for bp1 in b1:
                 for bp2 in b2:
                     if bp1._str == bp2._str:
                         midz = (bp1.position[2]+bp2.position[2])/2.0
                         bp1.position[2] = midz
                         bp2.position[2] = midz
-            all_pieces.extend(pieces)
+            #all_pieces.extend(pieces)
+            all_pieces.append(pieces[0])
 
-        all_pieces = fu.uniq(all_pieces)
+        #all_pieces = fu.uniq(all_pieces)
+        #all_pieces.pop(0)
         meshpieces = []
         lod_meshpieces = []
         [meshpieces.extend(p.meshes()) for p in all_pieces]

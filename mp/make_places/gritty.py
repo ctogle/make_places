@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import make_places.user_info as ui
 
 
 
@@ -23,10 +24,11 @@ def create_primitive(*args, **kwargs):
         elif ag is None: return
         else: [create_prim(p, **kwargs) for p in ag if not p is None]
     
-world_dir = os.path.join(
-    'C:\\', 'Users', 'bartl_000', 
-    'Desktop', 'gritengine', 'grit_core', 
-    'media', 'solemn', 'newworld')
+world_dir = ui.info['worlddir']
+#world_dir = os.path.join(
+#    'C:\\', 'Users', 'bartl_000', 
+#    'Desktop', 'gritengine', 'grit_core', 
+#    'media', 'solemn', 'newworld')
 #    'media', 'solemn', 'world')
 
 #world_primitives = {}

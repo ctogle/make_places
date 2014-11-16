@@ -1,4 +1,4 @@
-#import mp_utils as mpu
+import mp_utils as mpu
 
 from math import cos
 from math import sin
@@ -294,8 +294,8 @@ def offset_faces(faces, offset):
     return faces
 
 def find_closest_xy(one,bunch):
-    #ds = [mpu.distance_xy(one,b) for b in bunch]
-    ds = [distance_xy(one,b) for b in bunch]
+    ds = [mpu.distance_xy(one,b) for b in bunch]
+    #ds = [distance_xy(one,b) for b in bunch]
     dx = ds.index(min(ds))
     return bunch[dx],ds[dx],dx
 

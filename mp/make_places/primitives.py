@@ -1,27 +1,34 @@
 import make_places.fundamental as fu
 from make_places.fundamental import base
 import make_places.profiler as prf
+import make_places.user_info as ui
 
 import xml.etree.ElementTree
 
-import os, pdb
+import os, pdb, shutil
 import numpy as np
 from numpy import linalg
 from numpy import matrix
 from math import sin
 
 
-mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
+#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
+#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
+#mpdir = ui.info['mpdir']
 #mpdir = os.path.join('/home', 'cogle', 
 #        'dev', 'forblender', 'make_places', 
 #        'mp', 'make_places')
-primitive_data_path = os.path.join(mpdir, 'primitive_data')
+primitive_data_path = ui.info['primitivedir']
+#primitive_data_path = os.path.join(mpdir, 'primitive_data')
 #xml_primitive_files = {}
 xml_library = {}
 
 def load_xml_library():
-    from make_places.gritty import world_dir as wdir
+    wdir = ui.info['worlddir']
+    tdir = ui.info['texturedir']
+    if not os.path.isdir(wdir):shutil.copytree(ui.info['newworlddir'],wdir)
+    if not os.path.isdir(tdir):shutil.copytree(ui.info['newtexturedir'],tdir)
+
     for xfi in os.listdir(wdir):
         if not xfi.endswith('.xml'): continue
         else:
@@ -167,8 +174,9 @@ class arbitrary_primitive(base):
             xlines, xfile = xml_from_primitive_data(self)
             self.xml_representation = '\n'.join(xlines)
         else:
-            xml = os.path.join(mpdir, 
-                'primitive_data', self.xml_filename)
+            #xml = os.path.join(mpdir, 
+            #    'primitive_data', self.xml_filename)
+            xml = os.path.join(primitive_data_path,self.xml_filename)
             with open(xml, 'r') as handle:
                 xlines = handle.readlines()
             self.xml_representation = '\n'.join(xlines)

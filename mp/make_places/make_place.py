@@ -228,6 +228,8 @@ def afloor_b():
 def afloor_g():
     gritgeo.reset_world_scripts()
     elem = floors.floor()
+    pcube = pr.ucube()
+    gritgeo.create_primitive(pcube)
     gritgeo.create_element(elem)
     gritgeo.output_world_scripts()
 
@@ -267,7 +269,9 @@ def astory_b():
 
 def astory_g():
     gritgeo.reset_world_scripts()
-    st = blg.story(1, position = [2,2,2])
+    st = blg.story(1)
+    pcube = pr.ucube()
+    gritgeo.create_primitive(pcube)
     gritgeo.create_element(st)
     gritgeo.output_world_scripts()
 
@@ -300,7 +304,9 @@ def build_b():
 def build_g():
     gritgeo.reset_world_scripts()
     built = blg.building()
+    pcube = pr.ucube()
     gritgeo.create_element(built)
+    gritgeo.create_primitive(pcube)
     gritgeo.output_world_scripts()
 
 def buildfew_b():

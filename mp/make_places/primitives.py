@@ -76,8 +76,9 @@ class arbitrary_primitive(base):
         verts = self.coords + other.coords
         nverts = self.ncoords + other.ncoords
         uvs = self.uv_coords + other.uv_coords
-        faces = self.faces +\
-            fu.offset_faces(other.faces, other_offset)
+        #faces = self.faces +\
+        #    fu.offset_faces(other.faces[:], other_offset)
+        faces = self.faces + other.faces
         #materials = fu.uniq(self.materials + other.materials)
         omats = [m for m in other.materials if not m in self.materials]
         materials = self.materials + omats
@@ -106,7 +107,8 @@ class arbitrary_primitive(base):
 
     def calculate_normals(self):
         # must iterate over faces, for each vertex, apply new normal
-        for fa in self.faces:
+        try:
+          for fa in self.faces:
             fcoords = [self.coords[f] for f in fa]
             v1 = self.coords[fa[0]]
             v2 = self.coords[fa[1]]
@@ -119,6 +121,7 @@ class arbitrary_primitive(base):
             #if not fu.angle_between(fu.v1_v2(comf,com),normal)>fu.PI/2.0:
             #    normal = fu.flip(normal)
             for vdx in fa: self.ncoords[vdx] = normal
+        except: pdb.set_trace()
 
     def get_vertexes(self):
         vargs = zip(self.coords,self.ncoords,self.uv_coords)
@@ -170,7 +173,7 @@ class arbitrary_primitive(base):
 
     def write_as_xml(self):
         if self.modified:
-            #self.calculate_normals()
+            self.calculate_normals()
             xlines, xfile = xml_from_primitive_data(self)
             self.xml_representation = '\n'.join(xlines)
         else:

@@ -368,11 +368,9 @@ class terrain(node):
             ptlocs = [locs1,locs2]
             self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
 
-        #vegetate = True
-        vegetate = False
-        if vegetate:
-            self.children = prf.measure_time(
-                'vegetate',self.vegetate,pieces)
+        vegetate = True
+        #vegetate = False
+        if vegetate:self.children = prf.measure_time('vegetate',self.vegetate,pieces)
         node.__init__(self, *args, **kwargs)
         self.assign_material('grass2', propagate = False)
         #self.assign_material('ground')

@@ -11,13 +11,6 @@ from math import cos
 from math import sin
 from math import tan
 
-'''#
-create_primitive should make an xml mesh, write the class def, 
-add the necessary materials, and place the object in the world
-
-unmodified meshes can be placed in a dict and recycled
-'''#
-
 def create_primitive(*args, **kwargs):
     for ag in args:
         if not type(ag) is type([]): create_prim(ag, **kwargs)
@@ -25,18 +18,6 @@ def create_primitive(*args, **kwargs):
         else: [create_prim(p, **kwargs) for p in ag if not p is None]
     
 world_dir = ui.info['worlddir']
-#world_dir = os.path.join(
-#    'C:\\', 'Users', 'bartl_000', 
-#    'Desktop', 'gritengine', 'grit_core', 
-#    'media', 'solemn', 'newworld')
-#    'media', 'solemn', 'world')
-
-#world_primitives = {}
-#textdir = os.path.join(
-#    'C:\\', 'Users', 'bartl_000', 
-#    'Desktop', 'gritengine', 'grit_core', 
-#    'media', 'solemn', 'textures')
-
 textdir = '/solemn/textures'
 def create_prim(prim, name = None, center = False, 
         world_rotation = [0,0,0], rdist = 200, 
@@ -203,6 +184,8 @@ def write_map_lines(obj, location, rotation, name):
     return lines
 
 executable_suffix = '.exe'
+executable_suffix = ''
+converterpath = 'OgreXMLConverter'
 def create_grit_mesh(prim, tangents = False, 
             use_ogre_xml_converter = True):
     xml, is_new = prim.write_as_xml()
@@ -211,8 +194,8 @@ def create_grit_mesh(prim, tangents = False,
         with open(xdir,'w') as handle:
             [handle.write(li) for li in xml]
         if use_ogre_xml_converter:
-            converterpath = os.path.join(world_dir, 
-                'OgreXMLConverter' + executable_suffix)
+            #converterpath = os.path.join(world_dir, 
+            #    'OgreXMLConverter' + executable_suffix)
             args = [converterpath, "-e"]
             args.append("-q")
             if tangents:

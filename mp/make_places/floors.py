@@ -10,7 +10,7 @@ class floor(node):
         #self._default_('tform',tform(),**kwargs)
         self._default_('length',20,**kwargs)
         self._default_('width',20,**kwargs)
-        self._default_('floor_height',1,**kwargs)
+        self._default_('floor_height',0.5,**kwargs)
         self._default_('gaps',[],**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self.primitives = self.make_primitives([0,0,0],
@@ -82,7 +82,7 @@ class floor(node):
     def make_floor_segment(self, pos, length, width, flheight):
         fl = unit_cube()
         fl.scale([length, width, flheight])
-        fl.translate([pos[0],pos[1],-flheight])
+        fl.translate([pos[0],pos[1],pos[2]-flheight])
         return [fl]
 
 

@@ -17,9 +17,7 @@ class shaft(node):
 
     def __init__(self, *args, **kwargs):
         self._default_('grit_renderingdistance',100.0,**kwargs)
-        self._default_('consumes_children',True,**kwargs)
-        #self.building = kwargs['building']
-        #self._default_('position',[0,0,0],**kwargs)
+        #self._default_('consumes_children',True,**kwargs)
         self._default_('length',10.0,**kwargs)
         self._default_('width',10.0,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
@@ -41,7 +39,7 @@ class shaft(node):
             [[m,w-2*m]],
                 ]
         self.floor_gaps = [[self.tform.position, l, w]]
-        self.bottom = 0
+        self.bottom = -1
         self.top = 'roof'
         ramps = self.ramps(*args, **kwargs)
         kwargs['children'] = ramps
@@ -50,7 +48,7 @@ class shaft(node):
     def ramps(self, *args, **kwargs):
         comps = []
         ww = self.wall_width
-        floffset = self.ceiling_height+self.floor_height+self.wall_height
+        floffset = self.wall_height+self.floor_height#+self.ceiling_height
         flcnt = self.floors
         topology = []
 

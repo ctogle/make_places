@@ -7,6 +7,8 @@ import make_places.gritty as gritgeo
 from copy import deepcopy as dcopy
 import numpy as np
 
+import pdb
+
 
 
 
@@ -104,8 +106,8 @@ class node(base):
             self.children.append(ch)
 
     def worldly_primitive(self, prim, ttf, uv_ttf, **kwargs):
-        tpm = dcopy(prim)
-        #tpm = prim
+        #tpm = dcopy(prim)
+        tpm = prim
         tpm.scale(ttf.scales)
         tpm.worldly_uvs(uv_ttf)
         #tpm.rotate_z(ttf.rotation[2])
@@ -114,7 +116,8 @@ class node(base):
         kwargs['name'] = self.name
         kwargs['rdist'] = self.grit_renderingdistance
         kwargs['lodrdist'] = self.grit_lod_renderingdistance
-        tpm.translate(ttf.position)
+        #tpm.rotate_z(ttf.rotation[2])
+        #pdb.set_trace()
         return tpm, kwargs
 
     def worldly_children(self, **kwargs):

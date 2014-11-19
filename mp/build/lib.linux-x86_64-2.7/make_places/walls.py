@@ -86,7 +86,7 @@ class perimeter(node):
         else: corns = kwargs['corners']
         corns = self.add_corner_offset(corns)
         self._default_('corners',corns,**kwargs)
-        self._default_('wall_width', 0.4, **kwargs)
+        self._default_('wall_width', 0.5, **kwargs)
         self._default_('wall_height', 4, **kwargs)
         self._default_('wall_gaps',[[],[],[],[]],**kwargs) 
         self._default_('gaped',False,**kwargs)

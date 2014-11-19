@@ -257,7 +257,9 @@ def abox_b():
 
 def abox_g():
     gritgeo.reset_world_scripts()
-    fl = floors.floor(position = [2,2,2])
+    fl = floors.floor(
+        position = [2,2,2],
+        rotation = [0,0,fu.PI/6.0])
     pe = walls.perimeter(floor = fl)
     elems = [fl,pe]
     gritgeo.create_element(elems)
@@ -295,6 +297,43 @@ def someshafts_g():
     sh1 = blg.shaft(position = [-10,0,0],direction = 'north')
     sh2 = blg.shaft(position = [10,0,0], direction = 'east')
     blgeo.create_element(sh1,sh2)
+    gritgeo.output_world_scripts()
+
+def abox():
+    fl = floors.floor(
+        position = [20,0,5],
+        rotation = [0,0,fu.PI/6.0])
+    pe = walls.perimeter(floor = fl, gaped = True)
+    elems = [fl,pe]
+    return elems
+
+def tg():
+    gritgeo.reset_world_scripts()
+
+    st1 = blg.story(1, position = [0,-20,0], rotation = [0,0,fu.PI/3.0])
+
+    st2 = blg.story(1, position = [-20,0,0], rotation = [0,0,fu.PI/3.0])
+    stn = sg.node(position = [0,0,-5])
+    st2.tform.parent = stn.tform
+
+    st2 = blg.story(1, position = [-20,0,0], rotation = [0,0,fu.PI/3.0])
+    stn = sg.node(position = [0,0,-5])
+    stn.add_child(st2)
+    #st2.tform.parent = stn.tform
+    #stn = sg.node(children = [st2])
+    
+    ab = abox()
+    
+    built = blg.building(position = [0,20,-5], rotation = [0,0,fu.PI/12.0])
+    
+    pcube = pr.ucube()
+
+    gritgeo.create_primitive(pcube)
+    gritgeo.create_element(st1)
+    gritgeo.create_element(stn)
+    gritgeo.create_element(ab)
+    gritgeo.create_element(built)
+    
     gritgeo.output_world_scripts()
 
 def build_b():

@@ -42,7 +42,6 @@ def load_xml_library():
             xml_library[xml_rep] = (xfi,gcol,gfx,col)
 prf.measure_time('load xml library', load_xml_library)
 
-#class arbitrary_primitive(object):
 class arbitrary_primitive(base):
 
     _scale_uvs_ = False
@@ -52,11 +51,8 @@ class arbitrary_primitive(base):
         self.gfxmesh_name = self.xml_filename.replace('.xml','')
         self.colmesh_name = self.gcol_filename
         
-        #self.is_lod = False
-        #self.has_lod = False
         self._default_('is_lod',False,**kwargs)
         self._default_('has_lod',False,**kwargs)
-        #self.gfxlodmesh_name = 'NNNOOOONNE'
         
         self.position = kwargs['position']
         self.coords = kwargs['verts']
@@ -67,7 +63,7 @@ class arbitrary_primitive(base):
         #self.phys_materials = kwargs['phys_materials']
         self.phys_materials = ['/common/pmat/Stone']
         self.face_materials = kwargs['face_materials']
-        self.tag = '_arb_'
+        self._default_('tag','_arb_',**kwargs)
         self.modified = False
 
     def __add__(self, other):
@@ -105,10 +101,14 @@ class arbitrary_primitive(base):
         _32bitindices = 'true' if _32bitindices else 'false'
         return _32bitindices
 
+    def has_normals(self):
+        has = 'true' if self.ncoords else 'false'
+        return has
+
     def calculate_normals(self):
+        if self.has_normals() == 'false': return
         # must iterate over faces, for each vertex, apply new normal
-        try:
-          for fa in self.faces:
+        for fa in self.faces:
             fcoords = [self.coords[f] for f in fa]
             v1 = self.coords[fa[0]]
             v2 = self.coords[fa[1]]
@@ -121,7 +121,6 @@ class arbitrary_primitive(base):
             #if not fu.angle_between(fu.v1_v2(comf,com),normal)>fu.PI/2.0:
             #    normal = fu.flip(normal)
             for vdx in fa: self.ncoords[vdx] = normal
-        except: pdb.set_trace()
 
     def get_vertexes(self):
         vargs = zip(self.coords,self.ncoords,self.uv_coords)
@@ -276,22 +275,28 @@ def xml_from_primitive_data(prim):
     xlines = []
     (vertexes, faces) = prim.get_vertexes_faces()# THIS NEEDS TO RETURN PROPER FACES DICT FOR MATERIALS TO WORK!!!
     _32bitindices = prim.requires_32bit_indices()
-    sig = 6
+    _normals = prim.has_normals()
+    sig = 4
 
     xlines.append("<mesh>\n")
     xlines.append("    <sharedgeometry>\n")
-    xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
+    xlines.append("        <vertexbuffer positions=\"true\" normals=\"+_normals+\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
+    #xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     for v in vertexes:
         x,y,z = v.pos
         nx,ny,nz = v.normal
         ux,uy = v.uv
         xlines.append("            <vertex>\n")
-        #xlines.append("                <position x=\""+str(np.round(v.pos[0],sig))+"\" y=\""+str(np.round(v.pos[1],sig))+"\" z=\""+str(np.round(v.pos[2],sig))+"\" />\n")
-        #xlines.append("                <normal x=\""+str(np.round(v.normal[0],sig))+"\" y=\""+str(np.round(v.normal[1],sig))+"\" z=\""+str(np.round(v.normal[2],sig))+"\" />\n")
-        #xlines.append("                <texcoord u=\""+str(np.round(v.uv[0],sig))+"\" v=\""+str(np.round(1-v.uv[1],sig))+"\" />\n")
-        xlines.append("                <position x=\""+str(x)+"\" y=\""+str(y)+"\" z=\""+str(z)+"\" />\n")
-        xlines.append("                <normal x=\""+str(nx)+"\" y=\""+str(ny)+"\" z=\""+str(nz)+"\" />\n")
-        xlines.append("                <texcoord u=\""+str(ux)+"\" v=\""+str(1.0-uy)+"\" />\n")
+        
+        xlines.append("                <position x=\""+str(np.round(v.pos[0],sig))+"\" y=\""+str(np.round(v.pos[1],sig))+"\" z=\""+str(np.round(v.pos[2],sig))+"\" />\n")
+        if _normals == 'true':
+            xlines.append("                <normal x=\""+str(np.round(v.normal[0],sig))+"\" y=\""+str(np.round(v.normal[1],sig))+"\" z=\""+str(np.round(v.normal[2],sig))+"\" />\n")
+        xlines.append("                <texcoord u=\""+str(np.round(v.uv[0],sig))+"\" v=\""+str(np.round(1-v.uv[1],sig))+"\" />\n")
+        
+        #xlines.append("                <position x=\""+str(x)+"\" y=\""+str(y)+"\" z=\""+str(z)+"\" />\n")
+        #xlines.append("                <normal x=\""+str(nx)+"\" y=\""+str(ny)+"\" z=\""+str(nz)+"\" />\n")
+        #xlines.append("                <texcoord u=\""+str(ux)+"\" v=\""+str(1.0-uy)+"\" />\n")
+        
         xlines.append("            </vertex>\n")
     xlines.append("        </vertexbuffer>\n")
     xlines.append("    </sharedgeometry>\n")
@@ -317,10 +322,9 @@ def primitive_data_from_xml(xmlfile):
     verts = []
     nverts = []
     uvs = []
-    sig = 6
+    sig = 4
     for vbuff in sharedgeometry.iterfind('vertexbuffer'):
         for vt in vbuff.iterfind('vertex'):
-            '''#
             x = np.round(float(vt.find('position').get('x')), sig)
             y = np.round(float(vt.find('position').get('y')), sig)
             z = np.round(float(vt.find('position').get('z')), sig)
@@ -331,6 +335,7 @@ def primitive_data_from_xml(xmlfile):
             nverts.append([nx,ny,nz])
             u = np.round(float(vt.find('texcoord').get('u')), sig)
             v = np.round(float(vt.find('texcoord').get('v')), sig)
+            uvs.append([u,1-v])
             '''#
             x = float(vt.find('position').get('x'))
             y = float(vt.find('position').get('y'))
@@ -343,6 +348,7 @@ def primitive_data_from_xml(xmlfile):
             u = float(vt.find('texcoord').get('u'))
             v = float(vt.find('texcoord').get('v'))
             uvs.append([u,1-v])
+            '''#
     submeshes = root.find('submeshes')
     if submeshes == None: print('NEED SUBMESHES!')
     faces = []
@@ -386,9 +392,9 @@ class unit_cube(arbitrary_primitive):
 
     def __init__(self, *args, **kwargs):
         pcubedata = primitive_data_from_xml(self.cubexml)
+        self._default_('tag','_cube_',**kwargs)
         arbitrary_primitive.__init__(self, *args, **pcubedata)
         self.coords_by_face = self.find_faces()
-        self.tag = '_cube_'
         self._scale_uvs_ = True
 
     def find_faces(self):
@@ -425,8 +431,8 @@ class unit_cube(arbitrary_primitive):
         self.calculate_normals()
         self.modified = True
 
-def ucube():
-    pcube = unit_cube()
+def ucube(*args, **kwargs):
+    pcube = unit_cube(*args, **kwargs)
     return pcube
 
 def uoctagon():

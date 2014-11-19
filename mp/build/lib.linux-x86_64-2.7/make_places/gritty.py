@@ -172,15 +172,9 @@ def output_map():
         handle.write(''.join(maplines))
 
 def write_map_lines(obj, location, rotation, name):
-    #print 'final world rotation!', rotation
     zang = rotation[2]
-    #zang = fu.PI/2.0
-    #zang = 0
     quat = (cos(zang/2.0),0,0,sin(zang/2.0))
-    #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat(1.0, 0.0, 0.0, 0.0), name="' + name + '" }\n']
-    #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
     lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
-    #lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=euler' + rotation.__repr__() + ', name="' + name + '" }\n']
     return lines
 
 executable_suffix = '.exe'

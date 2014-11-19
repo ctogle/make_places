@@ -32,7 +32,6 @@ class story(node):
         self._default_('wall_height',4.0,**kwargs)
         self._default_('ext_gaped',True,**kwargs)
         self.children = self.make_children(*args, **kwargs)
-        self.lod_primitives = []
         #self.lod_primitives = self.make_lod(*args, **kwargs)
         node.__init__(self, *args, **kwargs)
 
@@ -109,9 +108,10 @@ class story(node):
         #floor_pieces = kwargs['floor']
         floor_pieces = self.floor_
         peargs = [{
-            'parent':fl, 
-            #'parent':self, 
+            #'parent':fl, 
+            'parent':self, 
             'floor':fl, 
+            'wall_offset':-self.wall_width/2.0, 
             'gaped':self.ext_gaped, 
             'wall_height':self.wall_height, 
             'wall_width':self.wall_width, 

@@ -67,12 +67,21 @@ def rotate_y_coords(coords, ang_y):
         coo[:] = rot_coo
     return coords
 
-def rotate_z_coords(coords, ang_z):
+def rotate_z_matrix(ang_z):
     M_z = [
         [cos(ang_z),-sin(ang_z), 0], 
         [sin(ang_z), cos(ang_z), 0], 
         [         0,          0, 1], 
             ]
+    return M_z
+
+def rotate_z_coord(coord, ang_z):
+    M_z = rotate_z_matrix(ang_z)
+    rot_coo = row_major_multiply(M_z, coord)
+    return rot_coo
+
+def rotate_z_coords(coords, ang_z):
+    M_z = rotate_z_matrix(ang_z)
     for coo in coords:
         rot_coo = row_major_multiply(M_z, coo)
         coo[:] = rot_coo

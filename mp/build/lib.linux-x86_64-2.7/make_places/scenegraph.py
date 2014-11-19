@@ -17,8 +17,9 @@ class tform(base):
     def true(self):
         if self.parent:
             tpar = self.parent.true()
-            self.position = fu.rotate_z_coords(
-                [self.position], tpar.rotation[2])[0]
+            #fu.rotate_z_coords([self.position],tpar.rotation[2])
+            #self.position = fu.rotate_z_coords(
+            #    [self.position], tpar.rotation[2])[0]
             return tpar + self
         else: return self
 
@@ -103,7 +104,8 @@ class node(base):
     def add_child(self, *chil):
         for ch in chil:
             ch.tform.parent = self.tform
-            self.children.append(ch)
+            if not ch in self.children:
+                self.children.append(ch)
 
     def worldly_primitive(self, prim, ttf, uv_ttf, **kwargs):
         #tpm = dcopy(prim)
@@ -111,15 +113,13 @@ class node(base):
         tpm.scale(ttf.scales)
         tpm.worldly_uvs(uv_ttf)
         #tpm.rotate_z(ttf.rotation[2])
-        #kwargs['world_rotation'] = ttf.rotation
-        kwargs['world_rotation'] = [0,0,ttf.rotation[2]]
+        tpm.translate(ttf.position)
+        #tpm.rotate_z(ttf.rotation[2])
+
+        kwargs['world_rotation'] = ttf.rotation
         kwargs['name'] = self.name
         kwargs['rdist'] = self.grit_renderingdistance
         kwargs['lodrdist'] = self.grit_lod_renderingdistance
-        tpm.translate(fu.rotate_z_coords(
-            [ttf.position[:]],ttf.rotation[2])[0])
-        #tpm.rotate_z(ttf.rotation[2])
-        #pdb.set_trace()
         return tpm, kwargs
 
     def worldly_children(self, **kwargs):

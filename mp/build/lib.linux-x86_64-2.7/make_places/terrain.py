@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 from make_places.scenegraph import node
 from make_places.primitives import arbitrary_primitive
 import make_places.profiler as prf
@@ -48,7 +49,7 @@ class terrain_point(fu.base):
         #    howmany += 1
         #    print('howmany', howmany, len(self.neighbors), self.position)
         #    #pdb.set_trace()
-        centroid = fu.center_of_mass([v.position for v in self.neighbors])
+        centroid = mpu.center_of_mass([v.position for v in self.neighbors])
         wx,wy,wz = self.weights[0],self.weights[1],self.weights[2]
         move = fu.scale_vector(
             fu.v1_v2(self.position,centroid), 
@@ -72,7 +73,7 @@ class terrain_triangle(fu.base):
 
     def set_center(self, *args, **kwargs):
         vposs = [v.position for v in self.verts]
-        self._default_('center',fu.center_of_mass(vposs),**kwargs)
+        self._default_('center',mpu.center_of_mass(vposs),**kwargs)
         self.com_vects = [fu.v1_v2(v,self.center) for v in vposs]
         self.com_vects = [fu.normalize(v) for v in self.com_vects]
 
@@ -234,6 +235,7 @@ class terrain_triangle(fu.base):
             'materials' : materials, 
             'face_materials' : face_materials, 
             'xmlfilename' : xmlfile, 
+            'force_normal_calc' : True, 
                 }
         new = arbitrary_primitive(**pwargs)
         new.phys_materials = ['/common/pmat/Grass']
@@ -324,7 +326,7 @@ class terrain(node):
             xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
             mrng = max([xrng,yrng])
             hrad = mrng
-            center = fu.center_of_mass([t1,t2,t3,t4])
+            center = mpu.center_of_mass([t1,t2,t3,t4])
             hverts = []
             for ang in [0,60,120,180,240,300]:
                 pt = [hrad,0,0]
@@ -368,8 +370,8 @@ class terrain(node):
             ptlocs = [locs1,locs2]
             self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
 
-        vegetate = True
-        #vegetate = False
+        #vegetate = True
+        vegetate = False
         if vegetate:self.children = prf.measure_time('vegetate',self.vegetate,pieces)
         node.__init__(self, *args, **kwargs)
         self.assign_material('grass2', propagate = False)

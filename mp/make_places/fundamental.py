@@ -36,7 +36,12 @@ def uniq(seq):
 def flatten(unflat_list):
     return [item for sublist in unflat_list for item in sublist]
 
-def center_of_mass(coords):
+def center_of_mass_____________(coords):
+    return mpu.center_of_mass(coords)
+
+
+
+
     xs,ys,zs = zip(*coords)
     #xme = np.round(np.mean(xs),8)
     xme = np.mean(xs, dtype = np.float32)

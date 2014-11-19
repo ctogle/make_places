@@ -2,8 +2,17 @@ import make_places.fundamental as fu
 from make_places.scenegraph import node
 from make_places.floors import floor
 
+_ramp_count_ = 0
 class ramp(floor):
+
+    def get_name(self):
+        global _ramp_count_
+        nam = 'ramp ' + str(_ramp_count_)
+        _ramp_count_ += 1
+        return nam
+        
     def __init__(self, *args, **kwargs):
+        self._default_('name',self.get_name(),**kwargs)
         floor.__init__(self, *args, **kwargs)
         if self.gapped:
             print('failed to make ramp!!')
@@ -42,7 +51,7 @@ class shaft(node):
         self.bottom = -1
         self.top = 'roof'
         ramps = self.ramps(*args, **kwargs)
-        kwargs['children'] = ramps
+        self.add_child(*ramps)
         node.__init__(self, *args, **kwargs)
 
     def ramps(self, *args, **kwargs):

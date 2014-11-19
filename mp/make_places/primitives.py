@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 from make_places.fundamental import base
 import make_places.profiler as prf
 import make_places.user_info as ui
@@ -54,6 +55,8 @@ class arbitrary_primitive(base):
         self._default_('is_lod',False,**kwargs)
         self._default_('has_lod',False,**kwargs)
         
+        self._default_('force_normal_calc',False,**kwargs)
+
         self.position = kwargs['position']
         self.coords = kwargs['verts']
         self.ncoords = kwargs['nverts']
@@ -72,10 +75,8 @@ class arbitrary_primitive(base):
         verts = self.coords + other.coords
         nverts = self.ncoords + other.ncoords
         uvs = self.uv_coords + other.uv_coords
-        #faces = self.faces +\
-        #    fu.offset_faces(other.faces[:], other_offset)
+        fu.offset_faces(other.faces, other_offset)
         faces = self.faces + other.faces
-        #materials = fu.uniq(self.materials + other.materials)
         omats = [m for m in other.materials if not m in self.materials]
         materials = self.materials + omats
         face_materials = self.face_materials + other.face_materials
@@ -105,8 +106,8 @@ class arbitrary_primitive(base):
         has = 'true' if self.ncoords else 'false'
         return has
 
-    def calculate_normals(self):
-        if self.has_normals() == 'false': return
+    def calculate_normals(self,anyway = False):
+        if self.has_normals() == 'false' and not anyway: return
         # must iterate over faces, for each vertex, apply new normal
         for fa in self.faces:
             fcoords = [self.coords[f] for f in fa]
@@ -117,7 +118,7 @@ class arbitrary_primitive(base):
             v1v3 = fu.v1_v2(v1,v3)
             normal = fu.normalize(fu.cross(v1v2,v1v3))
             com = self.find_centroid()
-            comf = fu.center_of_mass(fcoords)
+            comf = mpu.center_of_mass(fcoords)
             #if not fu.angle_between(fu.v1_v2(comf,com),normal)>fu.PI/2.0:
             #    normal = fu.flip(normal)
             for vdx in fa: self.ncoords[vdx] = normal
@@ -159,7 +160,7 @@ class arbitrary_primitive(base):
         return (vs, fa)
 
     def find_centroid(self):
-        com = fu.center_of_mass(self.coords)   
+        com = mpu.center_of_mass(self.coords)   
         return com
 
     def origin_to_centroid(self):
@@ -172,7 +173,7 @@ class arbitrary_primitive(base):
 
     def write_as_xml(self):
         if self.modified:
-            self.calculate_normals()
+            self.calculate_normals(self.force_normal_calc)
             xlines, xfile = xml_from_primitive_data(self)
             self.xml_representation = '\n'.join(xlines)
         else:
@@ -277,6 +278,7 @@ def xml_from_primitive_data(prim):
     _32bitindices = prim.requires_32bit_indices()
     _normals = prim.has_normals()
     sig = 4
+    doround = False
 
     xlines.append("<mesh>\n")
     xlines.append("    <sharedgeometry>\n")
@@ -287,16 +289,16 @@ def xml_from_primitive_data(prim):
         nx,ny,nz = v.normal
         ux,uy = v.uv
         xlines.append("            <vertex>\n")
-        
-        xlines.append("                <position x=\""+str(np.round(v.pos[0],sig))+"\" y=\""+str(np.round(v.pos[1],sig))+"\" z=\""+str(np.round(v.pos[2],sig))+"\" />\n")
-        if _normals == 'true':
-            xlines.append("                <normal x=\""+str(np.round(v.normal[0],sig))+"\" y=\""+str(np.round(v.normal[1],sig))+"\" z=\""+str(np.round(v.normal[2],sig))+"\" />\n")
-        xlines.append("                <texcoord u=\""+str(np.round(v.uv[0],sig))+"\" v=\""+str(np.round(1-v.uv[1],sig))+"\" />\n")
-        
-        #xlines.append("                <position x=\""+str(x)+"\" y=\""+str(y)+"\" z=\""+str(z)+"\" />\n")
-        #xlines.append("                <normal x=\""+str(nx)+"\" y=\""+str(ny)+"\" z=\""+str(nz)+"\" />\n")
-        #xlines.append("                <texcoord u=\""+str(ux)+"\" v=\""+str(1.0-uy)+"\" />\n")
-        
+        if doround:
+            xlines.append("                <position x=\""+str(np.round(v.pos[0],sig))+"\" y=\""+str(np.round(v.pos[1],sig))+"\" z=\""+str(np.round(v.pos[2],sig))+"\" />\n")
+            if _normals == 'true':
+                xlines.append("                <normal x=\""+str(np.round(v.normal[0],sig))+"\" y=\""+str(np.round(v.normal[1],sig))+"\" z=\""+str(np.round(v.normal[2],sig))+"\" />\n")
+            xlines.append("                <texcoord u=\""+str(np.round(v.uv[0],sig))+"\" v=\""+str(np.round(1-v.uv[1],sig))+"\" />\n")
+        else:
+            xlines.append("                <position x=\""+str(x)+"\" y=\""+str(y)+"\" z=\""+str(z)+"\" />\n")
+            if _normals == 'true':
+                xlines.append("                <normal x=\""+str(nx)+"\" y=\""+str(ny)+"\" z=\""+str(nz)+"\" />\n")
+            xlines.append("                <texcoord u=\""+str(ux)+"\" v=\""+str(1.0-uy)+"\" />\n")
         xlines.append("            </vertex>\n")
     xlines.append("        </vertexbuffer>\n")
     xlines.append("    </sharedgeometry>\n")
@@ -323,32 +325,33 @@ def primitive_data_from_xml(xmlfile):
     nverts = []
     uvs = []
     sig = 4
+    doround = False
     for vbuff in sharedgeometry.iterfind('vertexbuffer'):
         for vt in vbuff.iterfind('vertex'):
-            x = np.round(float(vt.find('position').get('x')), sig)
-            y = np.round(float(vt.find('position').get('y')), sig)
-            z = np.round(float(vt.find('position').get('z')), sig)
-            verts.append([x,y,z])
-            nx = np.round(float(vt.find('normal').get('x')), sig)
-            ny = np.round(float(vt.find('normal').get('y')), sig)
-            nz = np.round(float(vt.find('normal').get('z')), sig)
-            nverts.append([nx,ny,nz])
-            u = np.round(float(vt.find('texcoord').get('u')), sig)
-            v = np.round(float(vt.find('texcoord').get('v')), sig)
-            uvs.append([u,1-v])
-            '''#
-            x = float(vt.find('position').get('x'))
-            y = float(vt.find('position').get('y'))
-            z = float(vt.find('position').get('z'))
-            verts.append([x,y,z])
-            nx = float(vt.find('normal').get('x'))
-            ny = float(vt.find('normal').get('y'))
-            nz = float(vt.find('normal').get('z'))
-            nverts.append([nx,ny,nz])
-            u = float(vt.find('texcoord').get('u'))
-            v = float(vt.find('texcoord').get('v'))
-            uvs.append([u,1-v])
-            '''#
+            if doround:
+                x = np.round(float(vt.find('position').get('x')), sig)
+                y = np.round(float(vt.find('position').get('y')), sig)
+                z = np.round(float(vt.find('position').get('z')), sig)
+                verts.append([x,y,z])
+                nx = np.round(float(vt.find('normal').get('x')), sig)
+                ny = np.round(float(vt.find('normal').get('y')), sig)
+                nz = np.round(float(vt.find('normal').get('z')), sig)
+                nverts.append([nx,ny,nz])
+                u = np.round(float(vt.find('texcoord').get('u')), sig)
+                v = np.round(float(vt.find('texcoord').get('v')), sig)
+                uvs.append([u,1-v])
+            else:
+                x = float(vt.find('position').get('x'))
+                y = float(vt.find('position').get('y'))
+                z = float(vt.find('position').get('z'))
+                verts.append([x,y,z])
+                nx = float(vt.find('normal').get('x'))
+                ny = float(vt.find('normal').get('y'))
+                nz = float(vt.find('normal').get('z'))
+                nverts.append([nx,ny,nz])
+                u = float(vt.find('texcoord').get('u'))
+                v = float(vt.find('texcoord').get('v'))
+                uvs.append([u,1-v])
     submeshes = root.find('submeshes')
     if submeshes == None: print('NEED SUBMESHES!')
     faces = []
@@ -424,7 +427,7 @@ class unit_cube(arbitrary_primitive):
     def rotate_z_face(self, ang_z, face = 'top'):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
-        foff = fu.center_of_mass(face_coords)
+        foff = mpu.center_of_mass(face_coords)
         fu.translate_coords(face_coords, fu.flip(foff))
         fu.rotate_z_coords(face_coords, ang_z)
         fu.translate_coords(face_coords, foff)

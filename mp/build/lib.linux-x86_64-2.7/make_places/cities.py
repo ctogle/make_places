@@ -39,7 +39,7 @@ class block(node):
         children = self.reusing(*args, **kwargs)
         if not children: children =\
             self.children_from_kwargs(*args, **kwargs)
-        self._default_('children', children, **kwargs)
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
     def children_from_kwargs(self, *args, **kwargs):
@@ -282,14 +282,14 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':20, 
+                'intersection_count':5, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
                     }
             road_sys = road_system(**rsargs)
         self.road_system = road_sys
-        return road_sys
+        return [road_sys]
 
     def make_city_parts(self, *args, **kwargs):
         road_sys = self.make_road_system(*args, **kwargs)

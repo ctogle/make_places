@@ -95,23 +95,20 @@ class perimeter(node):
 
     def __init__(self, *args, **kwargs):
         self._default_('name',self.get_name(),**kwargs)
+        self._default_('floor',None,**kwargs)
+        if self.floor: corns = self.floor.corners
+        else: corns = kwargs['corners']
+        self._default_('wall_offset',0,**kwargs)
+        corns = self.add_corner_offset(corns)
+        self._default_('corners',corns,**kwargs)
+        kwargs['uv_parent'] = self.floor
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
-        self._default_('wall_offset',0,**kwargs)
-        self._default_('floor',None,**kwargs)
-        if self.floor:
-            corns = self.floor.corners
-            #self.set_parent(self.floor)
-            #self.floor.add_child(self)
-        else: corns = kwargs['corners']
-        #corns = self.add_corner_offset(corns)
-        self._default_('corners',corns,**kwargs)
         self._default_('wall_width', 0.5, **kwargs)
         self._default_('wall_height', 4, **kwargs)
         self._default_('wall_gaps',[[],[],[],[]],**kwargs) 
         self._default_('gaped',True,**kwargs)
         self.gapes = [self.gaped]*len(self.wall_gaps)
-        #self._default_('children',self.make_walls(
         self.add_child(*self.make_walls(self.corners,
             gapes = self.gapes,gaps = self.wall_gaps))
         node.__init__(self, *args, **kwargs)
@@ -138,16 +135,16 @@ class perimeter(node):
         c4 = corners[3]
         ww = self.wall_width
         h = self.wall_height
-        walls.append(wall(c1, c2, #parent = self, 
+        walls.append(wall(c1, c2, uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[0], gaped = gapes[0]))
-        walls.append(wall(c2, c3, #parent = self, 
+        walls.append(wall(c2, c3, uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[1], gaped = gapes[1]))
-        walls.append(wall(c3, c4, #parent = self, 
+        walls.append(wall(c3, c4, uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[2], gaped = gapes[2]))
-        walls.append(wall(c4, c1, #parent = self, 
+        walls.append(wall(c4, c1, uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[3], gaped = gapes[3]))
         return walls

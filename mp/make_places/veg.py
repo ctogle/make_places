@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 import make_places.primitives as pr
 from make_places.primitives import arbitrary_primitive
 from make_places.scenegraph import node
@@ -32,7 +33,7 @@ def vegetate(verts, norms, faces):
     # vegetate should create veg_batch for faces, using norms for orientation
     # should return node for all veg on faces
     # verts are expected to be in world space
-    #pt = fu.center_of_mass(verts)
+    #pt = mpu.center_of_mass(verts)
     treeprims = []
     treelodprims = []
     pts = []
@@ -40,7 +41,7 @@ def vegetate(verts, norms, faces):
     maxtcnt = 3
     for fa in faces:
         vs = verts[fa]
-        pt = fu.center_of_mass(vs)
+        pt = mpu.center_of_mass(vs)
         pts.append(pt)
         #for ntdx in rm.sample([0,1,2],rm.randrange(mintcnt,maxtcnt)):
         for ntdx in rm.sample([0,1,2],1):

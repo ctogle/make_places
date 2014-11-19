@@ -21,6 +21,25 @@ def distance_xy(v1,v2):
     ds = (dx**2 + dy**2)**(0.5)
     return ds
 
+cpdef center_of_mass(list coords):
+    cdef float xsum = 0.0
+    cdef float ysum = 0.0
+    cdef float zsum = 0.0
+    cdef int ccnt = len(coords)
+    cdef float ccntf = float(ccnt)
+    cdef int dx
+    cdef float xcm 
+    cdef float ycm 
+    cdef float zcm 
+    for dx in range(ccnt):
+        coo = coords[dx]
+        xsum += coo[0]
+        ysum += coo[1]
+        zsum += coo[2]
+    xcm = xsum/ccntf
+    ycm = ysum/ccntf
+    zcm = zsum/ccntf
+    return [xcm,ycm,zcm]
 
 
 

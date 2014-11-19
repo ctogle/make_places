@@ -1,6 +1,7 @@
 #from make_places.fundamental import element
 from make_places.scenegraph import node
 import make_places.fundamental as fu
+import mp_utils as mpu
 import make_places.primitives as pr
 from make_places.stairs import ramp
 from make_places.stairs import shaft
@@ -12,13 +13,21 @@ import random as rm
 
 import pdb
 
+_story_count_ = 0
 class story(node):
+
+    def get_name(self):
+        global _story_count_
+        nam = 'story ' + str(_story_count_)
+        _story_count_ += 1
+        return nam
 
     def __init__(self, *args, **kwargs):
         self.floor_number = args[0]
+        self._default_('name',self.get_name(),**kwargs)
         self._default_('add_ceiling',True,**kwargs)
         self._default_('shafts',[],**kwargs)
-        #self._default_('consumes_children',True,**kwargs)
+        self._default_('consumes_children',True,**kwargs)
         #self._default_('consumes_children',False,**kwargs)
         self._default_('grit_renderingdistance',250.0,**kwargs)
         self._default_('grit_lod_renderingdistance',1000.0,**kwargs)
@@ -31,8 +40,9 @@ class story(node):
         self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
         self._default_('ext_gaped',True,**kwargs)
-        self.children = self.make_children(*args, **kwargs)
-        #self.lod_primitives = self.make_lod(*args, **kwargs)
+        children = self.make_children(*args, **kwargs)
+        self.add_child(*children)
+        self.lod_primitives = self.make_lod(*args,**kwargs)
         node.__init__(self, *args, **kwargs)
 
     def make_lod(self, *args, **kwargs):
@@ -50,7 +60,7 @@ class story(node):
         lod.translate(pos)
         #lod.is_lod = True
 
-        self.children[0].primitives[0].has_lod = True
+        self.tform.children[0].owner.primitives[0].has_lod = True
 
         return [lod]
 
@@ -58,7 +68,6 @@ class story(node):
         floor_ = self.make_floor(*args, **kwargs)
         if self.add_ceiling:ceiling = self.make_ceiling(*args, **kwargs)
         else:ceiling = []
-        #ceiling = []
         ext_walls = self.make_exterior_walls(*args, **kwargs)
         #int_walls = self.make_interior_walls(*args, **kwargs)
         return floor_ + ceiling + ext_walls #+ int_walls
@@ -72,12 +81,12 @@ class story(node):
                 gaps.extend(sh.floor_gaps)
         flpos = [0,0,0]
         flargs = {
+            'uv_parent':self, 
             'position':flpos, 
             'length':flleng, 
             'width':flwidt, 
             'gaps':gaps,
             'height':self.floor_height, 
-            'parent':self, 
                 }
         floor_ = floor(**flargs)
         self.floor_ = [floor_]
@@ -93,12 +102,12 @@ class story(node):
         czpos = self.wall_height+self.ceiling_height#+self.floor_height
         flpos = [0,0,czpos]
         flargs = {
+            'uv_parent':self, 
             'position':flpos, 
             'length':flleng, 
             'width':flwidt, 
             'gaps':gaps,
             'floor_height':self.ceiling_height, 
-            'parent':self, 
                 }
         ceil = floor(**flargs)
         self.ceiling = [ceil]
@@ -109,7 +118,8 @@ class story(node):
         floor_pieces = self.floor_
         peargs = [{
             #'parent':fl, 
-            'parent':self, 
+            #'parent':self, 
+            'uv_parent':self, 
             'floor':fl, 
             'wall_offset':-self.wall_width/2.0, 
             'gaped':self.ext_gaped, 
@@ -160,19 +170,21 @@ class story_batch(node):
     def __init__(self, *args, **kwargs):
         self._default_('name','storybatch',**kwargs)
         self._default_('consumes_children',True,**kwargs)
-        self._default_('grit_renderingdistance',100,**kwargs)
+        self._default_('grit_renderingdistance',500,**kwargs)
         self._default_('grit_lod_renderingdistance',1000,**kwargs)
         node.__init__(self, *args, **kwargs)
 
 class building(node):
 
     def __init__(self, *args, **kwargs):
+        self._default_('grit_renderingdistance',250.0,**kwargs)
+        self._default_('grit_lod_renderingdistance',1000.0,**kwargs)
         self._default_('floors',5,**kwargs)
         self._default_('length',40,**kwargs)
         self._default_('width',30,**kwargs)
         self._default_('tform',
             self.def_tform(*args,**kwargs),**kwargs)
-        kwargs['uv_scales'] = [8,8,8]
+        #kwargs['uv_scales'] = [8,8,8]
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('materials',['imgtex'],**kwargs)
@@ -191,9 +203,10 @@ class building(node):
         story_batches = foundation + stories
         #story_batches = stories
         
-        self.children = shafts + story_batches
+        children = shafts + story_batches
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
-        self.assign_material('concrete')
+        #self.assign_material('concrete')
 
     def make_foundation(self):
         shafts = self.shafts
@@ -209,7 +222,7 @@ class building(node):
         baheight = basement_floor_height + basement_wall_height
         fu.translate_vector(bpos,[0,0,-baheight])
         baargs = {
-            'parent':self, 
+            #'parent':self, 
             'uv_parent':self, 
             'name':bname+'_basement_0', 
             'position':bpos, 
@@ -251,7 +264,7 @@ class building(node):
                 'name':'_storybatch_'+str(len(batches)), 
                 'position':stbatpos, 
                 'children':batches[-1], 
-                'parent':self, 
+                #'parent':self, 
                 'uv_parent':self, 
                     })
             b0.tform.position[2] = 0.0
@@ -259,7 +272,8 @@ class building(node):
         
         stbatches = [story_batch(**stbgs) for stbgs in stbargs]
         for stbat,bat in zip(stbatches,batches):
-            for ba in bat: ba.tform.parent = stbat.tform
+            for ba in bat: ba.set_parent(stbat)
+        #    #for ba in bat: ba.tform.parent = stbat.tform
         return stbatches
 
     def terrain_points(self):
@@ -267,7 +281,7 @@ class building(node):
         fu.translate_coords(tpts,[0,0,-0.5])
         #fu.translate_coords(tpts,[0,0,9])
         tpts = fu.dice_edges(tpts, dices = 1)
-        tpts.append(fu.center_of_mass(tpts))
+        tpts.append(mpu.center_of_mass(tpts))
         return tpts
 
     def make_shafts(self, *args, **kwargs):
@@ -275,7 +289,7 @@ class building(node):
         if not self.roof_access: flcnt -= 1
         if flcnt == 1: return []
         shargs = [{
-            'parent':self, 
+            #'parent':self, 
             'uv_parent':self, 
             'position':[0,0,0], 
             'rotation':[0,0,0], 
@@ -354,7 +368,7 @@ class building(node):
             stheight = wheight + fheight
             bump += stheight
             stargs = {
-                'parent':self, 
+                #'parent':self, 
                 'uv_parent':self, 
                 'name':stname, 
                 'position':fl_pos, 

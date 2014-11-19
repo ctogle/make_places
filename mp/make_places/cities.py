@@ -39,7 +39,7 @@ class block(node):
         children = self.reusing(*args, **kwargs)
         if not children: children =\
             self.children_from_kwargs(*args, **kwargs)
-        self._default_('children', children, **kwargs)
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
     def children_from_kwargs(self, *args, **kwargs):
@@ -239,7 +239,8 @@ class city(node):
 
     def __init__(self, *args, **kwargs):
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
-        self.children = self.make_city_parts(*args,**kwargs)
+        children = self.make_city_parts(*args,**kwargs)
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
     def make_blocks_from_roads(self, *args, **kwargs):
@@ -282,22 +283,22 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':20, 
+                'intersection_count':5, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
                     }
             road_sys = road_system(**rsargs)
         self.road_system = road_sys
-        return road_sys
+        return [road_sys]
 
     def make_city_parts(self, *args, **kwargs):
         road_sys = self.make_road_system(*args, **kwargs)
-        blocks = self.make_blocks_from_roads(road_sys)
-        pts_of_int = road_sys.terrain_points()
+        blocks = self.make_blocks_from_roads(road_sys[0])
+        pts_of_int = road_sys[0].terrain_points()
         for bl in blocks: pts_of_int.extend(bl.terrain_points())
         terra = self.make_terrain(pts_of_interest = pts_of_int, 
-                region_bounds = road_sys.region_bounds)
+                region_bounds = road_sys[0].region_bounds)
         parts = road_sys + blocks + terra
         return parts
 

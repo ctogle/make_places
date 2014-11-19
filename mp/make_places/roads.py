@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 import make_places.primitives as pr
 #from make_places.fundamental import element
 from make_places.scenegraph import node
@@ -195,7 +196,7 @@ class road_segment_primitive(arbitrary_primitive):
     def rotate_z_face(self, ang_z, face = 'top'):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
-        foff = fu.center_of_mass(face_coords)
+        foff = mpu.center_of_mass(face_coords)
         fu.translate_coords(face_coords, fu.flip(foff))
         fu.rotate_z_coords(face_coords, ang_z)
         fu.translate_coords(face_coords, foff)
@@ -245,8 +246,8 @@ class road(node):
             tcorns = fu.dice_edges(tcorns, dices = 1)
             tpts.extend(tcorns)
             #tpts.append(fu.translate_vector(
-            #    fu.center_of_mass(tpts),[0,0,-1.5]))
-            tpts.append(fu.center_of_mass(tpts))
+            #    mpu.center_of_mass(tpts),[0,0,-1.5]))
+            tpts.append(mpu.center_of_mass(tpts))
             mcorns = [tpts[3],tpts[7],tpts[8]]
             fu.translate_coords(mcorns,[0,0,-0.25])
         #return fu.uniq(tpts)
@@ -423,7 +424,8 @@ class road_system(node):
         #kwargs['road_width'] = rwidth
         children = self.reusing(*args, **kwargs)
         if not children:children = self.children_from_kwargs(*args,**kwargs)
-        self.children = children
+        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
     def children_from_kwargs(self, *args, **kwargs):
@@ -468,7 +470,8 @@ class road_system(node):
     def terrain_points(self):
         #pts = [ch.tform.true().position for ch in self.children]
         pts = []
-        [pts.extend(ch.terrain_points()) for ch in self.children]
+        [pts.extend(ch.owner.terrain_points()) 
+            for ch in self.tform.children]
         return pts
 
     def make_primitives_web(self, *args, **kwargs):
@@ -622,9 +625,9 @@ class road_system(node):
 
     def get_bbox(self):
         bboxes = []
-        roads = self.children
-        for rd in roads:
-            rdboxes = rd.get_bbox()
+        roads = self.tform.children
+        for rdtf in roads:
+            rdboxes = rdtf.owner.get_bbox()
             bboxes.extend(rdboxes)
         return bboxes
 

@@ -296,7 +296,8 @@ def create_elem(elem, center = True):
     import make_places.scenegraph as sg
     sgr = sg.sgraph(nodes = [elem])
     sgr.make_scene_g(center = center)
-    print('creating node', elem)
+    #print('creating node', elem)
+    print 'creating node\n', elem
 
 
 

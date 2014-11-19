@@ -425,14 +425,14 @@ def block_g():
     pts_of_int =\
         rsys.terrain_points() +\
         bl1.terrain_points() +\
-        bl2.terrain_points() +\
-        [[150,150,25]]
-    #corners = [[0,0,0],[200,0,0],[200,200,0],[0,200,0]]
-    #bboxes = [fu.bbox(corners = corners)]
+        bl2.terrain_points()
+    corners = [[0,0,0],[200,0,0],[200,200,0],[0,200,0]]
+    bboxes = [fu.bbox(corners = corners)]
     bboxes = rsys.get_bbox() + bl1.get_bbox() + bl2.get_bbox()
     ter = terr.terrain(
         pts_of_interest = pts_of_int, 
         splits = 5, bboxes = bboxes)
+    #gritgeo.create_element(rsys,bl1)
     gritgeo.create_element(rsys,bl1,bl2,ter)
     gritgeo.output_world_scripts()
 

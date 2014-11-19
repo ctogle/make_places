@@ -3,11 +3,18 @@ import make_places.fundamental as fu
 from make_places.scenegraph import node
 from make_places.primitives import unit_cube
 
+_floor_count_ = 0
 class floor(node):
+
+    def get_name(self):
+        global _floor_count_
+        nam = 'floor ' + str(_floor_count_)
+        _floor_count_ += 1
+        return nam
 
     def __init__(self, *args, **kwargs):
         self.seg_numbers = [str(x) for x in range(10)]  
-
+        self._default_('name',self.get_name(),**kwargs)
         #self._default_('position',[0,0,0],**kwargs)
         #self._default_('tform',tform(),**kwargs)
         self._default_('length',20,**kwargs)
@@ -79,8 +86,10 @@ class floor(node):
         s4z = c1z
         s3 = ([s3x,s3y,s3z],lg,s3w,h)
         s4 = ([s4x,s4y,s4z],lg,s4w,h)
-        segposs = [s1[0],s2[0],s3[0],s4[0]]
-        fu.rotate_z_coords(segposs, self.tform.rotation[2])
+        #segposs = [s1[0],s2[0],s3[0],s4[0]]
+        #print 'seggggg', segposs
+        #fu.rotate_z_coords(segposs, self.tform.rotation[2])
+        #print 'seggggg', segposs
         return [s1,s2,s3,s4]
 
     def seg_number(self):

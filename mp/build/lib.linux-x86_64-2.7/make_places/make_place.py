@@ -305,25 +305,17 @@ def abox():
         rotation = [0,0,fu.PI/6.0])
     pe = walls.perimeter(floor = fl, gaped = True)
     elems = [fl,pe]
-    return elems
+    no = sg.node(children = elems)
+    return no
 
 def tg():
     gritgeo.reset_world_scripts()
 
     st1 = blg.story(1, position = [0,-20,0], rotation = [0,0,fu.PI/3.0])
-
-    st2 = blg.story(1, position = [-20,0,0], rotation = [0,0,fu.PI/3.0])
-    stn = sg.node(position = [0,0,-5])
-    st2.tform.parent = stn.tform
-
     st2 = blg.story(1, position = [-20,0,0], rotation = [0,0,fu.PI/3.0])
     stn = sg.node(position = [0,0,-5])
     stn.add_child(st2)
-    #st2.tform.parent = stn.tform
-    #stn = sg.node(children = [st2])
-    
     ab = abox()
-    
     built = blg.building(position = [0,20,-5], rotation = [0,0,fu.PI/12.0])
     
     pcube = pr.ucube()
@@ -433,14 +425,14 @@ def block_g():
     pts_of_int =\
         rsys.terrain_points() +\
         bl1.terrain_points() +\
-        bl2.terrain_points() +\
-        [[150,150,25]]
-    #corners = [[0,0,0],[200,0,0],[200,200,0],[0,200,0]]
-    #bboxes = [fu.bbox(corners = corners)]
+        bl2.terrain_points()
+    corners = [[0,0,0],[200,0,0],[200,200,0],[0,200,0]]
+    bboxes = [fu.bbox(corners = corners)]
     bboxes = rsys.get_bbox() + bl1.get_bbox() + bl2.get_bbox()
     ter = terr.terrain(
         pts_of_interest = pts_of_int, 
         splits = 5, bboxes = bboxes)
+    #gritgeo.create_element(rsys,bl1)
     gritgeo.create_element(rsys,bl1,bl2,ter)
     gritgeo.output_world_scripts()
 

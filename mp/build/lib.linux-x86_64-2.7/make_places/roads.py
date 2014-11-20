@@ -69,7 +69,8 @@ class intersection(node):
         self._default_('road_width',20,**kwargs)
         self._default_('road_height',2,**kwargs)
         self.primitives = self.make_segments(*args, **kwargs)
-        self.children = self.place_vehicles()
+        children = self.place_vehicles()
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
     def find_corners(self):
@@ -635,14 +636,17 @@ class highway(road):
 
     def make_segments(self, *args, **kwargs):
         sverts = self.segmented_vertices
-        for sv in sverts[1:-1]: fu.translate_vector(sv,[0,0,20])
+        sverts_ground = self.segmented_vertices[:]
+        for sv in sverts[1:-1]: fu.translate_vector(sv,[0,0,10])
+        for sv in sverts[2:-2]: fu.translate_vector(sv,[0,0,10])
         rdsegs = road.make_segments(self, *args, **kwargs)
         return rdsegs
 
     def make_leg(self, v):
         leg = pr.ucube()
-        leg.scale([5,5,20])
-        leg.translate(v)
+        leg_leng = 20
+        leg.scale([5,5,leg_leng])
+        leg.translate(fu.translate_vector(v[:],[0,0,-leg_leng]))
         return leg
 
     def make_segment(self, p1, p2, widt, depth, a1, a2):

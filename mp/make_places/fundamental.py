@@ -1,4 +1,5 @@
 import mp_utils as mpu
+from mp_utils import dot
 
 from math import cos
 from math import sin
@@ -307,7 +308,7 @@ def offset_faces(faces, offset):
             fa[fx] += offset
     return faces
 
-def find_closest_xy(one,bunch):
+def find_closest_xy_____(one,bunch):
     ds = [mpu.distance_xy(one,b) for b in bunch]
     #ds = [distance_xy(one,b) for b in bunch]
     dx = ds.index(min(ds))
@@ -329,17 +330,23 @@ class bbox(base):
     def __init__(self, *args, **kwargs):
         self._default_('corners',[],**kwargs)
         self._default_('position',[0,0,0],**kwargs)
+        self._default_('edgenorms',
+            mpu.get_norms(self.corners),**kwargs)
 
     def intersects(self,boxes,box):
         if not type(box) is type([]):box = [box]
-        check = separating_axis
+        check = mpu.separating_axis
         for bo in box:
             for ibox in boxes:
                 if check(ibox,bo):
                     return True
         return False
 
-def get_norms(verts):
+
+
+
+
+def get_norms______(verts):
     norms = []
     #zhat = [0,0,1]
     for vdx in range(1, len(verts)):
@@ -353,7 +360,7 @@ def get_norms(verts):
         norms.append(norm)
     return norms
 
-def project(verts, axis):
+def project_____(verts, axis):
     min_ = dot(verts[0],axis)
     max_ = min_
     for v in verts[1:]:
@@ -362,12 +369,12 @@ def project(verts, axis):
         if val > max_: max_ = val
     return [min_,max_]
     
-def overlap(rng1,rng2):
+def overlap______(rng1,rng2):
     if max(rng1) < min(rng2): return False
     elif max(rng2) < min(rng1): return False
     else: return True
 
-def separating_axis(bb1,bb2):
+def separating_axis_____(bb1,bb2):
     ns1 = get_norms(bb1.corners)
     ns2 = get_norms(bb2.corners)
     edgenorms = ns1 + ns2
@@ -378,12 +385,6 @@ def separating_axis(bb1,bb2):
             return False
     return True
 
-def break_elements(elements):
-    def prep(elem):
-        elms = [elem.transform(child) for child in elem.children]
-        return elms
-    elements = [prep(el) for el in elements]
-    return [item for sublist in elements for item in sublist]
 
 
 

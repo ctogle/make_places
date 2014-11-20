@@ -26,7 +26,7 @@ class shaft(node):
 
     def __init__(self, *args, **kwargs):
         self._default_('grit_renderingdistance',100.0,**kwargs)
-        #self._default_('consumes_children',True,**kwargs)
+        self._default_('consumes_children',True,**kwargs)
         self._default_('length',10.0,**kwargs)
         self._default_('width',10.0,**kwargs)
         self._default_('wall_width',0.4,**kwargs)

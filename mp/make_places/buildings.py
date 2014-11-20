@@ -199,8 +199,8 @@ class building(node):
         stories = self.make_floors_from_shafts(*args, **kwargs)
         foundation = self.make_foundation()
         
-        #story_batches = self.batch_stories(foundation+stories)
-        story_batches = foundation + stories
+        story_batches = self.batch_stories(foundation+stories)
+        #story_batches = foundation + stories
         #story_batches = stories
         
         children = shafts + story_batches
@@ -365,7 +365,7 @@ class building(node):
             wheight = flwlhts[fdx]
             fl_pos = bpos[:]
             fl_pos[2] += bump
-            stheight = wheight + fheight
+            stheight = wheight + fheight + cheight
             bump += stheight
             stargs = {
                 #'parent':self, 

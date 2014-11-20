@@ -1,4 +1,5 @@
 import mp_utils as mpu
+from mp_utils import dot
 
 from math import cos
 from math import sin
@@ -36,7 +37,7 @@ def uniq(seq):
 def flatten(unflat_list):
     return [item for sublist in unflat_list for item in sublist]
 
-def center_of_mass(coords):
+def center_of_mass_____________(coords):
     return mpu.center_of_mass(coords)
 
 

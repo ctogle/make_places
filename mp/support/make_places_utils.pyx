@@ -11,39 +11,105 @@
 # from math import log
 
 #import random
-#import numpy as np
+import numpy as np
 
 #from numpy import pi
 
-def distance_xy(v1,v2):
+cpdef float distance_xy(list v1,list v2):
+    cdef float dx
+    cdef float dy
+    cdef float ds
     dx = v2[0] - v1[0]
     dy = v2[1] - v1[1]
     ds = (dx**2 + dy**2)**(0.5)
     return ds
 
-cpdef center_of_mass(list coords):
-    cdef float xsum = 0.0
-    cdef float ysum = 0.0
-    cdef float zsum = 0.0
-    cdef int ccnt = len(coords)
-    cdef float ccntf = float(ccnt)
-    cdef int dx
-    cdef float xcm 
-    cdef float ycm 
-    cdef float zcm 
-    for dx in range(ccnt):
-        coo = coords[dx]
-        xsum += coo[0]
-        ysum += coo[1]
-        zsum += coo[2]
-    xcm = xsum/ccntf
-    ycm = ysum/ccntf
-    zcm = zsum/ccntf
-    return [xcm,ycm,zcm]
+cpdef list center_of_mass(list coords):
+    xs,ys,zs = zip(*coords)
+    #xme = np.round(np.mean(xs),8)
+    xme = np.mean(xs, dtype = np.float32)
+    yme = np.mean(ys, dtype = np.float32)
+    zme = np.mean(zs, dtype = np.float32)
+    return [xme,yme,zme]
 
+cpdef float dot(list v1, list v2):
+    cdef float xp
+    cdef float yp
+    cdef float zp
+    xp = v1[0]*v2[0]
+    yp = v1[1]*v2[1]
+    zp = v1[2]*v2[2]
+    return xp + yp + zp
 
+cpdef tuple project(list verts, list axis):
+    cdef float min_ = dot(verts[0],axis)
+    cdef float max_ = min_
+    cdef int vcnt = len(verts)
+    cdef int vdx
+    cdef float val
+    for vdx in range(1,vcnt):
+    #for v in verts[1:]:
+        v = verts[vdx]
+        val = dot(v,axis)
+        if val < min_: min_ = val
+        if val > max_: max_ = val
+    return (min_,max_)
 
+cpdef bint overlap(rng1,rng2):
+    if max(rng1) < min(rng2): return 0
+    elif max(rng2) < min(rng1): return 0
+    else: return 1
 
+cpdef bint separating_axis(bb1,bb2):
+    #ns1 = get_norms(bb1.corners)
+    #ns2 = get_norms(bb2.corners)
+    cdef list ns1 = bb1.edgenorms
+    cdef list ns2 = bb2.edgenorms
+    cdef list edgenorms = ns1 + ns2
+    cdef list edgenorm
+    cdef int egcnt = len(edgenorms)
+    cdef int egdx
+    cdef tuple proj1
+    cdef tuple proj2
+    for egdx in range(egcnt):
+        edgenorm = edgenorms[egdx]
+        proj1 = project(bb1.corners,edgenorm)
+        proj2 = project(bb2.corners,edgenorm)
+        if not overlap(proj1,proj2): return 0
+    return 1
+
+cpdef list get_norms(list verts):
+    cdef list norms = []
+    #zhat = [0,0,1]
+    cdef int vcnt = len(verts)
+    cdef int vdx
+    cdef list v1
+    cdef list v2
+    cdef float dx
+    cdef float dy
+    cdef float dv
+    cdef list norm
+    for vdx in range(1,vcnt):
+        v1,v2 = verts[vdx-1],verts[vdx]
+        #v1_v2_ = normalize(v1_v2(v1,v2))
+        #norm = normalize(cross(v1_v2_,zhat))
+        dx = v2[0] - v1[0]
+        dy = v2[1] - v1[1]
+        dv = sqrt(dx**2 + dy**2)
+        norm = [dy/dv,-dx/dv,0]
+        norms.append(norm)
+    return norms
+
+cpdef tuple find_closest_xy(list one,list bunch):
+    cdef int bcnt = len(bunch)
+    cdef int bdx
+    cdef float nearest 100000000.0
+    for bdx in range(bcnt)
+        ds = distance_xy(one,bunch[bdx])
+        if ds < nearest:
+            nearest = ds
+            ndx = bdx
+    return bunch[ndx],nearest,ndx
 
 
 

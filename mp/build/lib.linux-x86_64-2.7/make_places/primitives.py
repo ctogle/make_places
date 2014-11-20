@@ -117,8 +117,8 @@ class arbitrary_primitive(base):
             v1v2 = fu.v1_v2(v1,v2)
             v1v3 = fu.v1_v2(v1,v3)
             normal = fu.normalize(fu.cross(v1v2,v1v3))
-            com = self.find_centroid()
-            comf = mpu.center_of_mass(fcoords)
+            #com = self.find_centroid()
+            #comf = mpu.center_of_mass(fcoords)
             #if not fu.angle_between(fu.v1_v2(comf,com),normal)>fu.PI/2.0:
             #    normal = fu.flip(normal)
             for vdx in fa: self.ncoords[vdx] = normal

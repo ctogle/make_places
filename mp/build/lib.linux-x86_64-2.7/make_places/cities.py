@@ -4,6 +4,7 @@ import make_places.scenegraph as sg
 from make_places.scenegraph import node
 from make_places.fundamental import bbox
 from make_places.roads import road_system
+from make_places.roads import highway
 from make_places.buildings import building
 from make_places.terrain import terrain
 import make_places.pkler as pk
@@ -45,7 +46,9 @@ class block(node):
     def children_from_kwargs(self, *args, **kwargs):
         if 'road' in kwargs.keys():
             rd = kwargs['road']
-            children = self.make_buildings_from_road(*args, **kwargs)
+            if not issubclass(rd,highway):
+                children = self.make_buildings_from_road(*args, **kwargs)
+            else: children = []
         else:
             pos = kwargs['position']
             length = kwargs['length']
@@ -239,7 +242,8 @@ class city(node):
 
     def __init__(self, *args, **kwargs):
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
-        self.children = self.make_city_parts(*args,**kwargs)
+        children = self.make_city_parts(*args,**kwargs)
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
     def make_blocks_from_roads(self, *args, **kwargs):
@@ -282,7 +286,7 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':5, 
+                'intersection_count':15, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
@@ -293,11 +297,11 @@ class city(node):
 
     def make_city_parts(self, *args, **kwargs):
         road_sys = self.make_road_system(*args, **kwargs)
-        blocks = self.make_blocks_from_roads(road_sys)
-        pts_of_int = road_sys.terrain_points()
+        blocks = self.make_blocks_from_roads(road_sys[0])
+        pts_of_int = road_sys[0].terrain_points()
         for bl in blocks: pts_of_int.extend(bl.terrain_points())
         terra = self.make_terrain(pts_of_interest = pts_of_int, 
-                region_bounds = road_sys.region_bounds)
+                region_bounds = road_sys[0].region_bounds)
         parts = road_sys + blocks + terra
         return parts
 

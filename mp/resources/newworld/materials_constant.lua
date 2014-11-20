@@ -8,8 +8,8 @@ material "grass2" {
     --normalMap="/solemn/textures/grass_N.dds", 
     --glossMap="/solemn/textures/grass_S.tga", 
     diffuseMap='../textures/grass.dds', 
-    normalMap='../textures/grass_N.dds', 
-    glossMap='../textures/grass_S.tga', 
+    --normalMap='../textures/grass_N.dds', 
+    --glossMap='../textures/grass_S.tga', 
     textureScale={2,2},
     shadowObliqueCutOff = soc,
 }
@@ -53,3 +53,31 @@ material "grasstuft2" {
     gloss = 0,
     specular = 0,
 }
+
+-- taxi materials
+material `Atlas` {
+    glossMap = `../textures/taxi/Gloss.png`, 
+    diffuseMap = `../textures/taxi/Diffuse.png`, 
+    shadowBias = 0.05, 
+}
+material `GlowingParts` {
+    glossMap=`../textures/taxi/Gloss.png`, 
+    diffuseMap=`../textures/taxi/Diffuse.png`, 
+    emissiveMap=`../textures/taxi/Diffuse.png`, 
+    emissiveColour=vec(0.4,0.4,0.4), 
+    shadowBias=0.05, 
+}
+material `LightOn` { emissiveMap=`Diffuse.png`, emissiveColour=vec(4,4,4); }
+material `LightBrakeOn` { emissiveMap=`Diffuse.png`, emissiveColour=vec(6,0,0); diffuseColour=vec(0,0,0); specular=0; gloss=0; }
+material `LightBrakeDim` { emissiveMap=`Diffuse.png`, emissiveColour=vec(2,0,0); diffuseColour=vec(0,0,0); specular=0; gloss=0; }
+
+material `LightHeadLeft` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
+material `LightHeadRight` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
+material `LightBrakeLeft` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
+material `LightBrakeRight` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
+
+
+
+
+
+

@@ -139,7 +139,7 @@ class terrain_triangle(fu.base):
         verts = [v.position for v in all_verts]
         for pt in pts:
             if not self.inside(pt): continue
-            nearest,neardis,neardex = fu.find_closest_xy(pt,verts)
+            nearest,neardis,neardex = mpu.find_closest_xy(pt,verts)
             closest = all_verts[neardex]
             q2 = pt[2] - closest.position[2]
             closest.position[2] += q2
@@ -183,8 +183,9 @@ class terrain_triangle(fu.base):
             lod_meshes = []
             for ch in self.children:
                 for subch in ch.children:
-                    lod_meshes.append(subch.mesh(
-                        depth = 0, max_depth = self.splits - 3))
+                    for subsubch in subch.children:
+                        lod_meshes.append(subsubch.mesh(
+                            depth = 0, max_depth = self.splits - 3))
             
             #lod_meshes = [
             #    ch.mesh(depth = 0, max_depth = self.splits - 3) 
@@ -195,7 +196,8 @@ class terrain_triangle(fu.base):
             meshes = []
             for ch in self.children:
                 for subch in ch.children:
-                    meshes.append(subch.mesh())
+                    for subsubch in subch.children:
+                        meshes.append(subsubch.mesh())
             
             #meshes = [ch.mesh() for ch in self.children]
             #meshes = [self.mesh()]
@@ -320,8 +322,8 @@ class terrain(node):
         t3 = [rb[0][0],rb[1][1],0]
         t4 = [rb[0][1],rb[1][1],0]
     
-        #hexagonal = True
-        hexagonal = False
+        hexagonal = True
+        #hexagonal = False
         if hexagonal:
             xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
             mrng = max([xrng,yrng])
@@ -423,7 +425,7 @@ class terrain(node):
 
         all_pieces = []
         for p1,p2 in pairs:
-            print('stitching',p1,p2)
+            print('stitching')#,p1,p2)
             b1,b2 = p1.boundary_points,p2.boundary_points
             for bp1 in b1:
                 for bp2 in b2:

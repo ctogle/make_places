@@ -320,8 +320,8 @@ class terrain(node):
         t3 = [rb[0][0],rb[1][1],0]
         t4 = [rb[0][1],rb[1][1],0]
     
-        #hexagonal = True
-        hexagonal = False
+        hexagonal = True
+        #hexagonal = False
         if hexagonal:
             xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
             mrng = max([xrng,yrng])
@@ -423,7 +423,7 @@ class terrain(node):
 
         all_pieces = []
         for p1,p2 in pairs:
-            print('stitching',p1,p2)
+            print('stitching')#,p1,p2)
             b1,b2 = p1.boundary_points,p2.boundary_points
             for bp1 in b1:
                 for bp2 in b2:

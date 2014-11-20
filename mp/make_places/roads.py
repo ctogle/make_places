@@ -30,16 +30,24 @@ cardinal_norms = [
     [0,-1,0],fu.normalize([-1,-1,0]), 
     [-1,0,0],fu.normalize([-1,1,0])]
 
-class truck_primitive(arbitrary_primitive):
-    truckxml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml')
+class vehicle_primitive(arbitrary_primitive):
+    vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml') 
 
     def __init__(self, *args, **kwargs):
-        ptruckdata = pr.primitive_data_from_xml(self.truckxml)
-        arbitrary_primitive.__init__(self, *args, **ptruckdata)
-        self.tag = '_truck_'
+        pvehdata = pr.primitive_data_from_xml(self.vehiclexml)
+        arbitrary_primitive.__init__(self, *args, **pvehdata)
+        self.tag = '_vehicle_'
         self._scale_uvs_ = False
 
+class truck_primitive(vehicle_primitive):
+    vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml')
+
+class taxi_primitive(vehicle_primitive):
+    vehiclexml = os.path.join(pr.primitive_data_path, 'Body.mesh.xml')
+
 class car_batch(node):
+
+    possible_vehicles = [truck_primitive,taxi_primitive]
 
     def __init__(self, *args, **kwargs):
         self._default_('cargs',[],**kwargs)
@@ -52,7 +60,7 @@ class car_batch(node):
     def make_batch(self, cargs):
         cars = []
         for cgs in cargs:
-            new = truck_primitive()
+            new = rm.choice(self.possible_vehicles)()
             new.rotate_z(cgs['rotation'][2])
             new.translate(cgs['position'])
             cars.append(new)
@@ -69,7 +77,8 @@ class intersection(node):
         self._default_('road_width',20,**kwargs)
         self._default_('road_height',2,**kwargs)
         self.primitives = self.make_segments(*args, **kwargs)
-        self.children = self.place_vehicles()
+        children = self.place_vehicles()
+        self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
     def find_corners(self):
@@ -635,14 +644,27 @@ class highway(road):
 
     def make_segments(self, *args, **kwargs):
         sverts = self.segmented_vertices
-        for sv in sverts[1:-1]: fu.translate_vector(sv,[0,0,20])
+        self.sverts_ground = self.segmented_vertices[:]
+
+        coz = [v[2] for v in sverts]
+        coz[1][2] + 5
+        coz[-2][2] + 5
+        print 'coz', coz
+        tim = [0.0,1.0,2.0,3.0]
+        alpha = 1.0/2.0
+        parameterize_time(tips,tim,alpha)
+        coz = catmull_rom(coz,tim,10)
+        print 'coz', coz
+        self sv,co in zip(sverts,coz): sv[2] = co
+        pdb.set_trace()
         rdsegs = road.make_segments(self, *args, **kwargs)
         return rdsegs
 
     def make_leg(self, v):
         leg = pr.ucube()
-        leg.scale([5,5,20])
-        leg.translate(v)
+        leg_leng = 20
+        leg.scale([5,5,leg_leng])
+        leg.translate(fu.translate_vector(v[:],[0,0,-leg_leng-1.0]))
         return leg
 
     def make_segment(self, p1, p2, widt, depth, a1, a2):

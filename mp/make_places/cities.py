@@ -4,6 +4,7 @@ import make_places.scenegraph as sg
 from make_places.scenegraph import node
 from make_places.fundamental import bbox
 from make_places.roads import road_system
+from make_places.roads import highway
 from make_places.buildings import building
 from make_places.terrain import terrain
 import make_places.pkler as pk
@@ -45,7 +46,9 @@ class block(node):
     def children_from_kwargs(self, *args, **kwargs):
         if 'road' in kwargs.keys():
             rd = kwargs['road']
-            children = self.make_buildings_from_road(*args, **kwargs)
+            if not issubclass(rd.__class__,highway):
+                children = self.make_buildings_from_road(*args, **kwargs)
+            else: children = []
         else:
             pos = kwargs['position']
             length = kwargs['length']
@@ -81,7 +84,8 @@ class block(node):
 
     def terrain_points(self):
         pts = []
-        [pts.extend(bg.terrain_points()) for bg in self.buildings]
+        if hasattr(self,'buildings'):
+            [pts.extend(bg.terrain_points()) for bg in self.buildings]
         return pts
 
     def get_bbox(self):
@@ -283,7 +287,7 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':5, 
+                'intersection_count':15, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 

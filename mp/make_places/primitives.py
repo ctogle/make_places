@@ -75,7 +75,7 @@ class arbitrary_primitive(base):
         verts = self.coords + other.coords
         nverts = self.ncoords + other.ncoords
         uvs = self.uv_coords + other.uv_coords
-        fu.offset_faces(other.faces, other_offset)
+        mpu.offset_faces(other.faces, other_offset)
         faces = self.faces + other.faces
         omats = [m for m in other.materials if not m in self.materials]
         materials = self.materials + omats
@@ -110,13 +110,14 @@ class arbitrary_primitive(base):
         if self.has_normals() == 'false' and not anyway: return
         # must iterate over faces, for each vertex, apply new normal
         for fa in self.faces:
-            fcoords = [self.coords[f] for f in fa]
+            try:fcoords = [self.coords[f] for f in fa]
+            except: pdb.set_trace()
             v1 = self.coords[fa[0]]
             v2 = self.coords[fa[1]]
             v3 = self.coords[fa[2]]
-            v1v2 = fu.v1_v2(v1,v2)
-            v1v3 = fu.v1_v2(v1,v3)
-            normal = fu.normalize(fu.cross(v1v2,v1v3))
+            v1v2 = mpu.v1_v2(v1,v2)
+            v1v3 = mpu.v1_v2(v1,v3)
+            normal = mpu.normalize(mpu.cross(v1v2,v1v3))
             #com = self.find_centroid()
             #comf = mpu.center_of_mass(fcoords)
             #if not fu.angle_between(fu.v1_v2(comf,com),normal)>fu.PI/2.0:
@@ -208,7 +209,7 @@ class arbitrary_primitive(base):
         return xlines, is_new
 
     def translate(self, vect):
-        self.coords = fu.translate_coords(self.coords, vect)
+        self.coords = mpu.translate_coords(self.coords, vect)
         self.modified = True
 
     def material_to_faces(self, mat, faces):
@@ -230,15 +231,15 @@ class arbitrary_primitive(base):
             uv = self.uv_coords[vdx]
             no = self.ncoords[vdx]
             alpha = fu.angle_between(no, vect)
-            fact = fu.magnitude(vect)*sin(alpha)
-            proj = fu.cross(no,fu.normalize(fu.cross(vect,no)))
-            fu.scale_vector(proj,[fact,fact,fact])
-            b1 = fu.normalize(fu.rotate_z_coords(
+            fact = mpu.magnitude(vect)*sin(alpha)
+            proj = mpu.cross(no,mpu.normalize(mpu.cross(vect,no)))
+            mpu.scale_vector(proj,[fact,fact,fact])
+            b1 = mpu.normalize(mpu.rotate_z_coords(
                 [[no[0],no[1],0]], fu.PI/2.0)[0])
-            if fu.magnitude(b1) == 0: us,vs = vect[0],vect[1]
+            if mpu.magnitude(b1) == 0: us,vs = vect[0],vect[1]
             else:
-                b3 = fu.normalize(no[:])
-                b2 = fu.normalize(fu.cross(b3,b1))
+                b3 = mpu.normalize(no[:])
+                b2 = mpu.normalize(mpu.cross(b3,b1))
                 m = matrix([b1,b2,b3]).transpose()
                 us,vs,ns = linalg.solve(m,proj)
                 us,vs,ns = abs(us),abs(vs),abs(ns)
@@ -252,13 +253,13 @@ class arbitrary_primitive(base):
             uvc[1] /= sy
 
     def scale(self, vect):
-        self.coords = fu.scale_coords(self.coords, vect)
+        self.coords = mpu.scale_coords(self.coords, vect)
         if self._scale_uvs_: self.scale_uvs(vect)
         self.modified = True
 
     def rotate_z(self, ang_z):
-        self.coords = fu.rotate_z_coords(self.coords, ang_z)
-        self.ncoords = fu.rotate_z_coords(self.ncoords, ang_z)
+        self.coords = mpu.rotate_z_coords(self.coords, ang_z)
+        self.ncoords = mpu.rotate_z_coords(self.ncoords, ang_z)
         self.modified = True
 
 xml_file_names = []
@@ -420,7 +421,7 @@ class unit_cube(arbitrary_primitive):
     def translate_face(self, vect, face = 'top'):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
-        fu.translate_coords(face_coords, vect)
+        mpu.translate_coords(face_coords, vect)
         self.calculate_normals()
         self.modified = True
 
@@ -428,9 +429,9 @@ class unit_cube(arbitrary_primitive):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
         foff = mpu.center_of_mass(face_coords)
-        fu.translate_coords(face_coords, fu.flip(foff))
-        fu.rotate_z_coords(face_coords, ang_z)
-        fu.translate_coords(face_coords, foff)
+        mpu.translate_coords(face_coords, fu.flip(foff))
+        mpu.rotate_z_coords(face_coords, ang_z)
+        mpu.translate_coords(face_coords, foff)
         self.calculate_normals()
         self.modified = True
 

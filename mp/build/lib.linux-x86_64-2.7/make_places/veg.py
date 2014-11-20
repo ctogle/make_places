@@ -14,19 +14,24 @@ class tree(arbitrary_primitive):
     def __init__(self, *args, **kwargs):
         self._default_('is_lod', False)
         self._default_('has_lod', False)
-        if self.is_lod:
-            ptreedata = pr.primitive_data_from_xml(self.treelodxml)
-        else: ptreedata = pr.primitive_data_from_xml(self.treexml)
+        if not 'data' in kwargs.keys():
+            if self.is_lod:
+                ptreedata = pr.primitive_data_from_xml(self.treelodxml)
+            else: ptreedata = pr.primitive_data_from_xml(self.treexml)
+        else: ptreedata = kwargs['data']
         arbitrary_primitive.__init__(self, *args, **ptreedata)
         self.tag = '_tree_'
         self._scale_uvs_ = False
 
-class veg_batch(node):
+tree_data = pr.primitive_data_from_xml(tree.treexml)
+tree_lod_data = pr.primitive_data_from_xml(tree.treelodxml)
+
+class veg_batch(node):                                
 
     def __init__(self, *args, **kwargs):
         self._default_('consumes_children',True,**kwargs)
-        self._default_('grit_renderingdistance',25,**kwargs)
-        self._default_('grit_lod_renderingdistance',1000,**kwargs)
+        self._default_('grit_renderingdistance',250,**kwargs)
+        self._default_('grit_lod_renderingdistance',10000,**kwargs)
         node.__init__(self, *args, **kwargs)
 
 def vegetate(verts, norms, faces):
@@ -45,9 +50,11 @@ def vegetate(verts, norms, faces):
         pts.append(pt)
         #for ntdx in rm.sample([0,1,2],rm.randrange(mintcnt,maxtcnt)):
         for ntdx in rm.sample([0,1,2],1):
-            npt = fu.midpoint(pt,vs[ntdx])
-            treeprims.append(tree(has_lod = True))
-            treelodprims.append(tree(is_lod = True))
+            npt = mpu.midpoint(pt,vs[ntdx])
+            #treeprims.append(tree(has_lod = True))
+            treeprims.append(tree(data = tree_data, has_lod = True))
+            #treelodprims.append(tree(is_lod = True))
+            treelodprims.append(tree(data = tree_lod_data, is_lod = True))
             treeprims[-1].translate(npt)
             treelodprims[-1].translate(npt)
 

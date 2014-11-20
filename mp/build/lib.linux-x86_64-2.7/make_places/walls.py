@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 #from make_places.fundamental import element
 from make_places.scenegraph import node
 import make_places.scenegraph as scg
@@ -20,7 +21,7 @@ class wall(node):
         self.v2 = args[1]
         v1, v2 = self.v1, self.v2
         self.v1_v2 = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
-        self._default_('length',fu.distance(v1,v2),**kwargs)
+        self._default_('length',mpu.distance(v1,v2),**kwargs)
         self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4,**kwargs)
         self._default_('gaps',[],**kwargs)
@@ -52,24 +53,24 @@ class wall(node):
 
     def make_wall_segment(self, pos, v1, v2):
         wall_ = unit_cube()
-        length = fu.distance_xy(v1,v2)
+        length = mpu.distance_xy(v1,v2)
         wall_.scale([length, self.wall_width, self.wall_height])
         wall_.translate([length/2.0,0,0])
-        ang_z = fu.angle_from_xaxis_xy(fu.v1_v2(v1,v2))
+        ang_z = fu.angle_from_xaxis_xy(mpu.v1_v2(v1,v2))
         wall_.rotate_z(ang_z)
-        if fu.magnitude(pos) > 0: wall_.translate(pos)
+        if mpu.magnitude(pos) > 0: wall_.translate(pos)
         return wall_
 
     def make_primitives(self, pos, v1, v2, gaps = []):
-        tang = fu.normalize([v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]])
+        tang = mpu.normalize([v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]])
         segmented = [v1, v2]
         for gap in gaps:
             cent = gap[0]
             widt = gap[1]
             nv1 = v1[:]
-            fu.translate_vector(nv1, [t*cent for t in tang])
+            mpu.translate_vector(nv1, [t*cent for t in tang])
             nv2 = nv1[:]
-            fu.translate_vector(nv2, [t*widt for t in tang])
+            mpu.translate_vector(nv2, [t*widt for t in tang])
             newvs = [nv1, nv2]
             segmented.extend(newvs)
             segmented.append(segmented.pop(-3))
@@ -79,7 +80,7 @@ class wall(node):
         for sgdx in range(len(frnts)):
             fr = frnts[sgdx]
             bk = backs[sgdx]
-            spos = fu.v1_v2(v1,fr)
+            spos = mpu.v1_v2(v1,fr)
             wall_ = self.make_wall_segment(spos, fr, bk)
             prims.append(wall_)
         return prims

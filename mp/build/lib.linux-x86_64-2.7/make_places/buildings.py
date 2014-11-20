@@ -164,6 +164,46 @@ class rooftop(story):
         self._default_('add_ceiling',False,**kwargs)
         self._default_('ext_gaped',False,**kwargs)
         story.__init__(self, *args, **kwargs)
+        veggies = self.vegetate()
+        self.add_child(*veggies)
+
+    def vegetate(self):
+        vchildren = []
+        return vchildren
+
+
+        for ter in terras:
+            fdat = ter.face_data()
+            vcargs = []
+            fcnt = len(fdat)
+            for fdx in range(fcnt):
+                if rm.choice([0,1,1,1]):
+                    verts = [v.position for v in fdat[fdx]]
+                    vegbox = fu.bbox(corners = verts)
+                    if not vegbox.intersects(bboxes, vegbox):
+                        nvcarg = (verts,None,[fdx])
+                        vcargs.append(nvcarg)
+
+            # stitch the nvcargs together based on how contiguous they are
+            dx = 0
+            vccnt = len(vcargs)
+            vcmax = 4
+            fewer = []
+            while dx < vccnt:
+                left = vccnt - dx
+                if left >= vcmax: vc_this_round = vcmax
+                else: vc_this_round = left % vcmax
+                relev = vcargs[dx:dx+vc_this_round]
+                reverts = [r[0] for r in relev]
+                refaces = range(vc_this_round)
+                fewer.append((reverts,[],refaces))
+                dx += vc_this_round
+
+            for varg in fewer:
+                vchild = veg.vegetate(*varg)
+                vchildren.append(vchild)
+
+        return vchildren
 
 class story_batch(node):
 
@@ -218,9 +258,9 @@ class building(node):
         basement_floor_height = self.floor_height
         basement_ceiling_height = self.ceiling_height
         basement_wall_height = 10
-        #baheight = basement_ceiling_height + basement_wall_height + basement_floor_height
-        baheight = basement_floor_height + basement_wall_height
-        fu.translate_vector(bpos,[0,0,-baheight])
+        baheight = basement_ceiling_height + basement_wall_height + basement_floor_height
+        #baheight = basement_floor_height + basement_wall_height
+        mpu.translate_vector(bpos,[0,0,-baheight])
         baargs = {
             #'parent':self, 
             'uv_parent':self, 
@@ -278,7 +318,7 @@ class building(node):
 
     def terrain_points(self):
         tpts = self.find_corners()
-        fu.translate_coords(tpts,[0,0,-0.5])
+        mpu.translate_coords(tpts,[0,0,-0.5])
         #fu.translate_coords(tpts,[0,0,9])
         tpts = fu.dice_edges(tpts, dices = 1)
         tpts.append(mpu.center_of_mass(tpts))
@@ -326,8 +366,8 @@ class building(node):
         corncoords = [c1, c2, c3, c4]
         zang = self.tform.rotation[2]
         #corncoords = fu.rotate_z_coords(corncoords,zang)
-        fu.rotate_z_coords(corncoords,zang)
-        fu.translate_coords(corncoords,self.tform.position)#this doesnt need to be true()??!?!
+        mpu.rotate_z_coords(corncoords,zang)
+        mpu.translate_coords(corncoords,self.tform.position)#this doesnt need to be true()??!?!
         #fu.translate_coords(corncoords,self.tform.true().position)#this doesnt need to be true()??!?!
         return [c1, c2, c3, c4]
 
@@ -365,7 +405,7 @@ class building(node):
             wheight = flwlhts[fdx]
             fl_pos = bpos[:]
             fl_pos[2] += bump
-            stheight = wheight + fheight
+            stheight = wheight + fheight# + cheight
             bump += stheight
             stargs = {
                 #'parent':self, 

@@ -25,25 +25,32 @@ cardinal_directions = [
     'south', 'southwest', 
     'west', 'northwest']
 cardinal_norms = [
-    [0,1,0],fu.normalize([1,1,0]),
-    [1,0,0],fu.normalize([1,-1,0]), 
-    [0,-1,0],fu.normalize([-1,-1,0]), 
-    [-1,0,0],fu.normalize([-1,1,0])]
+    [0,1,0],mpu.normalize([1,1,0]),
+    [1,0,0],mpu.normalize([1,-1,0]), 
+    [0,-1,0],mpu.normalize([-1,-1,0]), 
+    [-1,0,0],mpu.normalize([-1,1,0])]
 
 class vehicle_primitive(arbitrary_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml') 
+    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
+    offset = [0,0,0]
 
     def __init__(self, *args, **kwargs):
         pvehdata = pr.primitive_data_from_xml(self.vehiclexml)
+        #pvehdata = self.vehicledata
         arbitrary_primitive.__init__(self, *args, **pvehdata)
-        self.tag = '_vehicle_'
+        self._default_('tag','_vehicle_',**kwargs)
         self._scale_uvs_ = False
+        self.translate(self.offset)
 
 class truck_primitive(vehicle_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml')
+    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
 
 class taxi_primitive(vehicle_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'Body.mesh.xml')
+    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
+    offset = [0,0,0.5]
 
 class car_batch(node):
 
@@ -101,7 +108,7 @@ class intersection(node):
         corners = fu.dice_edges(corners, dices = 1)
         position = self.tform.true().position
         x,y,z = position
-        fu.translate_coords(corners,[x,y,z-rh2])
+        mpu.translate_coords(corners,[x,y,z-rh2])
         return corners
 
     def place_vehicles(self, cnt = 2):
@@ -143,11 +150,11 @@ class intersection(node):
         #fu.rotate_z_coords(corners,theta)
         position = self.tform.true().position
         x,y,z = position
-        fu.translate_coords(corners,[x,y,z])
+        mpu.translate_coords(corners,[x,y,z])
         bboxes = [fu.bbox(corners = corners)]
         return bboxes
 
-def catmull_rom(P,T,tcnt):
+def catmull_rom______(P,T,tcnt):
     spl = P[:1]
     for j in range(1, len(P)-2):  # skip the ends
         for t in range(tcnt):  # t: 0 .1 .2 .. .9
@@ -159,7 +166,7 @@ def catmull_rom(P,T,tcnt):
     spl.extend(P[-2:])
     return spl
 
-def spline(p,time,t):
+def spline_______(p,time,t):
     L01 = p[0] * (time[1] - t) / (time[1] - time[0]) + p[1] * (t - time[0]) / (time[1] - time[0])
     L12 = p[1] * (time[2] - t) / (time[2] - time[1]) + p[2] * (t - time[1]) / (time[2] - time[1])
     L23 = p[2] * (time[3] - t) / (time[3] - time[2]) + p[3] * (t - time[2]) / (time[3] - time[2])
@@ -198,7 +205,7 @@ class road_segment_primitive(arbitrary_primitive):
     def translate_face(self, vect, face = 'top'):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
-        fu.translate_coords(face_coords, vect)
+        mpu.translate_coords(face_coords, vect)
         self.calculate_normals()
         self.modified = True
 
@@ -206,9 +213,9 @@ class road_segment_primitive(arbitrary_primitive):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
         foff = mpu.center_of_mass(face_coords)
-        fu.translate_coords(face_coords, fu.flip(foff))
-        fu.rotate_z_coords(face_coords, ang_z)
-        fu.translate_coords(face_coords, foff)
+        mpu.translate_coords(face_coords, fu.flip(foff))
+        mpu.rotate_z_coords(face_coords, ang_z)
+        mpu.translate_coords(face_coords, foff)
         self.calculate_normals()
         self.modified = True
 
@@ -237,10 +244,10 @@ class road(node):
         tpts = []
         
         for corns in self.corners:
-            tcorns = fu.translate_coords(corns[:],[0,0,-0.25])
+            tcorns = mpu.translate_coords(corns[:],[0,0,-0.25])
             tcorns = fu.dice_edges(tcorns, dices = 1)
             mcorns = [tcorns[3],tcorns[7]]
-            fu.translate_coords(mcorns,[0,0,-0.25])
+            mpu.translate_coords(mcorns,[0,0,-0.25])
             tpts.extend([tc for tc in tcorns if not tc in tpts])
             
         return tpts
@@ -250,15 +257,15 @@ class road(node):
         vcnt = len(verts)
         for sgdx in range(1,vcnt):
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            tcorns = fu.translate_coords(
+            tcorns = mpu.translate_coords(
                 self.make_corners(p1,p2),[0,0,-0.25])
             tcorns = fu.dice_edges(tcorns, dices = 1)
             tpts.extend(tcorns)
-            #tpts.append(fu.translate_vector(
+            #tpts.append(mpu.translate_vector(
             #    mpu.center_of_mass(tpts),[0,0,-1.5]))
             tpts.append(mpu.center_of_mass(tpts))
             mcorns = [tpts[3],tpts[7],tpts[8]]
-            fu.translate_coords(mcorns,[0,0,-0.25])
+            mpu.translate_coords(mcorns,[0,0,-0.25])
         #return fu.uniq(tpts)
         return tpts
         '''#
@@ -275,16 +282,16 @@ class road(node):
     def make_corners(self, p1, p2):
         widt = self.road_width
         
-        p1_p2 = fu.v1_v2(p1,p2)
-        leng = fu.magnitude(p1_p2)
-        p1_p2 = fu.normalize(p1_p2)
+        p1_p2 = mpu.v1_v2(p1,p2)
+        leng = mpu.magnitude(p1_p2)
+        p1_p2 = mpu.normalize(p1_p2)
         
         ang_z = fu.angle_from_xaxis(p1_p2)
         corns = [[0,-widt/2.0,0],[leng,-widt/2.0,0],
                 [leng,widt/2.0,0],[0,widt/2.0,0]]
-        fu.rotate_z_coords(corns,ang_z)
-        fu.translate_coords(corns,p1)
-        fu.translate_coords(corns[1:3],[0,0,p2[2]-p1[2]])
+        mpu.rotate_z_coords(corns,ang_z)
+        mpu.translate_coords(corns,p1)
+        mpu.translate_coords(corns[1:3],[0,0,p2[2]-p1[2]])
         return corns
 
     def get_bbox(self):
@@ -326,11 +333,11 @@ class road(node):
         verts = self.clip_tips(verts,norms[0],norms[1])
         verts = self.add_tips(verts,norms[0],norms[1])
 
-        def parameterize_time(points,time,alpha):
+        def parameterize_time_______(points,time,alpha):
             total = 0
             for idx in range(1,4):
-                v1v2 = fu.v1_v2(points[idx-1],points[idx])
-                total += fu.magnitude(v1v2)**(2.0*alpha)
+                v1v2 = mpu.v1_v2(points[idx-1],points[idx])
+                total += mpu.magnitude(v1v2)**(2.0*alpha)
                 time[idx] = total
 
         def bend(vs):
@@ -338,10 +345,10 @@ class road(node):
             cox,coy,coz = [list(i) for i in zip(*tips)]
             tim = [0.0,1.0,2.0,3.0]
             alpha = 1.0/2.0
-            parameterize_time(tips,tim,alpha)
-            cox = catmull_rom(cox,tim,10)
-            coy = catmull_rom(coy,tim,10)
-            coz = catmull_rom(coz,tim,10)
+            mpu.parameterize_time(tips,tim,alpha)
+            cox = mpu.catmull_rom(cox,tim,10)
+            coy = mpu.catmull_rom(coy,tim,10)
+            coz = mpu.catmull_rom(coz,tim,10)
             new = [list(i) for i in zip(cox,coy,coz)]
             return new
 
@@ -354,18 +361,18 @@ class road(node):
         v1 = verts[0][:]
         v2 = verts[1][:]
         cl1,cl2 = clip,clip
-        fu.translate_vector(v1,fu.scale_vector(n1[:],[cl1,cl1,cl1]))
-        fu.translate_vector(v2,fu.scale_vector(n2[:],[cl2,cl2,cl2]))
+        mpu.translate_vector(v1,mpu.scale_vector(n1[:],[cl1,cl1,cl1]))
+        mpu.translate_vector(v2,mpu.scale_vector(n2[:],[cl2,cl2,cl2]))
         verts.extend([v1, v2])
         verts.append(verts.pop(-3))
         return verts
 
     def clip_tips(self,verts,n1,n2):
         cl = self.clip_length
-        v1 = fu.translate_vector(verts[0][:],
-            fu.scale_vector(n1[:],[cl,cl,cl]))
-        v2 = fu.translate_vector(verts[-1][:],
-            fu.scale_vector(n2[:],[cl,cl,cl]))
+        v1 = mpu.translate_vector(verts[0][:],
+            mpu.scale_vector(n1[:],[cl,cl,cl]))
+        v2 = mpu.translate_vector(verts[-1][:],
+            mpu.scale_vector(n2[:],[cl,cl,cl]))
         verts[0] = v1
         verts[1] = v2
         return verts
@@ -380,7 +387,7 @@ class road(node):
         angs = []
         for sgdx in range(1,vcnt):            
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            tangs.append(fu.normalize(fu.v1_v2(p1,p2)))
+            tangs.append(mpu.normalize(mpu.v1_v2(p1,p2)))
         tangs.append(self.ednorm)
         for tgdx in range(1,vcnt+1):
             t1,t2 = tangs[tgdx-1],tangs[tgdx]
@@ -398,8 +405,8 @@ class road(node):
         return segments
 
     def make_segment(self, p1, p2, widt, depth, a1, a2):
-        leng = fu.distance_xy(p1,p2)
-        p1_p2 = fu.normalize(fu.v1_v2(p1,p2))
+        leng = mpu.distance_xy(p1,p2)
+        p1_p2 = mpu.normalize(mpu.v1_v2(p1,p2))
         zdiff = p2[2] - p1[2]
         ang_z = fu.angle_from_xaxis_xy(p1_p2)
         #strip = ucube()
@@ -493,11 +500,11 @@ class road_system(node):
             z_off_max =  25
             z_offset = rm.randrange(z_off_min, z_off_max)
             offset = [link*cos(angrad),link*sin(angrad),z_offset]
-            newtip = fu.translate_vector(tippos, offset)
+            newtip = mpu.translate_vector(tippos, offset)
             if not fu.in_region(region_bounds, newtip):
                 return False,None
             for ipos in [i['position'] for i in interargs]:
-                d = fu.distance(newtip, ipos)
+                d = mpu.distance(newtip, ipos)
                 if d < linkmin: return False,None
             return True,newtip
 
@@ -507,7 +514,7 @@ class road_system(node):
                 for s in nodes]), np.mean([s[2] for s in nodes])]
             #cmass = [0,0,0]
             cmass_ang = fu.to_deg(fu.angle_from_xaxis(
-                fu.v1_v2(tip['position'],cmass)))
+                mpu.v1_v2(tip['position'],cmass)))
             tangs = angs[:]
             angdists = [abs(x-cmass_ang) for x in tangs]
             closestang = tangs[angdists.index(min(angdists))]
@@ -619,13 +626,13 @@ class road_system(node):
             for c_, signs in zip(corn, corner_signs):
                 ilength = get_inter_length()
                 iwidth = get_inter_width()
-                ipos = fu.translate_vector(c_[:], 
+                ipos = mpu.translate_vector(c_[:], 
                     [signs[0]*ilength,signs[1]*iwidth,0]), 
                 if not ipos in used_bcorners:
                     used_bcorners.append(ipos)
                     interargs.append({
                         'name' : 'intersection_' + str(len(used_bcorners)), 
-                        'position' : fu.translate_vector(
+                        'position' : mpu.translate_vector(
                             c_[:],[signs[0]*ilength,signs[1]*iwidth,0]), 
                         'length' : ilength, 
                         'width' : iwidth, 
@@ -645,18 +652,15 @@ class highway(road):
     def make_segments(self, *args, **kwargs):
         sverts = self.segmented_vertices
         self.sverts_ground = self.segmented_vertices[:]
-
-        coz = [v[2] for v in sverts]
-        coz[1][2] + 5
-        coz[-2][2] + 5
-        print 'coz', coz
+        sverts[1][2] += 5
+        sverts[-2][2] += 5
         tim = [0.0,1.0,2.0,3.0]
         alpha = 1.0/2.0
-        parameterize_time(tips,tim,alpha)
-        coz = catmull_rom(coz,tim,10)
-        print 'coz', coz
-        self sv,co in zip(sverts,coz): sv[2] = co
-        pdb.set_trace()
+        tips = sverts[:2] + sverts[-2:]
+        coz = [t[2] for t in tips]
+        mpu.parameterize_time(tips,tim,alpha)
+        coz = mpu.catmull_rom(coz,tim,10)
+        for sv,co in zip(sverts,coz): sv[2] = co
         rdsegs = road.make_segments(self, *args, **kwargs)
         return rdsegs
 
@@ -664,7 +668,7 @@ class highway(road):
         leg = pr.ucube()
         leg_leng = 20
         leg.scale([5,5,leg_leng])
-        leg.translate(fu.translate_vector(v[:],[0,0,-leg_leng-1.0]))
+        leg.translate(mpu.translate_vector(v[:],[0,0,-leg_leng-1.0]))
         return leg
 
     def make_segment(self, p1, p2, widt, depth, a1, a2):

@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 from make_places.scenegraph import node
 from make_places.floors import floor
 
@@ -26,7 +27,7 @@ class shaft(node):
 
     def __init__(self, *args, **kwargs):
         self._default_('grit_renderingdistance',100.0,**kwargs)
-        #self._default_('consumes_children',True,**kwargs)
+        self._default_('consumes_children',True,**kwargs)
         self._default_('length',10.0,**kwargs)
         self._default_('width',10.0,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
@@ -39,7 +40,8 @@ class shaft(node):
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         l = self.length
         w = self.width
-        self.corners = fu.find_corners(self.tform.position, l, w)
+        self.corners = self.find_corners()
+        #self.corners = fu.find_corners(self.tform.position, l, w)
         m = 0.25
         self.wall_gaps = [
             [[m,l-2*m]], 
@@ -54,10 +56,20 @@ class shaft(node):
         self.add_child(*ramps)
         node.__init__(self, *args, **kwargs)
 
+    def find_corners(self):
+        pos = self.tform.position
+        l,w = self.length,self.width
+        c1,c2,c3,c4 = pos[:],pos[:],pos[:],pos[:]
+        c2[0] += l
+        c3[0] += l
+        c3[1] += w
+        c4[1] += w
+        return [c1,c2,c3,c4]
+
     def ramps(self, *args, **kwargs):
         comps = []
         ww = self.wall_width
-        floffset = self.wall_height+self.floor_height#+self.ceiling_height
+        floffset = self.wall_height+self.floor_height+self.ceiling_height
         flcnt = self.floors
         topology = []
 

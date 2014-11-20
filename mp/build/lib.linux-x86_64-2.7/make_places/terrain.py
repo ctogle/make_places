@@ -34,9 +34,9 @@ class terrain_point(fu.base):
         self._str = str((self.position[0],self.position[1]))
 
     def __add__(self, other):
-        newpos = fu.midpoint(self.position,other.position)
+        newpos = mpu.midpoint(self.position,other.position)
         newneighbors = self.neighbors + other.neighbors
-        newweights = fu.scale_vector(self.weights[:],other.weights)
+        newweights = mpu.scale_vector(self.weights[:],other.weights)
         new = terrain_point(
             position = newpos, 
             neighbors = newneighbors, 
@@ -51,11 +51,11 @@ class terrain_point(fu.base):
         #    #pdb.set_trace()
         centroid = mpu.center_of_mass([v.position for v in self.neighbors])
         wx,wy,wz = self.weights[0],self.weights[1],self.weights[2]
-        move = fu.scale_vector(
-            fu.v1_v2(self.position,centroid), 
+        move = mpu.scale_vector(
+            mpu.v1_v2(self.position,centroid), 
             [xstr*wx,ystr*wy,zstr*wz])
-        fu.translate_vector(self.position, move)
-        return fu.magnitude(move)
+        mpu.translate_vector(self.position, move)
+        return mpu.magnitude(move)
 
 howmany = 0
 class terrain_triangle(fu.base):
@@ -74,8 +74,8 @@ class terrain_triangle(fu.base):
     def set_center(self, *args, **kwargs):
         vposs = [v.position for v in self.verts]
         self._default_('center',mpu.center_of_mass(vposs),**kwargs)
-        self.com_vects = [fu.v1_v2(v,self.center) for v in vposs]
-        self.com_vects = [fu.normalize(v) for v in self.com_vects]
+        self.com_vects = [mpu.v1_v2(v,self.center) for v in vposs]
+        self.com_vects = [mpu.normalize(v) for v in self.com_vects]
 
     def bisect_all(self, vcnt, controls):
         t1,t2,t3 = self.verts
@@ -129,7 +129,7 @@ class terrain_triangle(fu.base):
             self.fix_topology(locs = locs)
 
     def inside(self, pt):
-        corners = [fu.translate_vector(v.position[:],tv) 
+        corners = [mpu.translate_vector(v.position[:],tv) 
             for v,tv in zip(self.verts,self.com_vects)]
         return fu.inside(pt, corners)
 
@@ -139,7 +139,7 @@ class terrain_triangle(fu.base):
         verts = [v.position for v in all_verts]
         for pt in pts:
             if not self.inside(pt): continue
-            nearest,neardis,neardex = fu.find_closest_xy(pt,verts)
+            nearest,neardis,neardex = mpu.find_closest_xy(pt,verts)
             closest = all_verts[neardex]
             q2 = pt[2] - closest.position[2]
             closest.position[2] += q2
@@ -183,8 +183,9 @@ class terrain_triangle(fu.base):
             lod_meshes = []
             for ch in self.children:
                 for subch in ch.children:
-                    lod_meshes.append(subch.mesh(
-                        depth = 0, max_depth = self.splits - 3))
+                    for subsubch in subch.children:
+                        lod_meshes.append(subsubch.mesh(
+                            depth = 0, max_depth = self.splits - 3))
             
             #lod_meshes = [
             #    ch.mesh(depth = 0, max_depth = self.splits - 3) 
@@ -195,7 +196,8 @@ class terrain_triangle(fu.base):
             meshes = []
             for ch in self.children:
                 for subch in ch.children:
-                    meshes.append(subch.mesh())
+                    for subsubch in subch.children:
+                        meshes.append(subsubch.mesh())
             
             #meshes = [ch.mesh() for ch in self.children]
             #meshes = [self.mesh()]
@@ -215,9 +217,9 @@ class terrain_triangle(fu.base):
         for fdx,fdat in enumerate(data):
             #newverts = [dcopy(f.position) for f in fdat]
             newverts = [f.position[:] for f in fdat]
-            v1v2 = fu.v1_v2(newverts[0],newverts[1])
-            v1v3 = fu.v1_v2(newverts[0],newverts[2])
-            newnorml = [fu.normalize(fu.cross(v1v2,v1v3)) for f in fdat]
+            v1v2 = mpu.v1_v2(newverts[0],newverts[1])
+            v1v3 = mpu.v1_v2(newverts[0],newverts[2])
+            newnorml = [mpu.normalize(mpu.cross(v1v2,v1v3)) for f in fdat]
             newuvs = [[0,0],[1,0],[0,1]]
             verts.extend(newverts)
             nverts.extend(newnorml)
@@ -261,9 +263,9 @@ class terrain_triangle(fu.base):
 
 def bisect(tv1,tv2,vcnt,controls,tolerance = 25,big_tolerance = 250):
     if tv1 in tv2.neighbors and tv2 in tv1.neighbors:
-        newpos = fu.midpoint(tv1.position,tv2.position)
+        newpos = mpu.midpoint(tv1.position,tv2.position)
         if controls:
-            nearest,dist,ndex = fu.find_closest_xy(newpos,controls)
+            nearest,dist,ndex = mpu.find_closest_xy(newpos,controls)
             zdiff = nearest[2] - newpos[2]
             if dist < tolerance: zoff = zdiff
             elif dist < big_tolerance:
@@ -304,8 +306,8 @@ def make_terrain(initial_tps,splits = 2,smooths = 25,
 class terrain(node):
     def __init__(self, *args, **kwargs):
         kwargs['uv_scales'] = [0.1,0.1,0.1]
-        self._default_('uv_tform',
-            self.def_uv_tform(*args,**kwargs),**kwargs)
+        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+        self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',500,**kwargs)
         self._default_('grit_lod_renderingdistance',10000,**kwargs)
         self._default_('pts_of_interest',[],**kwargs)
@@ -320,8 +322,8 @@ class terrain(node):
         t3 = [rb[0][0],rb[1][1],0]
         t4 = [rb[0][1],rb[1][1],0]
     
-        hexagonal = True
-        #hexagonal = False
+        #hexagonal = True
+        hexagonal = False
         if hexagonal:
             xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
             mrng = max([xrng,yrng])
@@ -330,9 +332,9 @@ class terrain(node):
             hverts = []
             for ang in [0,60,120,180,240,300]:
                 pt = [hrad,0,0]
-                fu.rotate_z_coords([pt],fu.to_rad(ang))
+                mpu.rotate_z_coords([pt],fu.to_rad(ang))
                 hverts.append(pt)
-            fu.translate_coords(hverts,center)
+            mpu.translate_coords(hverts,center)
             hverts.insert(0,center)
             pieces = []
             ptlocs = []
@@ -360,10 +362,10 @@ class terrain(node):
             #y = (4*r)/sqrt(3)
             #t2 = [0,-y,0]
             #fu.translate_coords([t1,t2,t3],[250,250,0])
-            fu.translate_coords([t1],[-50,-50,0])
-            fu.translate_coords([t2],[ 50,-50,0])
-            fu.translate_coords([t3],[ 50, 50,0])
-            fu.translate_coords([t4],[-50, 50,0])
+            mpu.translate_coords([t1],[-50,-50,0])
+            mpu.translate_coords([t2],[ 50,-50,0])
+            mpu.translate_coords([t3],[ 50, 50,0])
+            mpu.translate_coords([t4],[-50, 50,0])
             terr1,locs1 = make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
             terr2,locs2 = make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
             pieces = [terr1,terr2]
@@ -372,7 +374,9 @@ class terrain(node):
 
         #vegetate = True
         vegetate = False
-        if vegetate:self.children = prf.measure_time('vegetate',self.vegetate,pieces)
+        if vegetate:
+            children = prf.measure_time('vegetate',self.vegetate,pieces)
+            self.add_child(*children)
         node.__init__(self, *args, **kwargs)
         self.assign_material('grass2', propagate = False)
         #self.assign_material('ground')

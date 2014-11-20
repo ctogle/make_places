@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 from make_places.fundamental import base
 import make_places.primitives as pr
 import make_places.blend_in as blgeo
@@ -19,10 +20,10 @@ class tform(base):
         nr = self.rotation[:]
         if self.parent:
             tpar = self.parent.true()
-            np = fu.rotate_z_coord(self.position[:],tpar.rotation[2])
-            fu.translate_vector(np,tpar.position)
-            fu.translate_vector(nr,tpar.rotation)
-            ns = fu.scale_vector(self.scales[:],tpar.scales)
+            np = mpu.rotate_z_coord(self.position[:],tpar.rotation[2])
+            mpu.translate_vector(np,tpar.position)
+            mpu.translate_vector(nr,tpar.rotation)
+            ns = mpu.scale_vector(self.scales[:],tpar.scales)
         else:
             np = self.position[:]
             ns = self.scales[:]
@@ -89,10 +90,10 @@ class node(base):
         return strr
 
     def translate(self, v):
-        fu.translate_vector(self.tform.position, v)
+        mpu.translate_vector(self.tform.position, v)
 
     def rotate(self, v):
-        fu.translate_vector(self.tform.rotation, v)
+        mpu.translate_vector(self.tform.rotation, v)
 
     def def_tform(self,*args,**kwargs):
         def _def(ke,de):
@@ -243,7 +244,6 @@ class node(base):
         _node_count_ += 1
         return nam
 
-    #if your xy position matches that of your parent, you can inherit your parents rotation in lua safely?
     def __init__(self, *args, **kwargs):
         self._default_('name',self.get_name(),**kwargs)
         self._default_('grit_renderingdistance',250,**kwargs)

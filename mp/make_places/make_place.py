@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 import make_places.scenegraph as sg
 import make_places.primitives as pr
 import make_places.cities as cities

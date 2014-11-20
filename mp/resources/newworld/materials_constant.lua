@@ -67,15 +67,44 @@ material `GlowingParts` {
     emissiveColour=vec(0.4,0.4,0.4), 
     shadowBias=0.05, 
 }
-material `LightOn` { emissiveMap=`Diffuse.png`, emissiveColour=vec(4,4,4); }
-material `LightBrakeOn` { emissiveMap=`Diffuse.png`, emissiveColour=vec(6,0,0); diffuseColour=vec(0,0,0); specular=0; gloss=0; }
-material `LightBrakeDim` { emissiveMap=`Diffuse.png`, emissiveColour=vec(2,0,0); diffuseColour=vec(0,0,0); specular=0; gloss=0; }
-
-material `LightHeadLeft` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
-material `LightHeadRight` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
-material `LightBrakeLeft` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
-material `LightBrakeRight` { glossMap=`Gloss.png`; diffuseMap=`Diffuse.png`; shadowBias=0.05 }
-
+material `LightOn` {
+    emissiveMap=`../textures/taxi/Diffuse.png`, 
+    emissiveColour=vec(4,4,4), 
+}
+material `LightBrakeOn` {
+    emissiveMap=`../textures/taxi/Diffuse.png`,
+    emissiveColour=vec(6,0,0), 
+    diffuseColour=vec(0,0,0),
+    specular=0,
+    gloss=0,
+}
+material `LightBrakeDim` {
+    emissiveMap=`../textures/taxi/Diffuse.png`, 
+    emissiveColour=vec(2,0,0), 
+    diffuseColour=vec(0,0,0), 
+    specular=0,
+    gloss=0, 
+}
+material `LightHeadLeft` {
+    glossMap=`../textures/taxi/Gloss.png`, 
+    diffuseMap=`../textures/taxi/Diffuse.png`, 
+    shadowBias=0.05, 
+}
+material `LightHeadRight` {
+    glossMap=`../textures/taxi/Gloss.png`, 
+    diffuseMap=`../textures/taxi/Diffuse.png`, 
+    shadowBias=0.05, 
+}
+material `LightBrakeLeft` {
+    glossMap=`../textures/taxi/Gloss.png`, 
+    diffuseMap=`../textures/taxi/Diffuse.png`, 
+    shadowBias=0.05, 
+}
+material `LightBrakeRight` {
+    glossMap=`../textures/taxi/Gloss.png`, 
+    diffuseMap=`../textures/taxi/Diffuse.png`, 
+    shadowBias=0.05, 
+}
 
 
 

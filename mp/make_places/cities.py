@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 import make_places.primitives as pr
 import make_places.scenegraph as sg
 from make_places.scenegraph import node
@@ -107,9 +108,9 @@ class block(node):
         #print('segverts',corns)
         corncnt = len(corns)
         zhat = [0,0,1]
-        thats = [fu.normalize(fu.v1_v2(corns[dx],corns[dx-1])) 
+        thats = [mpu.normalize(mpu.v1_v2(corns[dx],corns[dx-1])) 
                 for dx in range(1,corncnt)]
-        rdnorms = [fu.cross(that,zhat) for that in thats]
+        rdnorms = [mpu.cross(that,zhat) for that in thats]
         bcnt = self.building_count
         #bcnt = 10
         buildings = []
@@ -153,9 +154,9 @@ class block(node):
         segcnt = len(rdnorms)
         segdx = rm.randrange(segcnt)
         leadcorner = corners[segdx]
-        seglen = fu.distance(corners[segdx+1],leadcorner)
+        seglen = mpu.distance(corners[segdx+1],leadcorner)
         segnorm = rdnorms[segdx]
-        segtang = fu.normalize(fu.v1_v2(leadcorner,corners[segdx+1]))
+        segtang = mpu.normalize(mpu.v1_v2(leadcorner,corners[segdx+1]))
 
         minblen = 20
         minbwid = 20
@@ -194,17 +195,17 @@ class block(node):
                 rm.randrange(2,15 +int(blen/2.0))*easementsign + sidebase
             #easement = int((bwid+0.5)/2.0)*easementsign + sidebase
             #easement = 0
-            base = fu.translate_vector(fu.translate_vector(leadcorner[:],
-                fu.scale_vector(segnorm[:],[easement,easement,easement])),
-                fu.scale_vector(segtang[:],[sidesoff,sidesoff,sidesoff]))
+            base = mpu.translate_vector(mpu.translate_vector(leadcorner[:],
+                mpu.scale_vector(segnorm[:],[easement,easement,easement])),
+                mpu.scale_vector(segtang[:],[sidesoff,sidesoff,sidesoff]))
             #base = [50,50,0]
             bhei = 10.0
             #stry = rm.randrange(int(-1.0*blen), int(seglen + blen))
             stry = rm.randrange(0, int(seglen))
             #stry = seglen/2
             #stry = 0
-            xtry,ytry,ztry = fu.translate_vector(base[:],
-                fu.scale_vector(segtang[:],[stry,stry,stry]))
+            xtry,ytry,ztry = mpu.translate_vector(base[:],
+                mpu.scale_vector(segtang[:],[stry,stry,stry]))
             corners = self.make_corners(xtry,ytry,ztry,blen,bwid,bhei,rdpitch)
             boxtry = bbox(position = [xtry,ytry,ztry], corners = corners)
             return boxtry,blen,bwid,bhei
@@ -228,8 +229,8 @@ class block(node):
         hw = w/2.0
         corners = [[-hl,-hw,0],[hl,-hw,0],[hl,hw,0],[-hl,hw,0]]
         #corners = [[0,0,0],[l,0,0],[l,w,0],[0,w,0]]
-        fu.rotate_z_coords(corners,theta)
-        fu.translate_coords(corners,[x,y,z])
+        mpu.rotate_z_coords(corners,theta)
+        mpu.translate_coords(corners,[x,y,z])
         return corners
 
     def get_building_floor_count(self, *args, **kwargs):

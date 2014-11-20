@@ -1,4 +1,5 @@
 import make_places.fundamental as fu
+import mp_utils as mpu
 #from make_places.fundamental import element
 from make_places.scenegraph import node
 from make_places.primitives import unit_cube
@@ -29,15 +30,15 @@ class floor(node):
     def find_corners(self, pos, length, width):
         x = length/2.0
         y = width/2.0
-        c1 = fu.translate_vector(pos[:],[-x,-y,0])
-        c2 = fu.translate_vector(pos[:],[x,-y,0])
-        c3 = fu.translate_vector(pos[:],[x,y,0])
-        c4 = fu.translate_vector(pos[:],[-x,y,0])
+        c1 = mpu.translate_vector(pos[:],[-x,-y,0])
+        c2 = mpu.translate_vector(pos[:],[x,-y,0])
+        c3 = mpu.translate_vector(pos[:],[x,y,0])
+        c4 = mpu.translate_vector(pos[:],[-x,y,0])
         corners = [c1, c2, c3, c4]
         ttf = self.tform
         #ttf = self.tform.true()
-        fu.rotate_z_coords(corners, ttf.rotation[2])
-        fu.translate_coords(corners, ttf.position)
+        mpu.rotate_z_coords(corners, ttf.rotation[2])
+        mpu.translate_coords(corners, ttf.position)
         return corners
 
     def make_primitives(self, pos, length, width, flheight, gaps = []):

@@ -21,6 +21,30 @@ class base(object):
         if not key in self.__dict__.keys():
             self.__dict__[key] = init
 
+class vertex(object):
+    def __init__(self, pos, normal, uv):
+        self.pos = pos
+        self.normal = normal
+        self.uv = uv
+
+class bbox(base):
+    def __init__(self, *args, **kwargs):
+        self._default_('corners',[],**kwargs)
+        self._default_('position',[0,0,0],**kwargs)
+        self._default_('edgenorms',
+            mpu.get_norms(self.corners),**kwargs)
+
+    def intersects(self,boxes,box):
+        if not type(box) is type([]):box = [box]
+        check = mpu.separating_axis
+        for bo in box:
+            for ibox in boxes:
+                if check(ibox,bo):
+                    return True
+        return False
+
+
+
 #def uniq(seq):
 #    # Not order preserving
 #    keys = {}
@@ -42,104 +66,22 @@ def flatten(unflat_list):
 
 
 
-
-
-
-
-def center_of_mass_____________(coords):
-    return mpu.center_of_mass(coords)
-    xs,ys,zs = zip(*coords)
-    #xme = np.round(np.mean(xs),8)
-    xme = np.mean(xs, dtype = np.float32)
-    yme = np.mean(ys, dtype = np.float32)
-    zme = np.mean(zs, dtype = np.float32)
-    return [xme,yme,zme]
-
-def translate_coords_____(coords, vect):
-    for coo in coords:
-        for dx in range(3):
-            coo[dx] += vect[dx]
-    return coords
-
-def scale_coords_____(coords, vect):
-    for coo in coords:
-        for dx in range(3):
-            coo[dx] *= vect[dx]
-    return coords
-
-def rotate_y_coords_____(coords, ang_y):
-    M_y = [
-        [cos(ang_y), 0,-sin(ang_y)], 
-        [         0, 1,          0], 
-        [sin(ang_y), 0, cos(ang_y)], 
-            ]
-    for coo in coords:
-        rot_coo = row_major_multiply(M_y, coo)
-        coo[:] = rot_coo
-    return coords
-
-def rotate_z_matrix_____(ang_z):
-    M_z = [
-        [cos(ang_z),-sin(ang_z), 0], 
-        [sin(ang_z), cos(ang_z), 0], 
-        [         0,          0, 1], 
-            ]
-    return M_z
-
-def rotate_z_coord_____(coord, ang_z):
-    M_z = rotate_z_matrix(ang_z)
-    rot_coo = row_major_multiply(M_z, coord)
-    return rot_coo
-
-def rotate_z_coords_____(coords, ang_z):
-    M_z = rotate_z_matrix(ang_z)
-    for coo in coords:
-        rot_coo = row_major_multiply(M_z, coo)
-        coo[:] = rot_coo
-    return coords
-
-def scale_vector____(vect, sv):
-    for dx in range(3):
-        vect[dx] *= sv[dx]
-    return vect
-
-def translate_vector____(vect, tv):
-    for dx in range(3):
-        vect[dx] += tv[dx]
-    return vect
-
-#should this happen in place?
-def normalize_____(vect):
-    mag = magnitude(vect)
-    if mag == 0: return [0,0,0]
-    return [v/mag for v in vect]
-    #return [np.round(v/mag,4) for v in vect]
-
-def v1_v2____(v1, v2):
-    v1_v2_ = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
-    return v1_v2_
-
-
-
-
-
-
-def point_slope(x1,x2,y1,y2):
+def point_slope________(x1,x2,y1,y2):
     if x1 == x2: return None
     else: return (y2-y1)/(x2-x1)
 
-def line_y_intersect(pt,m):
+def line_y_intersect_________(pt,m):
     if m is None: return None
     x = pt[0]
     y = pt[1]
     run = x*m
     return y - run
 
-def in_range(x, rng):
+def in_range______(x, rng):
     in_ = x > min(rng) and x < max(rng)
     return in_
 
-def inside(pt, corners):
+def inside_________(pt, corners):
     poly = [(c[0],c[1]) for c in corners]
     x,y = pt[0],pt[1]
     n = len(poly)
@@ -160,14 +102,14 @@ def inside(pt, corners):
     return inside
 
 ###DONT TRUST THIS
-def pt_on_segment(pt,seg):
+def pt_on_segment__________(pt,seg):
     v1v2 = v1_v2(seg[0],pt)
     v1v3 = v1_v2(seg[0],seg[1])
     alpha = angle_between(v1v2,v1v3)
     if abs(alpha) <= 0.01: return True
     else: return False
 
-def segments_intersect(s1,s2):
+def segments_intersect_________(s1,s2):
     m1 = point_slope(s1[0][0],s1[1][0],s1[0][1],s1[1][1])
     m2 = point_slope(s2[0][0],s2[1][0],s2[0][1],s2[1][1])
     if m1 == m2:
@@ -195,52 +137,31 @@ def segments_intersect(s1,s2):
     #print('segmentsDOintersect!',s1,s2)
     return True
 
-def in_region(regi,pt):
+def in_region_______(regi,pt):
     for dx in range(len(regi)):
         if not in_range(pt[dx],regi[dx]):
             return False
     return True
 
-
-
-
-
-
-def midpoint____(p1,p2):
-    def me(x,y): return (x+y)/2.0
-    return [me(x,y) for x,y in zip(p1,p2)]
-
-def distance_xy____(v1,v2):
-    dx = v2[0] - v1[0]
-    dy = v2[1] - v1[1]
-    ds = sqrt(dx**2 + dy**2)
-    return ds
-
-def distance_____(v1,v2):
-    return magnitude(v1_v2(v1,v2))
-
-def magnitude_____(vect):
-    return sqrt(dot(vect,vect))
-
-def cross________(v1, v2):
-  return [
-      v1[1]*v2[2]-v1[2]*v2[1], 
-      v1[2]*v2[0]-v1[0]*v2[2], 
-      v1[0]*v2[1]-v1[1]*v2[0]]
-
-def dot_______(v1, v2):
-    xp = v1[0]*v2[0]
-    yp = v1[1]*v2[1]
-    zp = v1[2]*v2[2]
-    return xp + yp + zp
-
-
-
-
-
-
-def flip(v1):
+def flip_____(v1):
     return [-1*v for v in v1]
+
+def dice_edges_______(verts, dices = 3):
+    vcnt = len(verts)
+    for di in range(dices):
+        newpts = []
+        for tdx in range(1,vcnt):
+            pair = verts[tdx-1],verts[tdx]
+            mpt = mpu.midpoint(*pair)
+            newpts.extend([pair[0],mpt])
+        newpts.extend([newpts[-1],mpu.midpoint(newpts[-1],verts[0])])
+        verts = newpts
+    return verts
+
+
+
+
+
 
 def angle_between_xy(v1, v2):
     alpha1 = angle_from_xaxis_xy(v1)
@@ -296,78 +217,6 @@ def to_rad(deg):
 def to_deg(rad):
     return (180.0/PI)*rad
 
-def row_major_multiply______(M, coo):
-    rcoox = dot(M[0],coo)
-    rcooy = dot(M[1],coo)
-    rcooz = dot(M[2],coo)
-    return [rcoox, rcooy, rcooz]
-
-def find_corners______(pos, length, width):
-    c1, c2, c3, c4 = pos[:], pos[:], pos[:], pos[:]
-    c2[0] += length
-    c3[0] += length
-    c3[1] += width
-    c4[1] += width
-    return [c1, c2, c3, c4]
-
-def dice_edges(verts, dices = 3):
-    vcnt = len(verts)
-    for di in range(dices):
-        newpts = []
-        for tdx in range(1,vcnt):
-            pair = verts[tdx-1],verts[tdx]
-            mpt = mpu.midpoint(*pair)
-            newpts.extend([pair[0],mpt])
-        newpts.extend([newpts[-1],mpu.midpoint(newpts[-1],verts[0])])
-        verts = newpts
-    return verts
-
-
-
-
-
-
-
-
-def offset_faces______(faces, offset):
-    for fa in faces:
-        for fx in range(len(fa)):
-            fa[fx] += offset
-    return faces
-
-def find_in_radius________(pt,verts,radius = 10):
-    in_ = []
-    for vt in verts:
-        if distance(pt,vt) < radius: in_.append(vt)
-    return in_
-
-
-
-
-
-
-
-class vertex(object):
-    def __init__(self, pos, normal, uv):
-        self.pos = pos
-        self.normal = normal
-        self.uv = uv
-
-class bbox(base):
-    def __init__(self, *args, **kwargs):
-        self._default_('corners',[],**kwargs)
-        self._default_('position',[0,0,0],**kwargs)
-        self._default_('edgenorms',
-            mpu.get_norms(self.corners),**kwargs)
-
-    def intersects(self,boxes,box):
-        if not type(box) is type([]):box = [box]
-        check = mpu.separating_axis
-        for bo in box:
-            for ibox in boxes:
-                if check(ibox,bo):
-                    return True
-        return False
 
 
 

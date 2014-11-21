@@ -4,6 +4,7 @@ import make_places.primitives as pr
 from make_places.primitives import arbitrary_primitive
 from make_places.scenegraph import node
 
+from copy import deepcopy as dcopy
 import random as rm
 import os
 
@@ -52,9 +53,9 @@ def vegetate(verts, norms, faces):
         for ntdx in rm.sample([0,1,2],1):
             npt = mpu.midpoint(pt,vs[ntdx])
             #treeprims.append(tree(has_lod = True))
-            treeprims.append(tree(data = tree_data, has_lod = True))
+            treeprims.append(tree(data = dcopy(tree_data), has_lod = True))
             #treelodprims.append(tree(is_lod = True))
-            treelodprims.append(tree(data = tree_lod_data, is_lod = True))
+            treelodprims.append(tree(data = dcopy(tree_lod_data), is_lod = True))
             treeprims[-1].translate(npt)
             treelodprims[-1].translate(npt)
 

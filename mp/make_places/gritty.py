@@ -27,8 +27,15 @@ def create_prim(prim, name = None, center = False,
     # rotate coords backwards by world_rotation?
     w_position = prim.position
     w_rotation = world_rotation
-    is_new = create_grit_mesh(prim)
-    if is_new: create_gcol(prim)
+    #is_new = create_grit_mesh(prim)
+
+    xml, is_new = prim.write_as_xml()
+    if is_new:
+        xdir = os.path.join(world_dir, prim.xml_filename)
+        with open(xdir,'w') as handle:
+            [handle.write(li) for li in xml]
+        create_gcol(prim)
+
     gnum = get_grit_number(repeat = prim.is_lod)
     if name is None: oname = prim.tag + gnum
     else: oname = name + gnum
@@ -178,6 +185,11 @@ def write_map_lines(obj, location, rotation, name):
     lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
     return lines
 
+def create_grit_meshes():
+    print 'converting'
+    subprocess.call('./convert.sh', shell = True)
+    print 'converted'
+
 executable_suffix = '.exe'
 executable_suffix = ''
 converterpath = 'OgreXMLConverter'
@@ -189,8 +201,6 @@ def create_grit_mesh(prim, tangents = False,
         with open(xdir,'w') as handle:
             [handle.write(li) for li in xml]
         if use_ogre_xml_converter:
-            #converterpath = os.path.join(world_dir, 
-            #    'OgreXMLConverter' + executable_suffix)
             args = [converterpath, "-e"]
             args.append("-q")
             if tangents:
@@ -198,7 +208,9 @@ def create_grit_mesh(prim, tangents = False,
                 args.append("-ts")
                 args.append("4")
             args.append(xdir)
-            subprocess.call(args)
+            p_op = subprocess.Popen(args, bufsize = 4096)
+            #p_op.wait()
+            #subprocess.call(args)
     return is_new
 
 def create_gcol(prim):
@@ -237,8 +249,7 @@ def create_gcol(prim):
             glines += '\t\t'+\
                 ' '.join([str(f[0]),str(f[1]),str(f[2])])+\
                 ' \"'+m+'\";\n'
-    glines += '\t}\n'
-    glines += '}\n'
+    glines += '\t}\n}\n'
 
     #glines += children_lines
     gfile = os.path.join(world_dir,filename)
@@ -287,6 +298,7 @@ def output_world_scripts():
     output_classes()
     output_map()
     output_mats()
+    create_grit_meshes()
 
 def create_element(*args):
     for ag in args:

@@ -103,9 +103,9 @@ class intersection(node):
     def terrain_points(self):
         # i need the location of the octagon verts!
         #rh2 = self.road_height/2.0
-        rh2 = 0.15
+        rh2 = 0.25
         corners = self.find_corners()
-        corners = fu.dice_edges(corners, dices = 1)
+        #corners = mpu.dice_edges(corners, dices = 1)
         position = self.tform.true().position
         x,y,z = position
         mpu.translate_coords(corners,[x,y,z-rh2])
@@ -140,7 +140,9 @@ class intersection(node):
         octscl = clipln / cos(fu.to_rad(octang))
         uo = uoctagon()
         uo.scale([octscl,octscl,rh])
+        rh = 0.15
         uo.translate([0,0,-rh])
+        #uo.translate_face([0,0,-rh],'top')
         segs.append(uo)
         return segs
         
@@ -213,7 +215,7 @@ class road_segment_primitive(arbitrary_primitive):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
         foff = mpu.center_of_mass(face_coords)
-        mpu.translate_coords(face_coords, fu.flip(foff))
+        mpu.translate_coords(face_coords, mpu.flip(foff))
         mpu.rotate_z_coords(face_coords, ang_z)
         mpu.translate_coords(face_coords, foff)
         self.calculate_normals()
@@ -226,6 +228,7 @@ class road(node):
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',1000,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
+        #self._default_('consumes_children',True,**kwargs)
         self._default_('road_width', 10, **kwargs)
         self._default_('road_height', 1, **kwargs)
         self.clip_length = clip_length
@@ -242,34 +245,14 @@ class road(node):
 
     def terrain_points(self):
         tpts = []
-        
         for corns in self.corners:
             tcorns = mpu.translate_coords(corns[:],[0,0,-0.25])
-            tcorns = fu.dice_edges(tcorns, dices = 1)
+            tcorns = mpu.dice_edges(tcorns, dices = 1)
             mcorns = [tcorns[3],tcorns[7]]
             mpu.translate_coords(mcorns,[0,0,-0.25])
             tpts.extend([tc for tc in tcorns if not tc in tpts])
-            
         return tpts
         
-        '''#
-        verts = self.segmented_vertices
-        vcnt = len(verts)
-        for sgdx in range(1,vcnt):
-            p1,p2 = verts[sgdx-1],verts[sgdx]
-            tcorns = mpu.translate_coords(
-                self.make_corners(p1,p2),[0,0,-0.25])
-            tcorns = fu.dice_edges(tcorns, dices = 1)
-            tpts.extend(tcorns)
-            #tpts.append(mpu.translate_vector(
-            #    mpu.center_of_mass(tpts),[0,0,-1.5]))
-            tpts.append(mpu.center_of_mass(tpts))
-            mcorns = [tpts[3],tpts[7],tpts[8]]
-            mpu.translate_coords(mcorns,[0,0,-0.25])
-        #return fu.uniq(tpts)
-        return tpts
-        '''#
-
     def set_corners(self, verts):
         corners = []
         vcnt = len(verts)
@@ -326,19 +309,12 @@ class road(node):
         dirs = kwargs['directions']
         norms = self.get_cardinal_normals(dirs)
         self.stnorm = norms[0]
-        self.ednorm = fu.flip(norms[1])
+        self.ednorm = mpu.flip(norms[1])
 
         segdice = True
         verts = [stp,enp]
         verts = self.clip_tips(verts,norms[0],norms[1])
         verts = self.add_tips(verts,norms[0],norms[1])
-
-        def parameterize_time_______(points,time,alpha):
-            total = 0
-            for idx in range(1,4):
-                v1v2 = mpu.v1_v2(points[idx-1],points[idx])
-                total += mpu.magnitude(v1v2)**(2.0*alpha)
-                time[idx] = total
 
         def bend(vs):
             tips = vs[:2] + vs[-2:]
@@ -346,9 +322,12 @@ class road(node):
             tim = [0.0,1.0,2.0,3.0]
             alpha = 1.0/2.0
             mpu.parameterize_time(tips,tim,alpha)
-            cox = mpu.catmull_rom(cox,tim,10)
-            coy = mpu.catmull_rom(coy,tim,10)
-            coz = mpu.catmull_rom(coz,tim,10)
+
+            scnt = 20
+
+            cox = mpu.catmull_rom(cox,tim,scnt)
+            coy = mpu.catmull_rom(coy,tim,scnt)
+            coz = mpu.catmull_rom(coz,tim,scnt)
             new = [list(i) for i in zip(cox,coy,coz)]
             return new
 
@@ -501,7 +480,7 @@ class road_system(node):
             z_offset = rm.randrange(z_off_min, z_off_max)
             offset = [link*cos(angrad),link*sin(angrad),z_offset]
             newtip = mpu.translate_vector(tippos, offset)
-            if not fu.in_region(region_bounds, newtip):
+            if not mpu.in_region(region_bounds, newtip):
                 return False,None
             for ipos in [i['position'] for i in interargs]:
                 d = mpu.distance(newtip, ipos)
@@ -573,9 +552,11 @@ class road_system(node):
 
         self.reuse_data = {'rargs':[],'iargs':[],'topology':None}
         self.roads = []
+        self.highways = []
         for tdx, topo in enumerate(topology):
             topology[tdx] = find_neighbors(topology,topo,rwidth)
         rdbbs = []
+        hwbbs = []
         for tdx, topo in enumerate(topology):
             inter = topo['inter']
             inter['topology'] = topology
@@ -593,10 +574,12 @@ class road_system(node):
                 else:
                     newrd = highway(**rarg)
                     newbb = newrd.get_bbox()
-                    rdbbs.extend(newbb)
-                    self.roads.append(newrd)
-                    elements.append(newrd)
-                    print('topology mistake from road intersection!')
+                    if not fu.bbox.intersects(newbb[0],hwbbs,newbb):
+                        hwbbs.extend(newbb)
+                        self.highways.append(newrd)
+                        #self.roads.append(newrd)
+                        elements.append(newrd)
+                        print('topology mistake from road intersection!')
         self.topology = topology
         self.reuse_data['topology'] = topology
         return elements
@@ -649,18 +632,22 @@ class road_system(node):
 
 class highway(road):
 
+    def terrain_points(self):
+        tpts = []
+        return tpts
+        
     def make_segments(self, *args, **kwargs):
         sverts = self.segmented_vertices
         self.sverts_ground = self.segmented_vertices[:]
-        sverts[1][2] += 5
-        sverts[-2][2] += 5
+        sverts[2][2] += 2
+        sverts[-3][2] += 2
         tim = [0.0,1.0,2.0,3.0]
         alpha = 1.0/2.0
-        tips = sverts[:2] + sverts[-2:]
+        tips = sverts[1:3] + sverts[-3:-1]
         coz = [t[2] for t in tips]
         mpu.parameterize_time(tips,tim,alpha)
-        coz = mpu.catmull_rom(coz,tim,10)
-        for sv,co in zip(sverts,coz): sv[2] = co
+        coz = mpu.catmull_rom(coz,tim,8)
+        for sv,co in zip(sverts[1:-1],coz): sv[2] = min(co,20)
         rdsegs = road.make_segments(self, *args, **kwargs)
         return rdsegs
 
@@ -865,7 +852,7 @@ def no_road_intersects(topology,idx1,idx2):
             y = topology[ldx]
             s2 = (x['inter']['position'],
                   y['inter']['position'],)
-            if fu.segments_intersect(s1,s2): return False
+            if mpu.segments_intersect(s1,s2): return False
     return True
     
 

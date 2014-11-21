@@ -11,6 +11,8 @@ import numpy as np
 from numpy import linalg
 from numpy import matrix
 from math import sin
+from copy import deepcopy as dcopy
+from copy import copy
 
 
 #mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
@@ -121,7 +123,7 @@ class arbitrary_primitive(base):
             #com = self.find_centroid()
             #comf = mpu.center_of_mass(fcoords)
             #if not fu.angle_between(fu.v1_v2(comf,com),normal)>fu.PI/2.0:
-            #    normal = fu.flip(normal)
+            #    normal = mpu.flip(normal)
             for vdx in fa: self.ncoords[vdx] = normal
 
     def get_vertexes(self):
@@ -131,7 +133,6 @@ class arbitrary_primitive(base):
 
     def get_vertexes_faces_phys(self):
         vs = self.get_vertexes()
-        #self.phys_materials = fu.uniq(self.phys_materials)
         mcnt = len(self.phys_materials)
         fcnt = len(self.face_materials)
         self.phys_face_materials = [0]*fcnt
@@ -147,7 +148,6 @@ class arbitrary_primitive(base):
     def get_vertexes_faces(self):
         vargs = zip(self.coords,self.ncoords,self.uv_coords)
         vs = [fu.vertex(*va) for va in vargs]
-        #self.materials = fu.uniq(self.materials)
         mcnt = len(self.materials)
         fcnt = len(self.face_materials)
         fa = {}
@@ -170,7 +170,7 @@ class arbitrary_primitive(base):
 
     def reset_position(self, pos):
         self.position = pos
-        self.translate(fu.flip(pos))
+        self.translate(mpu.flip(pos))
 
     def write_as_xml(self):
         if self.modified:
@@ -283,7 +283,7 @@ def xml_from_primitive_data(prim):
 
     xlines.append("<mesh>\n")
     xlines.append("    <sharedgeometry>\n")
-    xlines.append("        <vertexbuffer positions=\"true\" normals=\"+_normals+\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
+    xlines.append("        <vertexbuffer positions=\"true\"normals=\""+_normals+"\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     #xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     for v in vertexes:
         x,y,z = v.pos
@@ -391,11 +391,14 @@ def primitive_from_xml(xmlfile):
     pwargs = primitive_data_from_xml(xmlfile)
     return arbitrary_primitive(**pwargs)
 
+cubexml = os.path.join(primitive_data_path, 'cube.mesh.xml')
+cubedata = primitive_data_from_xml(cubexml)
 class unit_cube(arbitrary_primitive):
     cubexml = os.path.join(primitive_data_path, 'cube.mesh.xml')
 
     def __init__(self, *args, **kwargs):
-        pcubedata = primitive_data_from_xml(self.cubexml)
+        pcubedata = dcopy(cubedata)
+        #pcubedata = primitive_data_from_xml(self.cubexml)
         self._default_('tag','_cube_',**kwargs)
         arbitrary_primitive.__init__(self, *args, **pcubedata)
         self.coords_by_face = self.find_faces()
@@ -429,7 +432,56 @@ class unit_cube(arbitrary_primitive):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
         foff = mpu.center_of_mass(face_coords)
-        mpu.translate_coords(face_coords, fu.flip(foff))
+        mpu.translate_coords(face_coords, mpu.flip(foff))
+        mpu.rotate_z_coords(face_coords, ang_z)
+        mpu.translate_coords(face_coords, foff)
+        self.calculate_normals()
+        self.modified = True
+
+#cubexml = os.path.join(primitive_data_path, 'cube.mesh.xml')
+octaxml = os.path.join(primitive_data_path, 'octagon.mesh.xml')
+#cubedata = primitive_data_from_xml(cubexml)
+class unit_octagon(arbitrary_primitive):
+    #cubexml = os.path.join(primitive_data_path, 'cube.mesh.xml')
+    octaxml = os.path.join(primitive_data_path, 'octagon.mesh.xml')
+
+    def __init__(self, *args, **kwargs):
+        #pcubedata = dcopy(cubedata)
+        poctadata = primitive_data_from_xml(self.octaxml)
+        self._default_('tag','_octagon_',**kwargs)
+        arbitrary_primitive.__init__(self, *args, **poctadata)
+        self.coords_by_face = self.find_faces()
+        self._scale_uvs_ = True
+
+    def find_faces(self):
+        #fronts = [v for v in self.coords if v[1] < 0.0]
+        #backs = [v for v in self.coords if v[1] > 0.0]
+        #lefts = [v for v in self.coords if v[0] < 0.0]
+        #rights = [v for v in self.coords if v[0] > 0.0]
+        bottoms = [v for v in self.coords if v[2] <= 0.0]
+        tops = [v for v in self.coords if v[2] > 0.0]
+        facedict = {
+        #    'front':fronts, 
+        #    'back':backs, 
+        #    'left':lefts,                                        
+        #    'right':rights, 
+            'top':tops, 
+            'bottom':bottoms, 
+                }
+        return facedict
+
+    def translate_face(self, vect, face = 'top'):
+        cfaces = self.coords_by_face
+        face_coords = cfaces[face]
+        mpu.translate_coords(face_coords, vect)
+        self.calculate_normals()
+        self.modified = True
+
+    def rotate_z_face(self, ang_z, face = 'top'):
+        cfaces = self.coords_by_face
+        face_coords = cfaces[face]
+        foff = mpu.center_of_mass(face_coords)
+        mpu.translate_coords(face_coords, mpu.flip(foff))
         mpu.rotate_z_coords(face_coords, ang_z)
         mpu.translate_coords(face_coords, foff)
         self.calculate_normals()
@@ -439,9 +491,10 @@ def ucube(*args, **kwargs):
     pcube = unit_cube(*args, **kwargs)
     return pcube
 
-def uoctagon():
+def uoctagon(*args, **kwargs):
     octaxml = os.path.join(primitive_data_path, 'octagon.mesh.xml')
     poct = primitive_from_xml(octaxml)
+    #poct = unit_octagon(*args, **kwargs)
     return poct
 
 def sum_primitives(prims):

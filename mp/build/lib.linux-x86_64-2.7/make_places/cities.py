@@ -273,7 +273,7 @@ class city(node):
 
     def make_terrain(self, *args, **kwargs):
         kwargs['parent'] = self
-        kwargs['splits'] = 7
+        kwargs['splits'] = 6
         kwargs['smooths'] = 1
         kwargs['bboxes'] = self.bboxes
         ter = terrain(**kwargs)
@@ -288,7 +288,7 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':15, 
+                'intersection_count':40, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 

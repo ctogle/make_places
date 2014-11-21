@@ -182,7 +182,7 @@ class block(node):
         def get_random():
             blen_bottom = max([int(maxblen/rmfact),minblen])
             blen_top = maxblen
-            if blen_bottom == blen_top: blen_bottom -= 1
+            if blen_bottom >= blen_top: blen_bottom = blen_top - 1
             blen = rm.randrange(blen_bottom,blen_top)
             #blen = rm.randrange(max([int(maxblen/rmfact),minblen]),maxblen)
             rmfactored = int(maxbwid/rmfact)
@@ -288,7 +288,7 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':15, 
+                'intersection_count':20, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 

@@ -131,7 +131,7 @@ class terrain_triangle(fu.base):
     def inside(self, pt):
         corners = [mpu.translate_vector(v.position[:],tv) 
             for v,tv in zip(self.verts,self.com_vects)]
-        return fu.inside(pt, corners)
+        return mpu.inside(pt, corners)
 
     def fix_closest(self, pts, locs):
         if not pts: return
@@ -151,9 +151,9 @@ class terrain_triangle(fu.base):
         s1 = [corners[0].position,corners[1].position]
         s2 = [corners[1].position,corners[2].position]
         s3 = [corners[2].position,corners[0].position]
-        if fu.pt_on_segment(v.position,s1): return True
-        elif fu.pt_on_segment(v.position,s2): return True
-        elif fu.pt_on_segment(v.position,s3): return True
+        if mpu.pt_on_segment(v.position,s1): return True
+        elif mpu.pt_on_segment(v.position,s2): return True
+        elif mpu.pt_on_segment(v.position,s3): return True
         else: return False
 
     def fix_bounds(self, locs):
@@ -186,6 +186,13 @@ class terrain_triangle(fu.base):
                     for subsubch in subch.children:
                         lod_meshes.append(subsubch.mesh(
                             depth = 0, max_depth = self.splits - 3))
+                            
+            #for ch in self.children:
+            #    for subch in ch.children:
+            #        for subsubch in subch.children:
+            #            for subsubsubch in subsubch.children:
+            #                lod_meshes.append(subsubsubch.mesh(
+            #                    depth = 0, max_depth = self.splits - 3))
             
             #lod_meshes = [
             #    ch.mesh(depth = 0, max_depth = self.splits - 3) 
@@ -198,6 +205,12 @@ class terrain_triangle(fu.base):
                 for subch in ch.children:
                     for subsubch in subch.children:
                         meshes.append(subsubch.mesh())
+
+            #for ch in self.children:
+            #    for subch in ch.children:
+            #        for subsubch in subch.children:
+            #            for subsubsubch in subsubch.children:
+            #                meshes.append(subsubsubch.mesh())
             
             #meshes = [ch.mesh() for ch in self.children]
             #meshes = [self.mesh()]
@@ -284,7 +297,7 @@ def bisect(tv1,tv2,vcnt,controls,tolerance = 25,big_tolerance = 250):
 
 def make_terrain(initial_tps,splits = 2,smooths = 25, 
         pts_of_interest = [[250,250,25],[500,250,-25]],locs = None):
-    pts_of_interest = fu.uniq(pts_of_interest)
+    #pts_of_interest = fu.uniq(pts_of_interest)
     t1 = terrain_point(position = initial_tps[0])
     t2 = terrain_point(position = initial_tps[1])
     t3 = terrain_point(position = initial_tps[2])
@@ -308,7 +321,7 @@ class terrain(node):
         kwargs['uv_scales'] = [0.1,0.1,0.1]
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
-        self._default_('grit_renderingdistance',500,**kwargs)
+        self._default_('grit_renderingdistance',250,**kwargs)
         self._default_('grit_lod_renderingdistance',10000,**kwargs)
         self._default_('pts_of_interest',[],**kwargs)
         self._default_('splits',4,**kwargs)
@@ -322,8 +335,8 @@ class terrain(node):
         t3 = [rb[0][0],rb[1][1],0]
         t4 = [rb[0][1],rb[1][1],0]
     
-        #hexagonal = True
-        hexagonal = False
+        hexagonal = True
+        #hexagonal = False
         if hexagonal:
             xrng,yrng = rb[0][1]-rb[0][0],rb[1][1]-rb[1][0]
             mrng = max([xrng,yrng])
@@ -435,20 +448,30 @@ class terrain(node):
                         midz = (bp1.position[2]+bp2.position[2])/2.0
                         bp1.position[2] = midz
                         bp2.position[2] = midz
-                        bp1.neighbors.extend(bp2.neighbors)
-                        alln = fu.uniq(bp1.neighbors)
-                        bp1.neighbors = alln
-                        bp2.neighbors = alln
+                        bp1.weights[2] = 0
+                        bp2.weights[2] = 0
+                        #newneighbs = [n for n in bp2.neighbors 
+                        #            if not n in bp1.neighbors]
+                        #bp1.neighbors.extend(newneighbs)
+                        #bp1.neighbors.extend(bp2.neighbors)
+                        #alln = fu.uniq(bp1.neighbors)
+                        #bp1.neighbors = alln
+                        #bp2.neighbors = alln
             pieces = [p1,p2]
             [pc.smooth(5,lc) for pc,lc in zip(pieces,locs)]
+            all_pieces.append(pieces[0])
+
+        '''#
+        for p1,p2 in pairs:
+            print('stitching')#,p1,p2)
+            b1,b2 = p1.boundary_points,p2.boundary_points
             for bp1 in b1:
                 for bp2 in b2:
                     if bp1._str == bp2._str:
                         midz = (bp1.position[2]+bp2.position[2])/2.0
                         bp1.position[2] = midz
                         bp2.position[2] = midz
-            #all_pieces.extend(pieces)
-            all_pieces.append(pieces[0])
+        '''#
 
         #all_pieces = fu.uniq(all_pieces)
         #all_pieces.pop(0)

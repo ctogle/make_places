@@ -51,9 +51,14 @@ class wall(node):
             gaps.append((gp,gwid))
         return gaps
 
-    def make_wall_segment(self, pos, v1, v2):
+    def make_wall_segment(self, pos, v1, v2, wall_scales):
         wall_ = unit_cube()
         length = mpu.distance_xy(v1,v2)
+        #wy = wall_scales[1]
+        #wz = wall_scales[2]
+        #wall_.scale_uvs([length,wy,wz])
+        #wall_._scale_uvs_ = False
+        wall_._scale_uvs_ = True
         wall_.scale([length, self.wall_width, self.wall_height])
         wall_.translate([length/2.0,0,0])
         ang_z = fu.angle_from_xaxis_xy(mpu.v1_v2(v1,v2))
@@ -64,6 +69,8 @@ class wall(node):
     def make_primitives(self, pos, v1, v2, gaps = []):
         tang = mpu.normalize([v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]])
         segmented = [v1, v2]
+        wscls = mpu.distance(v1,v2)
+        wscls = [wscls, self.wall_width, self.wall_height]
         for gap in gaps:
             cent = gap[0]
             widt = gap[1]
@@ -81,7 +88,7 @@ class wall(node):
             fr = frnts[sgdx]
             bk = backs[sgdx]
             spos = mpu.v1_v2(v1,fr)
-            wall_ = self.make_wall_segment(spos, fr, bk)
+            wall_ = self.make_wall_segment(spos, fr, bk, wscls)
             prims.append(wall_)
         return prims
 
@@ -102,7 +109,7 @@ class perimeter(node):
         self._default_('wall_offset',0,**kwargs)
         corns = self.add_corner_offset(corns)
         self._default_('corners',corns,**kwargs)
-        kwargs['uv_parent'] = self.floor
+        #kwargs['uv_parent'] = self.floor
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('wall_width', 0.5, **kwargs)
@@ -136,16 +143,16 @@ class perimeter(node):
         c4 = corners[3]
         ww = self.wall_width
         h = self.wall_height
-        walls.append(wall(c1, c2, uv_parent = self, 
+        walls.append(wall(c1, c2, #uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[0], gaped = gapes[0]))
-        walls.append(wall(c2, c3, uv_parent = self, 
+        walls.append(wall(c2, c3, #uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[1], gaped = gapes[1]))
-        walls.append(wall(c3, c4, uv_parent = self, 
+        walls.append(wall(c3, c4, #uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[2], gaped = gapes[2]))
-        walls.append(wall(c4, c1, uv_parent = self, 
+        walls.append(wall(c4, c1, #uv_parent = self, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[3], gaped = gapes[3]))
         return walls

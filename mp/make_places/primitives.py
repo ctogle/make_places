@@ -79,8 +79,27 @@ class arbitrary_primitive(base):
         uvs = self.uv_coords + other.uv_coords
         mpu.offset_faces(other.faces, other_offset)
         faces = self.faces + other.faces
-        omats = [m for m in other.materials if not m in self.materials]
-        materials = self.materials + omats
+
+        ofmats = other.face_materials
+        ofacnt = len(ofmats)
+        for dx in range(len(other.materials)):
+            omat = other.materials[dx]
+            #ofaces = [f for f in other.face_materials if f == dx]
+            if not omat in self.materials:
+                self.materials.append(omat)
+                mdx = len(self.materials) - 1
+                for fdx in range(ofacnt):
+                    if ofmats[fdx] == dx:
+                        ofmats[fdx] = mdx
+            else:
+                mdx = self.materials.index(omat)
+                if not mdx == dx:
+                    for fdx in range(ofacnt):
+                        if ofmats[fdx] == dx:
+                            ofmats[fdx] = mdx
+
+        #omats = [m for m in other.materials if not m in self.materials]
+        materials = self.materials[:]# + omats
         face_materials = self.face_materials + other.face_materials
         xmlfile = self.xml_filename
         pwargs = {
@@ -420,6 +439,9 @@ class unit_cube(arbitrary_primitive):
             'bottom':bottoms, 
                 }
         return facedict
+
+    def remove_face(self, face = 'top'):
+        print 'i would remove a face!!'
 
     def translate_face(self, vect, face = 'top'):
         cfaces = self.coords_by_face

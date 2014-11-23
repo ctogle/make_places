@@ -1,9 +1,9 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_bboxes as mpbb
 import make_places.primitives as pr
 import make_places.scenegraph as sg
 from make_places.scenegraph import node
-from make_places.fundamental import bbox
 from make_places.roads import road_system
 from make_places.roads import highway
 from make_places.buildings import building
@@ -124,6 +124,7 @@ class block(node):
                     road = rd,bboxes = bboxes)
             if not bpos is False:
                 blarg = {
+                    'theme':self.theme, 
                     'name':bname, 
                     'parent':self, 
                     'position':bpos, 
@@ -182,7 +183,7 @@ class block(node):
         def get_random():
             blen_bottom = max([int(maxblen/rmfact),minblen])
             blen_top = maxblen
-            if blen_bottom == blen_top: blen_bottom -= 1
+            if blen_bottom >= blen_top: blen_bottom = blen_top - 1
             blen = rm.randrange(blen_bottom,blen_top)
             #blen = rm.randrange(max([int(maxblen/rmfact),minblen]),maxblen)
             rmfactored = int(maxbwid/rmfact)
@@ -207,7 +208,7 @@ class block(node):
             xtry,ytry,ztry = mpu.translate_vector(base[:],
                 mpu.scale_vector(segtang[:],[stry,stry,stry]))
             corners = self.make_corners(xtry,ytry,ztry,blen,bwid,bhei,rdpitch)
-            boxtry = bbox(position = [xtry,ytry,ztry], corners = corners)
+            boxtry = mpbb.bbox(position = [xtry,ytry,ztry], corners = corners)
             return boxtry,blen,bwid,bhei
 
         try_cnt = 0
@@ -273,7 +274,7 @@ class city(node):
 
     def make_terrain(self, *args, **kwargs):
         kwargs['parent'] = self
-        kwargs['splits'] = 6
+        kwargs['splits'] = 8
         kwargs['smooths'] = 1
         kwargs['bboxes'] = self.bboxes
         ter = terrain(**kwargs)
@@ -288,7 +289,7 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':40, 
+                'intersection_count':30, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 

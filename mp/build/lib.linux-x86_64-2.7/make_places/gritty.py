@@ -73,6 +73,8 @@ materials = {
     
     #'grass2' : ('animgtex', 'grass.dds'), 
     'road' : ('animgtex', 'road.png'), 
+    
+    'roof' : ('animgtex', 'rubber.png'), 
     #material "Road" {vertexDiffuse=true, diffuseMap="textures/road.dds", normalMap="textures/road_N.dds", glossMap="textures/road_S.tga"  }
         }
 def read_material_name(matline):
@@ -187,7 +189,9 @@ def write_map_lines(obj, location, rotation, name):
 
 def create_grit_meshes():
     print 'converting'
-    subprocess.call('./convert.sh', shell = True)
+    gdir = os.path.join(world_dir, 'convert.sh')
+    subprocess.call([gdir, world_dir], shell = True)
+    #subprocess.call('./convert.sh', shell = True)
     print 'converted'
 
 executable_suffix = '.exe'

@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_bboxes as mpbb
 import make_places.scenegraph as sg
 import make_places.primitives as pr
 import make_places.cities as cities
@@ -428,7 +429,7 @@ def block_g():
         bl1.terrain_points() +\
         bl2.terrain_points()
     corners = [[0,0,0],[200,0,0],[200,200,0],[0,200,0]]
-    bboxes = [fu.bbox(corners = corners)]
+    bboxes = [mpbb.bbox(corners = corners)]
     bboxes = rsys.get_bbox() + bl1.get_bbox() + bl2.get_bbox()
     ter = terr.terrain(
         pts_of_interest = pts_of_int, 

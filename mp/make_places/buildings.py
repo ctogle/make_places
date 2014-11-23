@@ -1,6 +1,7 @@
 from make_places.scenegraph import node
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_bboxes as mpbb
 import make_places.primitives as pr
 from make_places.stairs import ramp
 from make_places.stairs import shaft
@@ -9,6 +10,7 @@ from make_places.walls import wall
 from make_places.walls import perimeter
 
 import random as rm
+import os
 
 import pdb
 
@@ -38,7 +40,8 @@ class story(node):
         self._default_('ceiling_height',0.5,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
-        self._default_('ext_gaped',True,**kwargs)
+        self._default_('ext_gaped',False,**kwargs)
+        #self._default_('ext_gaped',True,**kwargs)
         children = self.make_children(*args, **kwargs)
         self.add_child(*children)
         self.lod_primitives = self.make_lod(*args,**kwargs)
@@ -118,7 +121,7 @@ class story(node):
         peargs = [{
             #'parent':fl, 
             #'parent':self, 
-            'uv_parent':self, 
+            'uv_parent':fl, 
             'floor':fl, 
             'wall_offset':-self.wall_width/2.0, 
             'gaped':self.ext_gaped, 
@@ -156,15 +159,72 @@ class basement(story):
         self._default_('ext_gaped',False,**kwargs)
         story.__init__(self, *args, **kwargs)
 
+class roofwedge(pr.arbitrary_primitive):
+    roofxml = os.path.join(pr.primitive_data_path, 'roof_angled.mesh.xml') 
+    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
+    #offset = [0,0,0]
+
+    def __init__(self, *args, **kwargs):
+        proofdata = pr.primitive_data_from_xml(self.roofxml)
+        #pvehdata = self.vehicledata
+        pr.arbitrary_primitive.__init__(self, *args, **proofdata)
+        self._default_('tag','_roof_',**kwargs)
+        self._scale_uvs_ = True
+        #self.translate(self.offset)
+
+class wedged_roof(node):
+    def __init__(self, *args, **kwargs):
+        self._default_('consumes_children',True,**kwargs)
+        self._default_('length',10,**kwargs)
+        self._default_('width',10,**kwargs)
+        self._default_('height',5,**kwargs)
+        self.primitives = self.make_roof(*args, **kwargs)
+        node.__init__(self, *args, **kwargs)
+
+    def make_roof(self, *args, **kwargs):
+        l,w,h = self.length,self.width,self.height
+        seg1 = roofwedge()
+        seg2 = roofwedge()
+        flip = True if rm.random() < 0.25 else False
+        seg2.rotate_z(fu.PI)
+        if flip:
+            seg1.rotate_z(fu.PI/2.0)
+            seg2.rotate_z(fu.PI/2.0)
+        seg1.scale([l,w,h])
+        seg2.scale([l,w,h])
+        return [seg1,seg2]
+
 class rooftop(story):
 
     def __init__(self, *args, **kwargs):
+        self._default_('theme','suburbs',**kwargs)
         self._default_('wall_height',1,{})
-        self._default_('add_ceiling',False,**kwargs)
+        def_ceiling = True if self.theme == 'suburbs' else False
+        self._default_('add_ceiling',def_ceiling,**kwargs)
         self._default_('ext_gaped',False,**kwargs)
         story.__init__(self, *args, **kwargs)
         veggies = self.vegetate()
         self.add_child(*veggies)
+        self.assign_material('cubemat')
+
+    def make_ceiling(self, *args, **kwargs):
+        flleng = self.length/2.0
+        flwidt = self.width/2.0
+        flheit = rm.randrange(int(min([flleng,flwidt])),
+                        2*int(max([flleng,flwidt])+1))
+
+        czpos = self.wall_height#+self.ceiling_height#+self.floor_height
+        rfpos = [0,0,czpos]
+        rfargs = {
+            'uv_parent':self, 
+            'position':rfpos, 
+
+            'length':flleng, 
+            'width':flwidt, 
+                }
+        ceil = wedged_roof(**rfargs)
+        self.ceiling = [ceil]
+        return [ceil]
 
     def vegetate(self):
         vchildren = []
@@ -179,7 +239,7 @@ class rooftop(story):
             for fdx in range(fcnt):
                 if rm.choice([0,1,1,1]):
                     verts = [v.position for v in fdat[fdx]]
-                    vegbox = fu.bbox(corners = verts)
+                    vegbox = mpbb.bbox(corners = verts)
                     if not vegbox.intersects(bboxes, vegbox):
                         nvcarg = (verts,None,[fdx])
                         vcargs.append(nvcarg)
@@ -224,6 +284,9 @@ class story_batch(node):
 _building_count_ = 0
 class building(node):
 
+    hard_min_length = 20
+    hard_min_width = 20
+
     def get_name(self):
         global _building_count_
         nam = 'building ' + str(_building_count_)
@@ -231,6 +294,7 @@ class building(node):
         return nam
 
     def __init__(self, *args, **kwargs):
+        self._default_('theme','suburbs',**kwargs)
         self._default_('name',self.get_name(),**kwargs)
         self._default_('grit_renderingdistance',250.0,**kwargs)
         self._default_('grit_lod_renderingdistance',1000.0,**kwargs)
@@ -340,9 +404,12 @@ class building(node):
     def terrain_points(self):
         tpts = self.find_corners()
         mpu.translate_coords(tpts,[0,0,-0.5])
+        center = mpu.center_of_mass(tpts)
+        mpu.translate_vector(center,[0,0,-0.5])
         #fu.translate_coords(tpts,[0,0,9])
         tpts = mpu.dice_edges(tpts, dices = 1)
-        tpts.append(mpu.center_of_mass(tpts))
+        tpts.append(center)
+        #tpts.append(mpu.center_of_mass(tpts))
         return tpts
 
     def make_shafts(self, *args, **kwargs):
@@ -368,7 +435,7 @@ class building(node):
 
     def get_bbox(self, *args, **kwargs):
         cornas = self.find_corners()
-        bb = fu.bbox(corners = cornas)
+        bb = mpbb.bbox(corners = cornas)
         return [bb]
 
     def find_corners(self):
@@ -386,18 +453,14 @@ class building(node):
         c4[1] += width/2.0
         corncoords = [c1, c2, c3, c4]
         zang = self.tform.rotation[2]
-        #corncoords = fu.rotate_z_coords(corncoords,zang)
         mpu.rotate_z_coords(corncoords,zang)
         mpu.translate_coords(corncoords,self.tform.position)#this doesnt need to be true()??!?!
-        #fu.translate_coords(corncoords,self.tform.true().position)#this doesnt need to be true()??!?!
         return [c1, c2, c3, c4]
 
     def make_floors_from_shafts(self, *args, **kwargs):
         shafts = self.shafts
         bname = self.name
-        #bname = self.building_name
         bpos = [0.0,0.0,0.0]
-        #stheight = self.wall_height + self.floor_height
         ww = self.wall_width
         l,w = self.length,self.width
 
@@ -409,12 +472,15 @@ class building(node):
         clheits = [self.ceiling_height]*flcnt
         flwlhts = [self.wall_height]*flcnt
         hthresh = rm.randrange(int(flcnt/2.0),int(7.0*(flcnt+1)/8.0))
+        if hthresh < 5: hthresh = 5
         lfactor = rm.choice([0.5,0.6,0.7,0.8,0.9])
         wfactor = rm.choice([0.5,0.6,0.7,0.8,0.9])
         fllengs = [l if fdx < hthresh else lfactor*l 
-                    for fdx,l in enumerate(fllengs)]
+            #max([lfactor*l,min([l,self.hard_min_length])]) 
+                for fdx,l in enumerate(fllengs)]
         flwidts = [w if fdx < hthresh else wfactor*w 
-                    for fdx,w in enumerate(flwidts)]
+            #max([wfactor*w,min([w,self.hard_min_width])]) 
+                for fdx,w in enumerate(flwidts)]
         #fllengs = [l if flcnt < flcnt/2.0 else 0.75*l for l in fllengs]
         #flwidts = [w if flcnt < flcnt/2.0 else 0.75*w for w in flwidts]
         #pdb.set_trace()
@@ -450,6 +516,7 @@ class building(node):
         #bump += floors[-1].ceiling_height
         fl_pos[2] += bump
         rfarg = {
+            'theme':self.theme, 
             'parent':self, 
             'uv_parent':self, 
             'name':roof_name, 

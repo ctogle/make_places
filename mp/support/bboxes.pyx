@@ -3,15 +3,7 @@ from libc.math cimport sqrt
 from mp_utils import overlap
 from mp_utils import project
 
-
-
-
-
 stuff = 'hi'
-
-
-
-
 
 cpdef bint separating_axis(bb1,bb2):
     cdef list ns1 = bb1.edgenorms

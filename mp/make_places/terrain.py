@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_bboxes as mpbb
 from make_places.scenegraph import node
 from make_places.primitives import arbitrary_primitive
 import make_places.profiler as prf
@@ -33,7 +34,7 @@ class terrain_point(fu.base):
         self._default_('weights',[1,1,1],**kwargs)
         self._str = str((self.position[0],self.position[1]))
 
-    def __add__(self, other):
+    def __add__adfkjlkd(self, other):
         newpos = mpu.midpoint(self.position,other.position)
         newneighbors = self.neighbors + other.neighbors
         newweights = mpu.scale_vector(self.weights[:],other.weights)
@@ -77,11 +78,11 @@ class terrain_triangle(fu.base):
         self.com_vects = [mpu.v1_v2(v,self.center) for v in vposs]
         self.com_vects = [mpu.normalize(v) for v in self.com_vects]
 
-    def bisect_all(self, vcnt, controls):
+    def bisect_all(self, vcnt, controls, control_count):
         t1,t2,t3 = self.verts
-        newt1 = bisect(t1,t2,vcnt,controls)
-        newt2 = bisect(t2,t3,vcnt,controls)
-        newt3 = bisect(t3,t1,vcnt,controls)
+        newt1 = bisect(t1,t2,vcnt,controls,control_count)
+        newt2 = bisect(t2,t3,vcnt,controls,control_count)
+        newt3 = bisect(t3,t1,vcnt,controls,control_count)
         newt1.neighbors.extend([newt2,newt3])
         newt2.neighbors.extend([newt3,newt1])
         newt3.neighbors.extend([newt1,newt2])
@@ -91,7 +92,10 @@ class terrain_triangle(fu.base):
         if lockeys is None: tempkeys = locs.keys()
         else: tempkeys = lockeys
         if not self.children:
-            for vdx,v in enumerate(self.verts):
+            vcnt = len(self.verts)
+            for vdx in range(vcnt):
+            #for vdx,v in enumerate(self.verts):
+                v = self.verts[vdx]
                 str_v = v._str
                 if not str_v in tempkeys:
                     locs[str_v] = v
@@ -108,17 +112,18 @@ class terrain_triangle(fu.base):
                     locs = locs, lockeys = tempkeys)
         return locs, tempkeys
 
-    def split(self, vcnt, controls, locs = None):
+    def split(self, vcnt, controls, control_count, locs = None):
         if locs is None: locs = {}
         self.splits += 1
         if self.children:
             #[ch.split(vcnt, controls) for ch in self.children[1:]]
-            [ch.split(vcnt, controls, locs) for ch in self.children]
+            [ch.split(vcnt, controls, control_count, locs) for ch in self.children]
             #prf.measure_time('fix topology of terrain', 
             #            self.fix_topology, locs = locs)
         else:
             t1,t2,t3 = self.verts
-            newt1,newt2,newt3 = self.bisect_all(vcnt, controls)
+            newt1,newt2,newt3 = self.bisect_all(
+                    vcnt, controls, control_count)
             self.children = [
                 terrain_triangle(verts = [newt1,newt2,newt3]), 
                 terrain_triangle(verts = [t1,newt1,newt3]), 
@@ -137,9 +142,13 @@ class terrain_triangle(fu.base):
         if not pts: return
         all_verts = locs.values()
         verts = [v.position for v in all_verts]
+        vcnt = len(verts)
         for pt in pts:
             if not self.inside(pt): continue
-            nearest,neardis,neardex = mpu.find_closest_xy(pt,verts)
+            #nearest,neardis,neardex = mpu.find_closest_xy(pt,verts,vcnt)
+            neardex = mpu.find_closest_xy(pt,verts,vcnt,5.0)
+            nearest = verts[neardex]
+            #neardis = mpu.distance_xy(nearest,pt)
             closest = all_verts[neardex]
             q2 = pt[2] - closest.position[2]
             closest.position[2] += q2
@@ -181,16 +190,16 @@ class terrain_triangle(fu.base):
 
             #lod_meshes = [self.mesh(depth = 0,max_depth = self.splits-3)]
 
-            for ch in self.children:
-                for subch in ch.children:
-                    lod_meshes.append(subch.mesh(depth = 0, 
-                            max_depth = self.splits - 3))
-
             #for ch in self.children:
             #    for subch in ch.children:
-            #        for subsubch in subch.children:
-            #            lod_meshes.append(subsubch.mesh(
-            #                depth = 0, max_depth = self.splits - 3))
+            #        lod_meshes.append(subch.mesh(depth = 0, 
+            #                max_depth = self.splits - 3))
+
+            for ch in self.children:
+                for subch in ch.children:
+                    for subsubch in subch.children:
+                        lod_meshes.append(subsubch.mesh(
+                            depth = 0, max_depth = self.splits - 4))
                             
             #for ch in self.children:
             #    for subch in ch.children:
@@ -208,14 +217,14 @@ class terrain_triangle(fu.base):
         else:
             meshes = []
             
-            for ch in self.children:
-                for subch in ch.children:
-                    meshes.append(subch.mesh())
-
             #for ch in self.children:
             #    for subch in ch.children:
-            #        for subsubch in subch.children:
-            #            meshes.append(subsubch.mesh())
+            #        meshes.append(subch.mesh())
+
+            for ch in self.children:
+                for subch in ch.children:
+                    for subsubch in subch.children:
+                        meshes.append(subsubch.mesh())
 
             #for ch in self.children:
             #    for subch in ch.children:
@@ -285,17 +294,29 @@ class terrain_triangle(fu.base):
         else: data.append(self.verts)
         return data
 
-def bisect(tv1,tv2,vcnt,controls,tolerance = 25,big_tolerance = 250):
+def pick_zoff(dist,vcnt):
+    zoff = (rm.random()*2.0 - 1.0)*(dist**(1.0/2.0))/vcnt
+    return zoff
+
+def bisect(tv1,tv2,vcnt,controls,control_count,
+            tolerance = 25,big_tolerance = 250):
     if tv1 in tv2.neighbors and tv2 in tv1.neighbors:
         newpos = mpu.midpoint(tv1.position,tv2.position)
         if controls:
-            nearest,dist,ndex = mpu.find_closest_xy(newpos,controls)
+            #nearest,dist,ndex = mpu.find_closest_xy(
+            ndex = mpu.find_closest_xy(
+                newpos,controls,control_count,10.0)
+            nearest = controls[ndex]
+            dist = mpu.distance_xy(nearest,newpos)
             zdiff = nearest[2] - newpos[2]
             if dist < tolerance: zoff = zdiff
             elif dist < big_tolerance:
-                zoff = rm.choice([-1,0,1])*(dist**(1.0/2.0)/vcnt)
-            else: zoff = rm.choice([-1,0,1])*(250.0/vcnt)
-        else: zoff = rm.choice([-1,0,1])*(1000.0/vcnt)
+                zoff = pick_zoff(dist,vcnt)
+                #zoff = rm.choice([-1,0,1])*(dist**(1.0/2.0)/vcnt)
+            else: zoff = pick_zoff(250**2,vcnt)
+            #else: zoff = rm.choice([-1,0,1])*(250.0/vcnt)
+        else: zoff = pick_zoff(1000**2,vcnt)
+        #else: zoff = rm.choice([-1,0,1])*(1000.0/vcnt)
         newpos[2] += zoff
         newtv = terrain_point(position = newpos)
         newtv.neighbors = [tv1,tv2]
@@ -306,9 +327,18 @@ def bisect(tv1,tv2,vcnt,controls,tolerance = 25,big_tolerance = 250):
     else: newtv = [n for n in tv1.neighbors if n in tv2.neighbors][0]
     return newtv
 
+def filter(pts,tri):
+    good = []
+    for pt in pts:
+        if pt in good: continue
+        elif mpu.inside(pt,tri): good.append(pt)
+    return good
+
 def make_terrain(initial_tps,splits = 2,smooths = 25, 
         pts_of_interest = [[250,250,25],[500,250,-25]],locs = None):
+    pts_of_interest = filter(pts_of_interest,initial_tps)
     #pts_of_interest = fu.uniq(pts_of_interest)
+    poi_count = len(pts_of_interest)
     t1 = terrain_point(position = initial_tps[0])
     t2 = terrain_point(position = initial_tps[1])
     t3 = terrain_point(position = initial_tps[2])
@@ -321,7 +351,8 @@ def make_terrain(initial_tps,splits = 2,smooths = 25,
     for ivt in init_verts: locs[ivt._str] = ivt
     for sp in range(splits):
         vcnt = terra.count_vertices()
-        prf.measure_time('split terrain', terra.split, vcnt, pts_of_interest, locs)
+        prf.measure_time('split terrain', terra.split, vcnt, 
+            pts_of_interest, poi_count, locs)
     prf.measure_time('fix bounds', terra.fix_bounds, locs)
     prf.measure_time('fix closest', terra.fix_closest, pts_of_interest, locs)
     prf.measure_time('smooth terrain', terra.smooth, smooths, locs)
@@ -333,7 +364,7 @@ class terrain(node):
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',250,**kwargs)
-        self._default_('grit_lod_renderingdistance',10000,**kwargs)
+        self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self._default_('pts_of_interest',[],**kwargs)
         self._default_('splits',4,**kwargs)
         self._default_('smooths',50,**kwargs)
@@ -415,7 +446,7 @@ class terrain(node):
             for fdx in range(fcnt):
                 if rm.choice([0,1,1,1]):
                     verts = [v.position for v in fdat[fdx]]
-                    vegbox = fu.bbox(corners = verts)
+                    vegbox = mpbb.bbox(corners = verts)
                     if not vegbox.intersects(bboxes, vegbox):
                         nvcarg = (verts,None,[fdx])
                         vcargs.append(nvcarg)

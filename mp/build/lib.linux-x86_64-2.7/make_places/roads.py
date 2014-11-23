@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_bboxes as mpbb
 import make_places.primitives as pr
 #from make_places.fundamental import element
 from make_places.scenegraph import node
@@ -105,7 +106,10 @@ class intersection(node):
         #rh2 = self.road_height/2.0
         rh2 = 0.25
         corners = self.find_corners()
-        #corners = mpu.dice_edges(corners, dices = 1)
+        center = mpu.center_of_mass(corners)
+        mpu.translate_vector(center,[0,0,-0.5])
+        corners = mpu.dice_edges(corners, dices = 1)
+        corners.append(center)
         position = self.tform.true().position
         x,y,z = position
         mpu.translate_coords(corners,[x,y,z-rh2])
@@ -140,9 +144,9 @@ class intersection(node):
         octscl = clipln / cos(fu.to_rad(octang))
         uo = uoctagon()
         uo.scale([octscl,octscl,rh])
-        rh = 0.15
-        uo.translate([0,0,-rh])
-        uo.translate_face([0,0,-rh],'top')
+        rh = 0.25
+        uo.translate([0,0,-rh-2.0])
+        #uo.translate_face([0,0,-rh],'top')
         segs.append(uo)
         return segs
         
@@ -153,29 +157,9 @@ class intersection(node):
         position = self.tform.true().position
         x,y,z = position
         mpu.translate_coords(corners,[x,y,z])
-        bboxes = [fu.bbox(corners = corners)]
+        bboxes = [mpbb.bbox(corners = corners)]
+        #bboxes = [fu.bbox(corners = corners)]
         return bboxes
-
-def catmull_rom______(P,T,tcnt):
-    spl = P[:1]
-    for j in range(1, len(P)-2):  # skip the ends
-        for t in range(tcnt):  # t: 0 .1 .2 .. .9
-            tt = float(t)/tcnt
-            tt = T[1] + tt*(T[2]-T[1])
-            p = spline([P[j-1], P[j], P[j+1], P[j+2]],
-                    [T[j-1], T[j], T[j+1], T[j+2]],tt)
-            spl.append(p)
-    spl.extend(P[-2:])
-    return spl
-
-def spline_______(p,time,t):
-    L01 = p[0] * (time[1] - t) / (time[1] - time[0]) + p[1] * (t - time[0]) / (time[1] - time[0])
-    L12 = p[1] * (time[2] - t) / (time[2] - time[1]) + p[2] * (t - time[1]) / (time[2] - time[1])
-    L23 = p[2] * (time[3] - t) / (time[3] - time[2]) + p[3] * (t - time[2]) / (time[3] - time[2])
-    L012 = L01 * (time[2] - t) / (time[2] - time[0]) + L12 * (t - time[0]) / (time[2] - time[0])
-    L123 = L12 * (time[3] - t) / (time[3] - time[1]) + L23 * (t - time[1]) / (time[3] - time[1])
-    C12 = L012 * (time[2] - t) / (time[2] - time[1]) + L123 * (t - time[1]) / (time[2] - time[1])
-    return C12
 
 class road_segment_primitive(arbitrary_primitive):
     roadxml = os.path.join(pr.primitive_data_path, 'road.mesh.xml')
@@ -228,7 +212,7 @@ class road(node):
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',1000,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
-        #self._default_('consumes_children',True,**kwargs)
+        self._default_('consumes_children',True,**kwargs)
         self._default_('road_width', 10, **kwargs)
         self._default_('road_height', 1, **kwargs)
         self.clip_length = clip_length
@@ -238,6 +222,11 @@ class road(node):
         litter = self.litter(segs)
         self.primitives = segs + litter
         node.__init__(self, *args, **kwargs)
+
+    def pick_seg_count(self, vs):
+        ds = mpu.distance(vs[0],vs[-1])
+        seglen = 15
+        return int(ds/seglen)
 
     def litter(self, segs):
         lit = []
@@ -280,7 +269,8 @@ class road(node):
     def get_bbox(self):
         bboxes = []
         for corns in self.corners:
-            bboxes.append(fu.bbox(corners = corns))
+            bboxes.append(mpbb.bbox(corners = corns))
+            #bboxes.append(fu.bbox(corners = corns))
         return bboxes
 
     def get_cardinal_normals(self, dirs):
@@ -316,15 +306,17 @@ class road(node):
         verts = self.clip_tips(verts,norms[0],norms[1])
         verts = self.add_tips(verts,norms[0],norms[1])
 
+        scnt = self.pick_seg_count(verts)
+        self.segment_count = scnt
         def bend(vs):
             tips = vs[:2] + vs[-2:]
             cox,coy,coz = [list(i) for i in zip(*tips)]
             tim = [0.0,1.0,2.0,3.0]
             alpha = 1.0/2.0
             mpu.parameterize_time(tips,tim,alpha)
-            cox = mpu.catmull_rom(cox,tim,10)
-            coy = mpu.catmull_rom(coy,tim,10)
-            coz = mpu.catmull_rom(coz,tim,10)
+            cox = mpu.catmull_rom(cox,tim,scnt)
+            coy = mpu.catmull_rom(coy,tim,scnt)
+            coz = mpu.catmull_rom(coz,tim,scnt)
             new = [list(i) for i in zip(cox,coy,coz)]
             return new
 
@@ -372,15 +364,17 @@ class road(node):
             if abs(a12) > np.pi/2:
                 a12 = 0.0
             angs.append(sign * abs(a12))
+        legs = [True]*vcnt
+        legs[1::2] = [False]*(int(vcnt/2))
         for sgdx in range(1,vcnt):            
             a1,a2 = angs[sgdx-1],angs[sgdx]
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            strips = self.make_segment(p1,p2,rw,rh,a1,a2)
+            strips = self.make_segment(p1,p2,rw,rh,a1,a2,legs[sgdx])
             #segments.append(strip)
             segments.extend(strips)
         return segments
 
-    def make_segment(self, p1, p2, widt, depth, a1, a2):
+    def make_segment(self, p1, p2, widt, depth, a1, a2, leg = False):
         leng = mpu.distance_xy(p1,p2)
         p1_p2 = mpu.normalize(mpu.v1_v2(p1,p2))
         zdiff = p2[2] - p1[2]
@@ -564,14 +558,16 @@ class road_system(node):
                 self.reuse_data['rargs'].append(rarg)
                 newrd = road(**rarg)
                 newbb = newrd.get_bbox()
-                if not fu.bbox.intersects(newbb[0],rdbbs,newbb):
+                if not mpbb.bbox.intersects(newbb[0],rdbbs,newbb):
+                #if not fu.bbox.intersects(newbb[0],rdbbs,newbb):
                     rdbbs.extend(newbb)
                     self.roads.append(newrd)
                     elements.append(newrd)
                 else:
                     newrd = highway(**rarg)
                     newbb = newrd.get_bbox()
-                    if not fu.bbox.intersects(newbb[0],hwbbs,newbb):
+                    if not mpbb.bbox.intersects(newbb[0],hwbbs,newbb):
+                    #if not fu.bbox.intersects(newbb[0],hwbbs,newbb):
                         hwbbs.extend(newbb)
                         self.highways.append(newrd)
                         #self.roads.append(newrd)
@@ -630,21 +626,25 @@ class road_system(node):
 class highway(road):
 
     def terrain_points(self):
-        tpts = []
+        tpts = [mpu.translate_vector(l,[0,0,5]) 
+                for l in self.leg_positions]
         return tpts
         
     def make_segments(self, *args, **kwargs):
+        self.leg_positions = []
+        scnt = self.segment_count
         sverts = self.segmented_vertices
         self.sverts_ground = self.segmented_vertices[:]
-        sverts[2][2] += 5
-        sverts[-3][2] += 5
+        sverts[1][2] += 1
+        sverts[-2][2] += 1
         tim = [0.0,1.0,2.0,3.0]
         alpha = 1.0/2.0
-        tips = sverts[1:3] + sverts[-3:-1]
+        tips = sverts[:2] + sverts[-2:]
+        #tips = sverts[1:3] + sverts[-3:-1]
         coz = [t[2] for t in tips]
         mpu.parameterize_time(tips,tim,alpha)
-        coz = mpu.catmull_rom(coz,tim,8)
-        for sv,co in zip(sverts[1:-1],coz): sv[2] = min(co,20)
+        coz = mpu.catmull_rom(coz,tim,scnt)
+        for sv,co in zip(sverts[1:-1],coz): sv[2] = min(co,sv[2]+20)
         rdsegs = road.make_segments(self, *args, **kwargs)
         return rdsegs
 
@@ -652,11 +652,15 @@ class highway(road):
         leg = pr.ucube()
         leg_leng = 20
         leg.scale([5,5,leg_leng])
-        leg.translate(mpu.translate_vector(v[:],[0,0,-leg_leng-1.0]))
+        leg_pos = [v[0],v[1],v[2]-leg_leng-2.0]
+        leg.translate(leg_pos)
+        self.leg_positions.append(leg_pos)
         return leg
 
-    def make_segment(self, p1, p2, widt, depth, a1, a2):
+    def make_segment(self, p1, p2, widt, depth, a1, a2, leg = False):
         rs = road.make_segment(self,p1,p2,widt,depth,a1,a2)
+        # use a bbox check to decide to place a leg or not
+        if not leg: return rs
         leg = self.make_leg(p1)
         rs.append(leg)
         return rs

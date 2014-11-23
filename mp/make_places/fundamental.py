@@ -27,24 +27,6 @@ class vertex(object):
         self.normal = normal
         self.uv = uv
 
-class bbox(base):
-    def __init__(self, *args, **kwargs):
-        self._default_('corners',[],**kwargs)
-        self._default_('position',[0,0,0],**kwargs)
-        self._default_('edgenorms',
-            mpu.get_norms(self.corners),**kwargs)
-
-    def intersects(self,boxes,box):
-        if not type(box) is type([]):box = [box]
-        check = mpu.separating_axis
-        for bo in box:
-            for ibox in boxes:
-                if check(ibox,bo):
-                    return True
-        return False
-
-
-
 #def uniq(seq):
 #    # Not order preserving
 #    keys = {}

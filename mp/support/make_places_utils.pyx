@@ -36,13 +36,29 @@ cpdef float distance_xy(list v1,list v2):
 cpdef float distance(list v1,list v2):
     return magnitude(v1_v2(v1,v2))
 
+cdef list com(list coords):
+    cdef int ccnt = len(coords)
+    cdef float ccntf = float(ccnt)
+    cdef int cdx = 0
+    cdef float x = 0.0
+    cdef float y = 0.0
+    cdef float z = 0.0
+    cdef list coo
+    for cdx in range(ccnt):
+        coo = <list>coords[cdx]
+        x += coo[0]
+        y += coo[1]
+        z += coo[2]
+    return [x/ccntf,y/ccntf,z/ccntf]
+
 cpdef list center_of_mass(list coords):
-    xs,ys,zs = zip(*coords)
-    #xme = np.round(np.mean(xs),8)
-    xme = np.mean(xs, dtype = np.float32)
-    yme = np.mean(ys, dtype = np.float32)
-    zme = np.mean(zs, dtype = np.float32)
-    return [xme,yme,zme]
+    return com(coords)
+    #xs,ys,zs = zip(*coords)
+    ##xme = np.round(np.mean(xs),8)
+    #xme = np.mean(xs, dtype = np.float32)
+    #yme = np.mean(ys, dtype = np.float32)
+    #zme = np.mean(zs, dtype = np.float32)
+    #return [xme,yme,zme]
 
 cpdef list cross(list v1, list v2):
     cdef float cx = v1[1]*v2[2]-v1[2]*v2[1]
@@ -117,18 +133,21 @@ cpdef list get_norms(list verts):
         norms.append(norm)
     return norms
 
-cpdef tuple find_closest_xy(list one,list bunch):
-    cdef int bcnt = len(bunch)
+cpdef int find_closest_xy(list one,list bunch,int bcnt,float close_enough):
+    #cdef int bcnt = len(bunch)
     cdef float nearest = 100000000.0
     cdef float ds = nearest
     cdef int bdx
     cdef int ndx = 0
     for bdx in range(bcnt):
-        ds = distance_xy(one,bunch[bdx])
+        which = bunch[bdx]
+        ds = distance_xy(one,which)
         if ds < nearest:
             nearest = ds
             ndx = bdx
-    return bunch[ndx],nearest,ndx
+            if ds <= close_enough: return ndx
+    return ndx
+    #return bunch[ndx],nearest,ndx
 
 cpdef list find_in_radius(list pt,list verts,float radius = 10):
     cdef list in_ = []

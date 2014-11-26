@@ -3,6 +3,7 @@ import mp_utils as mpu
 import mp_bboxes as mpbb
 import make_places.scenegraph as sg
 import make_places.primitives as pr
+import make_places.waters as mpw
 import make_places.cities as cities
 import make_places.buildings as blg
 import make_places.roads as roads
@@ -24,6 +25,13 @@ def ucube_b():
 def ucube_g():
     gritgeo.reset_world_scripts()
     pcube = pr.ucube()
+    gritgeo.create_primitive(pcube)
+    gritgeo.output_world_scripts()
+
+def ucube_test():
+    gritgeo.reset_world_scripts()
+    pcube = pr.ucube()
+    pcube.remove_face()
     gritgeo.create_primitive(pcube)
     gritgeo.output_world_scripts()
 
@@ -319,14 +327,23 @@ def tg():
     stn.add_child(st2)
     ab = abox()
     built = blg.building(position = [0,20,-5], rotation = [0,0,fu.PI/12.0])
+    poi = built.terrain_points()
+    ter = terr.terrain(splits = 6, pts_of_interest = poi)
     
     pcube = pr.ucube()
+    pcube.remove_face('top','front')
 
+    pc = pr.ucube()
+    pc.scale([10,10,10])
+    pc.assign_material('ocean')
+
+    gritgeo.create_primitive(pc)
     gritgeo.create_primitive(pcube)
     gritgeo.create_element(st1)
     gritgeo.create_element(stn)
     gritgeo.create_element(ab)
     gritgeo.create_element(built)
+    gritgeo.create_element(ter)
     
     gritgeo.output_world_scripts()
 
@@ -406,7 +423,7 @@ def block_g():
         'position':[300,100,10], 
             }]
     rsargs = {
-        'interargs':iargs, 
+        #'interargs':iargs, 
             }
     rsys = roads.road_system(**rsargs)
     rd = rsys.roads[1]
@@ -415,6 +432,7 @@ def block_g():
         'road':rd, 
         'bboxes':rd.get_bbox(),
         'side':'right',
+        'theme':'suburbs', 
         #'reuse':True,
             }
     b2 = {
@@ -433,9 +451,15 @@ def block_g():
     bboxes = rsys.get_bbox() + bl1.get_bbox() + bl2.get_bbox()
     ter = terr.terrain(
         pts_of_interest = pts_of_int, 
-        splits = 5, bboxes = bboxes)
+        splits = 8, bboxes = bboxes)
     #gritgeo.create_element(rsys,bl1)
+    
+    ocean = mpw.waters(position = [500,500,0],
+        depth = 10,sealevel = -10.0,length = 1000,width = 1000)
+
+    gritgeo.create_element(ocean)
     gritgeo.create_element(rsys,bl1,bl2,ter)
+
     gritgeo.output_world_scripts()
 
 def profile_block_b():
@@ -472,9 +496,13 @@ def add_prims_g():
 
 def terrain_g():
     gritgeo.reset_world_scripts()
-    ter = terr.terrain()
+    ter = terr.terrain(splits = 4)
     gritgeo.create_element(ter)
     gritgeo.output_world_scripts()
+
+def profile_terrain_g():
+    prf.profile_function(terrain_g)
+
 
 
 

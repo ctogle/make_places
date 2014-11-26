@@ -17,6 +17,8 @@ import random as rm
 
 #from numpy import pi
 
+stuff = 'hi'
+
 cpdef list v1_v2(list v1, list v2):
     cdef list v1_v2_ = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
     return v1_v2_

@@ -1,6 +1,7 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
 import mp_bboxes as mpbb
+import mp_terrain as mpt
 from make_places.scenegraph import node
 from make_places.primitives import arbitrary_primitive
 import make_places.profiler as prf
@@ -366,8 +367,8 @@ class terrain(node):
         self._default_('grit_renderingdistance',250,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self._default_('pts_of_interest',[],**kwargs)
-        self._default_('splits',4,**kwargs)
-        self._default_('smooths',50,**kwargs)
+        self._default_('splits',3,**kwargs)
+        self._default_('smooths',25,**kwargs)
         self._default_('region_bounds',[(0,1000),(0,1000)],**kwargs)
         self._default_('bboxes',[],**kwargs)
     
@@ -376,6 +377,8 @@ class terrain(node):
         t2 = [rb[0][1],rb[1][0],0]
         t3 = [rb[0][0],rb[1][1],0]
         t4 = [rb[0][1],rb[1][1],0]
+
+        use_mpt = False
     
         hexagonal = True
         #hexagonal = False
@@ -401,13 +404,19 @@ class terrain(node):
                 c1 = hverts[0]
                 c2 = hverts[c2dx]
                 c3 = hverts[c3dx]
-                terr,locs = make_terrain((c1,c2,c3),
+                #terr,locs = make_terrain((c1,c2,c3),
+                terr,locs,locs_str = mpt.make_terrain((c1,c2,c3),
                     self.splits,self.smooths,self.pts_of_interest)
+                use_mpt = True
+                #pdb.set_trace()
+                #use_mpt = False
                 #bounds.extend(terr.boundary_points)
-                self.pts_of_interest.extend(
-                    [v.position for v in terr.boundary_points])
+                #self.pts_of_interest.extend(
+                #    [v.position for v in terr.boundary_points])
                 pieces.append(terr)
                 ptlocs.append(locs)
+        
+            self.use_mpt = use_mpt
             self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
 
         else:
@@ -421,10 +430,15 @@ class terrain(node):
             mpu.translate_coords([t2],[ 50,-50,0])
             mpu.translate_coords([t3],[ 50, 50,0])
             mpu.translate_coords([t4],[-50, 50,0])
-            terr1,locs1 = make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
-            terr2,locs2 = make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
+            terr1,locs1,locs1str = mpt.make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
+            terr2,locs2,locs2str = mpt.make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
+            #terr1,locs1 = make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
+            #terr2,locs2 = make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
             pieces = [terr1,terr2]
             ptlocs = [locs1,locs2]
+            
+            self.use_mpt = use_mpt
+            self.use_mpt = True
             self.primitives, self.lod_primitives = self.stitch(pieces,ptlocs)
 
         #vegetate = True
@@ -447,7 +461,8 @@ class terrain(node):
                 if rm.choice([0,1,1,1]):
                     verts = [v.position for v in fdat[fdx]]
                     vegbox = mpbb.bbox(corners = verts)
-                    if not vegbox.intersects(bboxes, vegbox):
+                    if not mpbb.intersects(bboxes, vegbox):
+                    #if not vegbox.intersects(bboxes, vegbox):
                         nvcarg = (verts,None,[fdx])
                         vcargs.append(nvcarg)
 
@@ -487,40 +502,31 @@ class terrain(node):
             for bp1 in b1:
                 for bp2 in b2:
                     if bp1._str == bp2._str:
-                        midz = (bp1.position[2]+bp2.position[2])/2.0
-                        bp1.position[2] = midz
-                        bp2.position[2] = midz
-                        bp1.weights[2] = 0
-                        bp2.weights[2] = 0
-                        #newneighbs = [n for n in bp2.neighbors 
-                        #            if not n in bp1.neighbors]
-                        #bp1.neighbors.extend(newneighbs)
-                        #bp1.neighbors.extend(bp2.neighbors)
-                        #alln = fu.uniq(bp1.neighbors)
-                        #bp1.neighbors = alln
-                        #bp2.neighbors = alln
+                        if not self.use_mpt:
+                            midz = (bp1.position[2]+bp2.position[2])/2.0
+                            bp1.position[2] = midz
+                            bp2.position[2] = midz
+                            bp1.weights[2] = 0.0
+                            bp2.weights[2] = 0.0
+                        else:
+                            midz = (bp1.position.z+bp2.position.z)/2.0
+                            bp1.position.z = midz
+                            bp2.position.z = midz
+                            bp1.weights.z = 0.0
+                            bp2.weights.z = 0.0
             pieces = [p1,p2]
-            [pc.smooth(5,lc) for pc,lc in zip(pieces,locs)]
+            [pc.smooth(1,lc) for pc,lc in zip(pieces,locs)]
             all_pieces.append(pieces[0])
 
-        '''#
-        for p1,p2 in pairs:
-            print('stitching')#,p1,p2)
-            b1,b2 = p1.boundary_points,p2.boundary_points
-            for bp1 in b1:
-                for bp2 in b2:
-                    if bp1._str == bp2._str:
-                        midz = (bp1.position[2]+bp2.position[2])/2.0
-                        bp1.position[2] = midz
-                        bp2.position[2] = midz
-        '''#
-
-        #all_pieces = fu.uniq(all_pieces)
-        #all_pieces.pop(0)
         meshpieces = []
         lod_meshpieces = []
         [meshpieces.extend(p.meshes()) for p in all_pieces]
         [lod_meshpieces.extend(p.meshes(lod = True)) for p in all_pieces]
+
+        if self.use_mpt:
+            meshpieces = [arbitrary_primitive(**pwg) for pwg in meshpieces]
+            lod_meshpieces = [arbitrary_primitive(**lpwg) for lpwg in lod_meshpieces]
+
         return meshpieces, lod_meshpieces
     
 

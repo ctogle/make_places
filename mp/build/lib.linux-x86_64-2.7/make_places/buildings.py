@@ -40,8 +40,9 @@ class story(node):
         self._default_('ceiling_height',0.5,**kwargs)
         self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
-        self._default_('ext_gaped',False,**kwargs)
-        #self._default_('ext_gaped',True,**kwargs)
+        #self._default_('ext_gaped',False,**kwargs)
+        self._default_('ext_gaped',True,**kwargs)
+        self._default_('rid_top_bottom_walls',True,**kwargs)
         children = self.make_children(*args, **kwargs)
         self.add_child(*children)
         self.lod_primitives = self.make_lod(*args,**kwargs)
@@ -91,6 +92,8 @@ class story(node):
             'height':self.floor_height, 
                 }
         floor_ = floor(**flargs)
+        #for flp in floor_.primitives:
+        #    flp.remove_face('bottom')
         self.floor_ = [floor_]
         return [floor_]
 
@@ -112,16 +115,20 @@ class story(node):
             'floor_height':self.ceiling_height, 
                 }
         ceil = floor(**flargs)
+        #for flp in ceil.primitives:
+        #    flp.remove_face('top')
         self.ceiling = [ceil]
         return [ceil]
 
     def make_exterior_walls(self, *args, **kwargs):
         #floor_pieces = kwargs['floor']
         floor_pieces = self.floor_
+        rid = self.rid_top_bottom_walls
         peargs = [{
             #'parent':fl, 
             #'parent':self, 
-            'uv_parent':fl, 
+            #'uv_parent':fl, 
+            'rid_top_bottom_walls':rid, 
             'floor':fl, 
             'wall_offset':-self.wall_width/2.0, 
             'gaped':self.ext_gaped, 
@@ -154,7 +161,7 @@ class story(node):
 class basement(story):
 
     def __init__(self, *args, **kwargs):
-        #self._default_('consumes_children',True,**kwargs)
+        self._default_('consumes_children',True,**kwargs)
         self._default_('wall_height',8,**kwargs)
         self._default_('ext_gaped',False,**kwargs)
         story.__init__(self, *args, **kwargs)
@@ -198,10 +205,12 @@ class rooftop(story):
 
     def __init__(self, *args, **kwargs):
         self._default_('theme','suburbs',**kwargs)
+        self._default_('grit_renderingdistance',1000,**kwargs)
         self._default_('wall_height',1,{})
         def_ceiling = True if self.theme == 'suburbs' else False
         self._default_('add_ceiling',def_ceiling,**kwargs)
         self._default_('ext_gaped',False,**kwargs)
+        self._default_('rid_top_bottom_walls',False,**kwargs)
         story.__init__(self, *args, **kwargs)
         veggies = self.vegetate()
         self.add_child(*veggies)
@@ -211,7 +220,7 @@ class rooftop(story):
         flleng = self.length/2.0
         flwidt = self.width/2.0
         flheit = rm.randrange(int(min([flleng,flwidt])),
-                        2*int(max([flleng,flwidt])+1))
+                            int(max([flleng,flwidt])+1))
 
         czpos = self.wall_height#+self.ceiling_height#+self.floor_height
         rfpos = [0,0,czpos]
@@ -221,6 +230,7 @@ class rooftop(story):
 
             'length':flleng, 
             'width':flwidt, 
+            'height':flheit, 
                 }
         ceil = wedged_roof(**rfargs)
         self.ceiling = [ceil]
@@ -240,7 +250,8 @@ class rooftop(story):
                 if rm.choice([0,1,1,1]):
                     verts = [v.position for v in fdat[fdx]]
                     vegbox = mpbb.bbox(corners = verts)
-                    if not vegbox.intersects(bboxes, vegbox):
+                    if not mpbb.intersects(bboxes, vegbox):
+                    #if not vegbox.intersects(bboxes, vegbox):
                         nvcarg = (verts,None,[fdx])
                         vcargs.append(nvcarg)
 
@@ -303,7 +314,7 @@ class building(node):
         self._default_('width',30,**kwargs)
         self._default_('tform',
             self.def_tform(*args,**kwargs),**kwargs)
-        #kwargs['uv_scales'] = [8,8,8]
+        kwargs['uv_scales'] = [2,2,2]
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('materials',['imgtex'],**kwargs)
@@ -327,7 +338,7 @@ class building(node):
         #children = shafts + story_batches
         self.add_child(*children)
         node.__init__(self, *args, **kwargs)
-        #self.assign_material('concrete')
+        self.assign_material('concrete')
 
     def make_foundation(self):
         shafts = self.shafts

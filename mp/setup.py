@@ -9,7 +9,12 @@ from Cython.Distutils import build_ext
 #from setuptools import setup,Extension
 
 core_modules = []
-ext_modules = [Extension('mp_utils', ['support/make_places_utils.c'])]
+ext_modules = [
+    Extension('mp_utils', ['support/mp_utils.c']), 
+    Extension('mp_vector', ['support/mp_vector.c']), 
+    Extension('mp_bboxes', ['support/mp_bboxes.c']), 
+    Extension('mp_terrain', ['support/mp_terrain.c']), 
+            ]
 #ext_modules = [Extension('mp_utils', ['support/make_places_utils.pyx'])]
 #ext_modules = []
 

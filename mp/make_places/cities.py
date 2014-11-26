@@ -3,6 +3,7 @@ import mp_utils as mpu
 import mp_bboxes as mpbb
 import make_places.primitives as pr
 import make_places.scenegraph as sg
+import make_places.waters as mpw
 from make_places.scenegraph import node
 from make_places.roads import road_system
 from make_places.roads import highway
@@ -215,8 +216,7 @@ class block(node):
         max_tries = 50
         tries_exceeded = False
         boxtry,blen,bwid,bhei = get_random()
-        while boxtry.intersects(bboxes, boxtry) and not tries_exceeded:
-        #while boxtry.intersects([], boxtry) and not tries_exceeded:
+        while mpbb.intersects(bboxes, boxtry) and not tries_exceeded:
             try_cnt += 1
             tries_exceeded = try_cnt == max_tries
             boxtry,blen,bwid,bhei = get_random()
@@ -275,7 +275,7 @@ class city(node):
     def make_terrain(self, *args, **kwargs):
         kwargs['parent'] = self
         kwargs['splits'] = 8
-        kwargs['smooths'] = 1
+        kwargs['smooths'] = 5
         kwargs['bboxes'] = self.bboxes
         ter = terrain(**kwargs)
         return [ter]
@@ -289,7 +289,7 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':30, 
+                'intersection_count':20, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
@@ -305,7 +305,9 @@ class city(node):
         for bl in blocks: pts_of_int.extend(bl.terrain_points())
         terra = self.make_terrain(pts_of_interest = pts_of_int, 
                 region_bounds = road_sys[0].region_bounds)
-        parts = road_sys + blocks + terra
+        ocean = [mpw.waters(position = [500,500,0],depth = 10,
+            sealevel = 0.0,length = 2000,width = 2000)]
+        parts = road_sys + blocks + terra + ocean
         return parts
 
     def get_bbox(self):

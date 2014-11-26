@@ -1,3 +1,7 @@
+#imports
+# cython: profile=True
+#cimport cython
+
 from libc.math cimport sqrt
 
  
@@ -8,14 +12,14 @@ stuff = 'hi'
 
 cdef class vector:
 
-    cdef float x
-    cdef float y
-    cdef float z
-
     def __cinit__(self,float x,float y,float z):
         self.x = x
         self.y = y
         self.z = z
+
+    def __str__(self):
+        strr = 'vector:' + str((self.x,self.y,self.z))
+        return strr
 
     cpdef list to_list(self):
         cdef list new = [self.x,self.y,self.z]
@@ -36,21 +40,25 @@ cdef class vector:
             self.z /= mag
 
     cpdef translate(self, vector tv):
-        self.x += tv[0]
-        self.y += tv[1]
-        self.z += tv[2]
+        self.x += tv.x
+        self.y += tv.y
+        self.z += tv.z
 
     cpdef scale(self, vector sv):
-        self.x *= sv[0]
-        self.y *= sv[1]
-        self.z *= sv[2]
+        self.x *= sv.x
+        self.y *= sv.y
+        self.z *= sv.z
 
-cdef vector v1_v2(vector v1, vector v2):
-    cdef float dx = v2[0] - v1[0]
-    cdef float dy = v2[1] - v1[1]
-    cdef float dz = v2[2] - v1[2]
+cdef vector v1_v2_(vector v1, vector v2):
+    cdef float dx = v2.x - v1.x
+    cdef float dy = v2.y - v1.y
+    cdef float dz = v2.z - v1.z
     cdef vector new = vector(dx,dy,dz)
     return new
+
+cpdef vector v1_v2(vector v1, vector v2):
+    cdef vector pt = v1_v2_(v1, v2)
+    return pt
 
 cdef vector vzip(vector v1, vector v2):
     cdef float x = v1.x*v2.x
@@ -58,14 +66,35 @@ cdef vector vzip(vector v1, vector v2):
     cdef float z = v1.z*v2.z
     return vector(x,y,z)
 
-cdef vector midpoint(vector v1, vector v2):
+cdef vector midpt(vector v1, vector v2):
     cdef float x = (v1.x + v2.x)/2.0
     cdef float y = (v1.y + v2.y)/2.0
     cdef float z = (v1.z + v2.z)/2.0
     cdef vector new = vector(x,y,z)
     return new
 
+cpdef vector midpoint(vector v1, vector v2):
+    cdef vector pt = midpt(v1, v2)
+    return pt
+
 cdef vector com(list coords):
+    cdef int ccnt = len(coords)
+    cdef float ccntf = float(ccnt)
+    cdef int cdx = 0
+    cdef float x = 0.0
+    cdef float y = 0.0
+    cdef float z = 0.0
+    cdef vector coo
+    cdef vector new
+    for cdx in range(ccnt):
+        coo = <vector>coords[cdx]
+        x += coo.x
+        y += coo.y
+        z += coo.z
+    new = vector(x/ccntf,y/ccntf,z/ccntf)
+    return new
+
+cdef vector com__broken(list coords):
     cdef int ccnt = len(coords)
     cdef int cdx = 0
     cdef float cdxn = 1.0
@@ -86,18 +115,24 @@ cdef vector com(list coords):
 cpdef vector center_of_mass(list coords):
     return com(coords)
 
-cdef float distance_xy(vector v1, vector v2):
-    cdef float dx = v2[0] - v1[0]
-    cdef float dy = v2[1] - v1[1]
+cdef float distance_xy_c(vector v1, vector v2):
+    cdef float dx = v2.x - v1.x
+    cdef float dy = v2.y - v1.y
     cdef float ds = sqrt(dx**2 + dy**2)
     return ds
 
-cdef float distance(vector v1, vector v2):
+cpdef float distance_xy(vector v1, vector v2):
+    return distance_xy_c(v1, v2)
+
+cdef float distance_c(vector v1, vector v2):
     cdef vector v1v2 = v1_v2(v1,v2)
     cdef float mag = v1v2.magnitude()
     return mag
 
-cdef int find_closest_xy(list one,list bunch,int bcnt,float close_enough):
+cpdef float distance(vector v1, vector v2):
+    return distance_c(v1, v2)
+
+cdef int find_closest_xy_c(vector one,list bunch,int bcnt,float close_enough):
     cdef float nearest = 100000000.0
     cdef float ds = nearest
     cdef int bdx
@@ -112,6 +147,9 @@ cdef int find_closest_xy(list one,list bunch,int bcnt,float close_enough):
             if ds <= close_enough:
                 return ndx
     return ndx
+
+cpdef int find_closest_xy(vector one,list bunch,int bcnt,float close_enough):
+    return find_closest_xy_c(one,bunch,bcnt,close_enough)
 
 cpdef bint inside(vector pt, list corners):
     poly = [(c.x,c.y) for c in corners]

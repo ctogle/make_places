@@ -76,7 +76,6 @@ class car_batch(node):
 
 clip_length = 25
 class intersection(node):
-
     def __init__(self, *args, **kwargs):
         #self._default_('consumes_children',True,**kwargs)
         self._default_('grit_renderingdistance',1000,**kwargs)
@@ -104,7 +103,7 @@ class intersection(node):
     def terrain_points(self):
         # i need the location of the octagon verts!
         #rh2 = self.road_height/2.0
-        rh2 = 0.25
+        rh2 = 0.4
         corners = self.find_corners()
         center = mpu.center_of_mass(corners)
         mpu.translate_vector(center,[0,0,-0.5])
@@ -205,7 +204,12 @@ class road_segment_primitive(arbitrary_primitive):
         self.calculate_normals()
         self.modified = True
 
+class highway_segment_primitive(road_segment_primitive):
+    roadxml = os.path.join(pr.primitive_data_path, 'highroad.mesh.xml')
+
 class road(node):
+    road_prim_type = road_segment_primitive
+
     def __init__(self, *args, **kwargs):
         kwargs['uv_scales'] = [1,1,1]
         self._default_('uv_tform',
@@ -380,7 +384,8 @@ class road(node):
         zdiff = p2[2] - p1[2]
         ang_z = fu.angle_from_xaxis_xy(p1_p2)
         #strip = ucube()
-        strip = road_segment_primitive()
+        strip = self.road_prim_type()#road_segment_primitive()
+        #strip = road_segment_primitive()
         strip.scale([leng,widt,depth])
         strip.scale_uvs([leng/widt,1,1])
         strip.translate([leng/2.0,0,-depth])
@@ -558,19 +563,16 @@ class road_system(node):
                 self.reuse_data['rargs'].append(rarg)
                 newrd = road(**rarg)
                 newbb = newrd.get_bbox()
-                if not mpbb.bbox.intersects(newbb[0],rdbbs,newbb):
-                #if not fu.bbox.intersects(newbb[0],rdbbs,newbb):
+                if not mpbb.intersects(rdbbs,newbb):
                     rdbbs.extend(newbb)
                     self.roads.append(newrd)
                     elements.append(newrd)
                 else:
                     newrd = highway(**rarg)
                     newbb = newrd.get_bbox()
-                    if not mpbb.bbox.intersects(newbb[0],hwbbs,newbb):
-                    #if not fu.bbox.intersects(newbb[0],hwbbs,newbb):
+                    if not mpbb.intersects(hwbbs,newbb):
                         hwbbs.extend(newbb)
                         self.highways.append(newrd)
-                        #self.roads.append(newrd)
                         elements.append(newrd)
                         print('topology mistake from road intersection!')
         self.topology = topology
@@ -624,6 +626,7 @@ class road_system(node):
         return bboxes
 
 class highway(road):
+    road_prim_type = highway_segment_primitive
 
     def terrain_points(self):
         tpts = [mpu.translate_vector(l,[0,0,5]) 
@@ -635,8 +638,8 @@ class highway(road):
         scnt = self.segment_count
         sverts = self.segmented_vertices
         self.sverts_ground = self.segmented_vertices[:]
-        sverts[1][2] += 1
-        sverts[-2][2] += 1
+        #sverts[1][2] += 1
+        #sverts[-2][2] += 1
         tim = [0.0,1.0,2.0,3.0]
         alpha = 1.0/2.0
         tips = sverts[:2] + sverts[-2:]
@@ -658,7 +661,9 @@ class highway(road):
         return leg
 
     def make_segment(self, p1, p2, widt, depth, a1, a2, leg = False):
+        depth = 8 # unacceptable...
         rs = road.make_segment(self,p1,p2,widt,depth,a1,a2)
+        [r.translate([0,0,1.75]) for r in rs]# unacceptable...
         # use a bbox check to decide to place a leg or not
         if not leg: return rs
         leg = self.make_leg(p1)

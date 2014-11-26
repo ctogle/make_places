@@ -54,6 +54,16 @@ material "grasstuft2" {
     specular = 0,
 }
 
+material "ocean" {
+	diffuseColour = V_ZERO,
+	--diffuseMap="textures/ocean_D.dds",
+	normalMap='../textures/ocean_N.tga',
+	glossMap='../textures/ocean_S.tga',
+    depthWrite=true,
+	alpha = 0.9,
+	textureAnimation={-0.1,0},
+}
+
 -- taxi materials
 material `Atlas` {
     glossMap = `../textures/taxi/Gloss.png`, 

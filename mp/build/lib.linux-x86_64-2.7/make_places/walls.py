@@ -3,6 +3,7 @@ import mp_utils as mpu
 #from make_places.fundamental import element
 from make_places.scenegraph import node
 import make_places.scenegraph as scg
+import make_places.primitives as pr
 from make_places.primitives import unit_cube
 
 import numpy as np
@@ -21,6 +22,7 @@ class wall(node):
         self.v2 = args[1]
         v1, v2 = self.v1, self.v2
         self.v1_v2 = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
+        self._default_('rid_top_bottom',True,**kwargs)
         self._default_('length',mpu.distance(v1,v2),**kwargs)
         self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4,**kwargs)
@@ -53,12 +55,17 @@ class wall(node):
 
     def make_wall_segment(self, pos, v1, v2, wall_scales):
         wall_ = unit_cube()
+        if self.rid_top_bottom:
+            wall_.remove_face('top','bottom')
+            #wall_.remove_face('bottom')
         length = mpu.distance_xy(v1,v2)
         #wy = wall_scales[1]
         #wz = wall_scales[2]
-        #wall_.scale_uvs([length,wy,wz])
-        #wall_._scale_uvs_ = False
-        wall_._scale_uvs_ = True
+        #ws = wall_scales
+        #wall_.scale_uvs([ws[0],ws[1],ws[2]])
+        #wall_.scale_uvs([1.0,wy,wz])
+        wall_._scale_uvs_ = False
+        #wall_._scale_uvs_ = True
         wall_.scale([length, self.wall_width, self.wall_height])
         wall_.translate([length/2.0,0,0])
         ang_z = fu.angle_from_xaxis_xy(mpu.v1_v2(v1,v2))
@@ -90,6 +97,8 @@ class wall(node):
             spos = mpu.v1_v2(v1,fr)
             wall_ = self.make_wall_segment(spos, fr, bk, wscls)
             prims.append(wall_)
+        prims = [pr.sum_primitives(prims)]
+        #prims[0].scale_uvs(wscls)
         return prims
 
 _perim_count_ = 0
@@ -107,9 +116,9 @@ class perimeter(node):
         if self.floor: corns = self.floor.corners
         else: corns = kwargs['corners']
         self._default_('wall_offset',0,**kwargs)
+        self._default_('rid_top_bottom_walls',True,**kwargs)
         corns = self.add_corner_offset(corns)
         self._default_('corners',corns,**kwargs)
-        #kwargs['uv_parent'] = self.floor
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('wall_width', 0.5, **kwargs)
@@ -136,6 +145,7 @@ class perimeter(node):
     def make_walls(self, corners, 
             gapes = [True,True,False,False], 
             gaps = [[],[],[],[]]):
+        rid = self.rid_top_bottom_walls
         walls = []
         c1 = corners[0]
         c2 = corners[1]
@@ -144,15 +154,19 @@ class perimeter(node):
         ww = self.wall_width
         h = self.wall_height
         walls.append(wall(c1, c2, #uv_parent = self, 
+            rid_top_bottom = rid, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[0], gaped = gapes[0]))
         walls.append(wall(c2, c3, #uv_parent = self, 
+            rid_top_bottom = rid, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[1], gaped = gapes[1]))
         walls.append(wall(c3, c4, #uv_parent = self, 
+            rid_top_bottom = rid, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[2], gaped = gapes[2]))
         walls.append(wall(c4, c1, #uv_parent = self, 
+            rid_top_bottom = rid, 
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[3], gaped = gapes[3]))
         return walls

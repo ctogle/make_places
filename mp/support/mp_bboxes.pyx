@@ -1,7 +1,12 @@
+#imports
+# cython: profile=True
+#cimport cython
 from libc.math cimport sqrt
 
 from mp_utils import overlap
 from mp_utils import project
+#from make_places_utils import overlap
+#from make_places_utils import project
 
 stuff = 'hi'
 
@@ -12,7 +17,7 @@ cpdef bint separating_axis(bb1,bb2):
     cdef list edgenorm
     cdef int egcnt = len(edgenorms)
     cdef int egdx
-    cdef tuple proj1
+    cdef tuple proj3
     cdef tuple proj2
     for egdx in range(egcnt):
         edgenorm = edgenorms[egdx]
@@ -41,7 +46,22 @@ cpdef list get_norms(list verts):
         norms.append(norm)
     return norms
 
-class bbox(object):
+cpdef bint intersects(list boxes, box):
+    cdef bbox bo
+    cdef bbox ibox
+    if not type(box) is type([]):box = [box]
+    for bo in box:
+        for ibox in boxes:
+            if separating_axis(ibox,bo):
+                return True
+    return False
+
+cdef class bbox:
+
+    cdef public list corners
+    cdef public list position
+    cdef public list edgenorms
+
     def __init__(self, *args, **kwargs):
         self.corners = kwargs['corners']
         if 'position' in kwargs.keys():
@@ -49,14 +69,6 @@ class bbox(object):
         else: self.position = [0,0,0]
         self.edgenorms = get_norms(self.corners)
 
-    def intersects(self,boxes,box):
-        if not type(box) is type([]):box = [box]
-        check = separating_axis
-        for bo in box:
-            for ibox in boxes:
-                if check(ibox,bo):
-                    return True
-        return False
 
 
 

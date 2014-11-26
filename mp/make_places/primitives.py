@@ -15,15 +15,7 @@ from copy import deepcopy as dcopy
 from copy import copy
 
 
-#mpdir = os.path.join('C:\\', 'Users', 'bartl_000', 
-#    'Desktop', 'dev', 'make_places', 'mp', 'make_places')
-#mpdir = ui.info['mpdir']
-#mpdir = os.path.join('/home', 'cogle', 
-#        'dev', 'forblender', 'make_places', 
-#        'mp', 'make_places')
 primitive_data_path = ui.info['primitivedir']
-#primitive_data_path = os.path.join(mpdir, 'primitive_data')
-#xml_primitive_files = {}
 xml_library = {}
 
 def load_xml_library():
@@ -64,10 +56,15 @@ class arbitrary_primitive(base):
         self.ncoords = kwargs['nverts']
         self.uv_coords = kwargs['uvs']
         self.faces = kwargs['faces']
-        self.materials = kwargs['materials']
-        #self.phys_materials = kwargs['phys_materials']
-        self.phys_materials = ['/common/pmat/Stone']
-        self.face_materials = kwargs['face_materials']
+
+        fcnt = len(self.faces)
+        zero = [0]*fcnt
+        self._default_('materials',['cubemat'],**kwargs)
+        self._default_('phys_materials',['/common/pmat/Stone'],**kwargs)
+        self._default_('phys_face_materials',zero,**kwargs)
+        self._default_('face_materials',zero[:],**kwargs)
+        #self.face_materials = kwargs['face_materials']
+
         self._default_('tag','_arb_',**kwargs)
         self.modified = False
 
@@ -84,7 +81,6 @@ class arbitrary_primitive(base):
         ofacnt = len(ofmats)
         for dx in range(len(other.materials)):
             omat = other.materials[dx]
-            #ofaces = [f for f in other.face_materials if f == dx]
             if not omat in self.materials:
                 self.materials.append(omat)
                 mdx = len(self.materials) - 1
@@ -98,8 +94,7 @@ class arbitrary_primitive(base):
                         if ofmats[fdx] == dx:
                             ofmats[fdx] = mdx
 
-        #omats = [m for m in other.materials if not m in self.materials]
-        materials = self.materials[:]# + omats
+        materials = self.materials[:]
         face_materials = self.face_materials + other.face_materials
         xmlfile = self.xml_filename
         pwargs = {
@@ -154,7 +149,7 @@ class arbitrary_primitive(base):
         vs = self.get_vertexes()
         mcnt = len(self.phys_materials)
         fcnt = len(self.face_materials)
-        self.phys_face_materials = [0]*fcnt
+        #self.phys_face_materials = [0]*fcnt
         fa = {}
         for mdx in range(mcnt):
             ma = self.phys_materials[mdx]
@@ -228,7 +223,8 @@ class arbitrary_primitive(base):
         return xlines, is_new
 
     def translate(self, vect):
-        self.coords = mpu.translate_coords(self.coords, vect)
+        mpu.translate_coords(self.coords, vect)
+        #self.coords = mpu.translate_coords(self.coords, vect)
         self.modified = True
 
     def material_to_faces(self, mat, faces):
@@ -302,7 +298,7 @@ def xml_from_primitive_data(prim):
 
     xlines.append("<mesh>\n")
     xlines.append("    <sharedgeometry>\n")
-    xlines.append("        <vertexbuffer positions=\"true\"normals=\""+_normals+"\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
+    xlines.append("        <vertexbuffer positions=\"true\" normals=\""+_normals+"\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     #xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     for v in vertexes:
         x,y,z = v.pos
@@ -438,10 +434,50 @@ class unit_cube(arbitrary_primitive):
             'top':tops, 
             'bottom':bottoms, 
                 }
+
+        def subset(super, sub):
+            for su in sub:
+                if not su in super:
+                    return False
+            return True
+
+        def find_face_indices(side):
+            found = []
+            for fdx in range(fcnt):
+                face = self.faces[fdx]
+                relevcoords = [self.coords[f] for f in face]
+                if subset(facedict[side],relevcoords):
+                    found.append(fdx)
+            return found
+
+        fcnt = len(self.faces)
+        fs = self.faces
+        top_faces = find_face_indices('top')
+        bottom_faces = find_face_indices('bottom')
+        left_faces = find_face_indices('left')
+        right_faces = find_face_indices('right')
+        front_faces = find_face_indices('front')
+        back_faces = find_face_indices('back')
+        truefacedict = {
+            'top':top_faces, 
+            'bottom':bottom_faces, 
+            'left':left_faces, 
+            'right':right_faces, 
+            'front':front_faces, 
+            'back':back_faces, 
+                }
+        self.face_dict = truefacedict
         return facedict
 
-    def remove_face(self, face = 'top'):
-        print 'i would remove a face!!'
+    def remove_face(self, *args):# calling this more than once will ruin geometry
+        fdxs = [self.face_dict[face] for face in args]
+        fdxs = fu.flatten(fdxs)
+        fdxs = sorted(fdxs)
+        fdxs.reverse()
+        for fx in fdxs:
+            self.faces.pop(fx)
+            self.face_materials.pop(fx)
+            self.phys_face_materials.pop(fx)
 
     def translate_face(self, vect, face = 'top'):
         cfaces = self.coords_by_face

@@ -1,4 +1,5 @@
 import mp_utils as mpu
+import mp_vector as cv
 from mp_utils import dot
 from mp_utils import magnitude
 
@@ -12,6 +13,7 @@ import random as rm
 import os, pdb
 
 PI = np.round(np.pi,8)
+zhat = cv.vector(0,0,1)
 
 class base(object):
     def _default_(self, *args, **kwargs):
@@ -21,7 +23,7 @@ class base(object):
         if not key in self.__dict__.keys():
             self.__dict__[key] = init
 
-class vertex(object):
+class vertex_________(object):
     def __init__(self, pos, normal, uv):
         self.pos = pos
         self.normal = normal
@@ -43,6 +45,19 @@ def uniq(seq):
 
 def flatten(unflat_list):
     return [item for sublist in unflat_list for item in sublist]
+
+def quadrant(theta):
+    if theta >= 0.0 and theta < PI/2.0: return 1
+    elif theta >= PI/2.0 and theta < PI: return 2
+    elif theta >= PI and theta < 3.0*PI/2.0: return 3
+    elif theta >= 3.0*PI/2.0 and theta < 2.0*PI: return 4
+    elif theta >= 2.0*PI: return quadrant(theta % (2.0*PI))
+    else: print 'theta', theta, 'not found to be in any quadrant!'
+      
+
+
+
+
 
 def angle_between_xy(v1, v2):
     alpha1 = angle_from_xaxis_xy(v1)

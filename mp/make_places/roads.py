@@ -520,6 +520,7 @@ class road_system(node):
                 'position' : seeds[idx],   
                     }])
         interargs = [br[0] for br in branches]
+        sealevelvals = []
         for idx in range(intercnt):
             tips = [br[-min([len(interargs),growth_tips]):] 
                     for br in branches]
@@ -527,6 +528,7 @@ class road_system(node):
             tip = rm.choice(tips[bdx])
             newpos = place_inter(tip)
             if not newpos is None:
+                sealevelvals.append(newpos[2])
                 interargs.append({
                     'position' : newpos, 
                         })
@@ -534,7 +536,14 @@ class road_system(node):
             else: print('cant place intersection!!')
         #rwidth = kwargs['road_width']
         rwidth = self.road_width
+        self._suggested_sea_level_ = self.pick_sea_level(sealevelvals)
         return self.make_system_from_intersections(interargs, rwidth)
+
+    def pick_sea_level(self, vals):
+        maxval = max(vals)
+        minval = min(vals)
+        rng = maxval - minval
+        return minval + rng/10.0
 
     def make_system_from_intersections(self, interargs, rwidth):
         elements = []

@@ -47,6 +47,7 @@ class story(node):
         self.add_child(*children)
         self.lod_primitives = self.make_lod(*args,**kwargs)
         node.__init__(self, *args, **kwargs)
+        self.assign_material('concrete')
 
     def make_lod(self, *args, **kwargs):
         lod = pr.ucube()
@@ -176,7 +177,7 @@ class roofwedge(pr.arbitrary_primitive):
         #pvehdata = self.vehicledata
         pr.arbitrary_primitive.__init__(self, *args, **proofdata)
         self._default_('tag','_roof_',**kwargs)
-        self._scale_uvs_ = True
+        self._scale_uvs_ = False
         #self.translate(self.offset)
 
 class wedged_roof(node):
@@ -214,7 +215,7 @@ class rooftop(story):
         story.__init__(self, *args, **kwargs)
         veggies = self.vegetate()
         self.add_child(*veggies)
-        self.assign_material('cubemat')
+        if hasattr(self,'ceiling'):self.ceiling[0].assign_material('cubemat')
 
     def make_ceiling(self, *args, **kwargs):
         flleng = self.length/2.0
@@ -225,7 +226,7 @@ class rooftop(story):
         czpos = self.wall_height#+self.ceiling_height#+self.floor_height
         rfpos = [0,0,czpos]
         rfargs = {
-            'uv_parent':self, 
+            #'uv_parent':self, 
             'position':rfpos, 
 
             'length':flleng, 
@@ -338,7 +339,7 @@ class building(node):
         #children = shafts + story_batches
         self.add_child(*children)
         node.__init__(self, *args, **kwargs)
-        self.assign_material('concrete')
+        #self.assign_material('concrete')
 
     def make_foundation(self):
         shafts = self.shafts
@@ -529,7 +530,7 @@ class building(node):
         rfarg = {
             'theme':self.theme, 
             'parent':self, 
-            'uv_parent':self, 
+            #'uv_parent':self, 
             'name':roof_name, 
             'position':fl_pos, 
             'length':fllengs[-1], 

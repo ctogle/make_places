@@ -55,12 +55,6 @@ cdef list com(list coords):
 
 cpdef list center_of_mass(list coords):
     return com(coords)
-    #xs,ys,zs = zip(*coords)
-    ##xme = np.round(np.mean(xs),8)
-    #xme = np.mean(xs, dtype = np.float32)
-    #yme = np.mean(ys, dtype = np.float32)
-    #zme = np.mean(zs, dtype = np.float32)
-    #return [xme,yme,zme]
 
 cpdef list cross(list v1, list v2):
     cdef float cx = v1[1]*v2[2]-v1[2]*v2[1]
@@ -80,7 +74,8 @@ cpdef float dot(list v1, list v2):
     res = xp + yp + zp
     return res
 
-cpdef tuple project(list verts, list axis):
+'''#
+cpdef tuple project____(list verts, list axis):
     cdef float min_ = dot(verts[0],axis)
     cdef float max_ = min_
     cdef int vcnt = len(verts)
@@ -94,12 +89,14 @@ cpdef tuple project(list verts, list axis):
         if val > max_: max_ = val
     return (min_,max_)
 
-cpdef bint overlap(rng1,rng2):
+cpdef bint overlap_____(rng1,rng2):
     if max(rng1) < min(rng2): return 0
     elif max(rng2) < min(rng1): return 0
     else: return 1
 
-cpdef bint separating_axis(bb1,bb2):
+'''#
+'''#
+cpdef bint separating_axis_____(bb1,bb2):
     cdef list ns1 = bb1.edgenorms
     cdef list ns2 = bb2.edgenorms
     cdef list edgenorms = ns1 + ns2
@@ -115,7 +112,7 @@ cpdef bint separating_axis(bb1,bb2):
         if not overlap(proj1,proj2): return 0
     return 1
 
-cpdef list get_norms(list verts):
+cpdef list get_norms_______(list verts):
     cdef list norms = []
     #zhat = [0,0,1]
     cdef int vcnt = len(verts)
@@ -134,6 +131,7 @@ cpdef list get_norms(list verts):
         norm = [dy/dv,-dx/dv,0]
         norms.append(norm)
     return norms
+'''#
 
 cpdef int find_closest_xy(list one,list bunch,int bcnt,float close_enough):
     #cdef int bcnt = len(bunch)

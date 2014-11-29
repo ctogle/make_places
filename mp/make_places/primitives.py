@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_primitives as mpp
 from make_places.fundamental import base
 import make_places.profiler as prf
 import make_places.user_info as ui
@@ -37,6 +38,43 @@ def load_xml_library():
             xml_library[xml_rep] = (xfi,gcol,gfx,col)
 prf.measure_time('load xml library', load_xml_library)
 
+class xml_primitive(base):
+    
+    def __init__(self, *args, **kwargs):
+        self._default_('_scale_uvs_',False,**kwargs)
+        self.xml_filename = kwargs['xmlfilename']
+        self.gcol_filename = self.xml_filename.replace('mesh.xml','gcol')
+        self.gfxmesh_name = self.xml_filename.replace('.xml','')
+        self.colmesh_name = self.gcol_filename
+        
+        self._default_('is_lod',False,**kwargs)
+        self._default_('has_lod',False,**kwargs)
+        
+        self._default_('force_normal_calc',False,**kwargs)
+
+        self.position = kwargs['position']
+
+        self.mesh = mpp.mesh()
+        #self.coords = kwargs['verts']
+        #self._default_('ncoords',[],**kwargs)
+        #self.ncoords = kwargs['nverts']
+        #self.uv_coords = kwargs['uvs']
+        
+        #self.faces = kwargs['faces']
+
+        #fcnt = len(self.faces)
+        #zero = [0]*fcnt
+        #self._default_('materials',['cubemat'],**kwargs)
+        #self._default_('phys_materials',['/common/pmat/Stone'],**kwargs)
+        #self._default_('phys_face_materials',zero,**kwargs)
+        #self._default_('face_materials',zero[:],**kwargs)
+        #self.face_materials = kwargs['face_materials']
+
+        self._default_('tag','_arb_',**kwargs)
+        self.modified = False
+
+
+
 class arbitrary_primitive(base):
 
     _scale_uvs_ = False
@@ -49,7 +87,8 @@ class arbitrary_primitive(base):
         self._default_('is_lod',False,**kwargs)
         self._default_('has_lod',False,**kwargs)
         
-        self._default_('force_normal_calc',False,**kwargs)
+        self._default_('force_normal_calc',False,**kwargs)                   
+        self._default_('smooth_normals',False,**kwargs)                   
 
         self.position = kwargs['position']
         self.coords = kwargs['verts']
@@ -122,12 +161,11 @@ class arbitrary_primitive(base):
         has = 'true' if self.ncoords else 'false'
         return has
 
-    def calculate_normals(self,anyway = False):
+    def calculate_normals(self,anyway = False,smooth = False):
         if self.has_normals() == 'false' and not anyway: return
         # must iterate over faces, for each vertex, apply new normal
         for fa in self.faces:
-            try:fcoords = [self.coords[f] for f in fa]
-            except: pdb.set_trace()
+            fcoords = [self.coords[f] for f in fa]
             v1 = self.coords[fa[0]]
             v2 = self.coords[fa[1]]
             v3 = self.coords[fa[2]]
@@ -139,11 +177,30 @@ class arbitrary_primitive(base):
             #if not fu.angle_between(fu.v1_v2(comf,com),normal)>fu.PI/2.0:
             #    normal = mpu.flip(normal)
             for vdx in fa: self.ncoords[vdx] = normal
+        if smooth:
+
+            cbins = []
+            cdexs = []
+            for cdx in range(len(self.coords)):
+                coo = self.coords[cdx]
+                if coo in cbins:
+                    wdx = cbins.index(coo)
+                    cdexs[wdx].append(cdx)
+                else:
+                    cbins.append(coo)
+                    cdexs.append([cdx])
+
+            for cd in cdexs:
+                newnormal = mpu.center_of_mass([self.ncoords[n] for n in cd])
+                for n in cd:
+                    self.ncoords[n] = newnormal
 
     def get_vertexes(self):
-        vargs = zip(self.coords,self.ncoords,self.uv_coords)
-        vs = [fu.vertex(*va) for va in vargs]
-        return vs
+        return mpp.vertices_from_data(self.coords,self.ncoords,self.uv_coords)
+        #vargs = zip(self.coords,self.ncoords,self.uv_coords)
+        #vs = [mpp.vertex(*va) for va in vargs]
+        #vs = [fu.vertex(*va) for va in vargs]
+        #return vs
 
     def get_vertexes_faces_phys(self):
         vs = self.get_vertexes()
@@ -160,8 +217,10 @@ class arbitrary_primitive(base):
         return (vs, fa)
 
     def get_vertexes_faces(self):
-        vargs = zip(self.coords,self.ncoords,self.uv_coords)
-        vs = [fu.vertex(*va) for va in vargs]
+        #vargs = zip(self.coords,self.ncoords,self.uv_coords)
+        #vs = [fu.vertex(*va) for va in vargs]
+        #vs = [mpp.vertex(*va) for va in vargs]
+        vs = self.get_vertexes()
         mcnt = len(self.materials)
         fcnt = len(self.face_materials)
         fa = {}
@@ -188,7 +247,7 @@ class arbitrary_primitive(base):
 
     def write_as_xml(self):
         if self.modified:
-            self.calculate_normals(self.force_normal_calc)
+            self.calculate_normals(self.force_normal_calc,self.smooth_normals)
             xlines, xfile = xml_from_primitive_data(self)
             self.xml_representation = '\n'.join(xlines)
         else:
@@ -241,7 +300,7 @@ class arbitrary_primitive(base):
         y_hat = [0,1,0]
         z_hat = [0,0,1]
         hats = [x_hat,y_hat,z_hat]
-        if vect == [1,1,1]: return
+        if vect == [1,1,1] or not self.ncoords: return
         for vdx in range(len(self.coords)):
             uv = self.uv_coords[vdx]
             no = self.ncoords[vdx]
@@ -290,7 +349,7 @@ def xml_from_primitive_data(prim):
         xfile = make_xml_name_unique(xfile)
     xml_file_names.append(xfile)
     xlines = []
-    (vertexes, faces) = prim.get_vertexes_faces()# THIS NEEDS TO RETURN PROPER FACES DICT FOR MATERIALS TO WORK!!!
+    (vertexes, faces) = prim.get_vertexes_faces()
     _32bitindices = prim.requires_32bit_indices()
     _normals = prim.has_normals()
     sig = 4
@@ -301,9 +360,17 @@ def xml_from_primitive_data(prim):
     xlines.append("        <vertexbuffer positions=\"true\" normals=\""+_normals+"\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     #xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     for v in vertexes:
-        x,y,z = v.pos
-        nx,ny,nz = v.normal
-        ux,uy = v.uv
+        #x,y,z = v.pos
+        #nx,ny,nz = v.normal
+        #ux,uy = v.uv
+        x = v.position.x
+        y = v.position.y
+        z = v.position.z
+        nx = v.normal.x
+        ny = v.normal.y
+        nz = v.normal.z
+        ux = v.uv.x
+        uy = v.uv.y
         xlines.append("            <vertex>\n")
         if doround:
             xlines.append("                <position x=\""+str(np.round(v.pos[0],sig))+"\" y=\""+str(np.round(v.pos[1],sig))+"\" z=\""+str(np.round(v.pos[2],sig))+"\" />\n")

@@ -243,8 +243,12 @@ def create_gcol(prim):
     glines += 'trimesh {\n'
     glines += '\tvertexes {\n'
     for v in vertexes:
+        x = v.position.x
+        y = v.position.y
+        z = v.position.z
+        #' '.join([str(v.pos[0]),str(v.pos[1]),str(v.pos[2])])+\
         glines += '\t\t'+\
-            ' '.join([str(v.pos[0]),str(v.pos[1]),str(v.pos[2])])+\
+            ' '.join([str(x),str(y),str(z)])+\
             ';\n'
     glines += '\t}\n'
     glines += '\tfaces {\n'

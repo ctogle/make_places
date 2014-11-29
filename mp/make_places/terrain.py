@@ -20,14 +20,14 @@ import pdb, time
 
 
 terrain_numbers = [0]
-def get_terrain_number(repeat = False):
+def get_terrain_number______(repeat = False):
     if repeat: return str(terrain_numbers[0] - 1)
     num = terrain_numbers.pop(0)
     nex = num + 1
     terrain_numbers.append(nex)
     return str(num)
 
-class terrain_point(fu.base):
+class terrain_point_____(fu.base):
 
     def __init__(self, *args, **kwargs):
         self._default_('position',[0,0,0],**kwargs)
@@ -60,7 +60,7 @@ class terrain_point(fu.base):
         return mpu.magnitude(move)
 
 howmany = 0
-class terrain_triangle(fu.base):
+class terrain_triangle____(fu.base):
 
     def __init__(self, *args, **kwargs):
         self._default_('verts',None,**kwargs)
@@ -200,7 +200,7 @@ class terrain_triangle(fu.base):
                 for subch in ch.children:
                     for subsubch in subch.children:
                         lod_meshes.append(subsubch.mesh(
-                            depth = 0, max_depth = self.splits - 4))
+                            depth = 0, max_depth = self.splits - 3))
                             
             #for ch in self.children:
             #    for subch in ch.children:
@@ -295,11 +295,11 @@ class terrain_triangle(fu.base):
         else: data.append(self.verts)
         return data
 
-def pick_zoff(dist,vcnt):
-    zoff = (rm.random()*2.0 - 1.0)*(dist**(1.0/2.0))/vcnt
+def pick_zoff_____(dist,vcnt):
+    zoff = (rm.random()*2.0 - 1.0)*(dist**(1.0/2.0))/(vcnt**(1.0/2.0))
     return zoff
 
-def bisect(tv1,tv2,vcnt,controls,control_count,
+def bisect____(tv1,tv2,vcnt,controls,control_count,
             tolerance = 25,big_tolerance = 250):
     if tv1 in tv2.neighbors and tv2 in tv1.neighbors:
         newpos = mpu.midpoint(tv1.position,tv2.position)
@@ -328,14 +328,14 @@ def bisect(tv1,tv2,vcnt,controls,control_count,
     else: newtv = [n for n in tv1.neighbors if n in tv2.neighbors][0]
     return newtv
 
-def filter(pts,tri):
+def filter____(pts,tri):
     good = []
     for pt in pts:
         if pt in good: continue
         elif mpu.inside(pt,tri): good.append(pt)
     return good
 
-def make_terrain(initial_tps,splits = 2,smooths = 25, 
+def make_terrain____(initial_tps,splits = 2,smooths = 25, 
         pts_of_interest = [[250,250,25],[500,250,-25]],locs = None):
     pts_of_interest = filter(pts_of_interest,initial_tps)
     #pts_of_interest = fu.uniq(pts_of_interest)
@@ -362,9 +362,10 @@ def make_terrain(initial_tps,splits = 2,smooths = 25,
 class terrain(node):
     def __init__(self, *args, **kwargs):
         kwargs['uv_scales'] = [0.1,0.1,0.1]
+        self._default_('sea_level',0.0,**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
-        self._default_('grit_renderingdistance',250,**kwargs)
+        self._default_('grit_renderingdistance',500,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self._default_('pts_of_interest',[],**kwargs)
         self._default_('splits',3,**kwargs)
@@ -406,13 +407,14 @@ class terrain(node):
                 c3 = hverts[c3dx]
                 #terr,locs = make_terrain((c1,c2,c3),
                 terr,locs,locs_str = mpt.make_terrain((c1,c2,c3),
-                    self.splits,self.smooths,self.pts_of_interest)
+                    self.splits,self.smooths,self.pts_of_interest,
+                    self.sea_level)
                 use_mpt = True
                 #pdb.set_trace()
                 #use_mpt = False
                 #bounds.extend(terr.boundary_points)
-                #self.pts_of_interest.extend(
-                #    [v.position for v in terr.boundary_points])
+                self.pts_of_interest.extend(
+                    [v.position for v in terr.boundary_points])
                 pieces.append(terr)
                 ptlocs.append(locs)
         
@@ -430,8 +432,10 @@ class terrain(node):
             mpu.translate_coords([t2],[ 50,-50,0])
             mpu.translate_coords([t3],[ 50, 50,0])
             mpu.translate_coords([t4],[-50, 50,0])
-            terr1,locs1,locs1str = mpt.make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
-            terr2,locs2,locs2str = mpt.make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
+            terr1,locs1,locs1str = mpt.make_terrain((t1,t2,t3),self.splits,
+                        self.smooths,self.pts_of_interest,self.sea_level)
+            terr2,locs2,locs2str = mpt.make_terrain((t2,t4,t3),self.splits,
+                        self.smooths,self.pts_of_interest,self.sea_level)
             #terr1,locs1 = make_terrain((t1,t2,t3),self.splits,self.smooths,self.pts_of_interest)
             #terr2,locs2 = make_terrain((t2,t4,t3),self.splits,self.smooths,self.pts_of_interest)
             pieces = [terr1,terr2]
@@ -515,7 +519,7 @@ class terrain(node):
                             bp1.weights.z = 0.0
                             bp2.weights.z = 0.0
             pieces = [p1,p2]
-            [pc.smooth(1,lc) for pc,lc in zip(pieces,locs)]
+            [pc.smooth(5,lc) for pc,lc in zip(pieces,locs)]
             all_pieces.append(pieces[0])
 
         meshpieces = []

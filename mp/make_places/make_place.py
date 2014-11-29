@@ -1,6 +1,8 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
 import mp_bboxes as mpbb
+import mp_vector as cv
+import make_places.blueprints as bp
 import make_places.scenegraph as sg
 import make_places.primitives as pr
 import make_places.waters as mpw
@@ -455,7 +457,7 @@ def block_g():
     #gritgeo.create_element(rsys,bl1)
     
     ocean = mpw.waters(position = [500,500,0],
-        depth = 10,sealevel = -10.0,length = 1000,width = 1000)
+        depth = 10,sealevel = -30.0,length = 1000,width = 1000)
 
     gritgeo.create_element(ocean)
     gritgeo.create_element(rsys,bl1,bl2,ter)
@@ -502,6 +504,28 @@ def terrain_g():
 
 def profile_terrain_g():
     prf.profile_function(terrain_g)
+
+def bplan():
+    gritgeo.reset_world_scripts()
+    plan = bp.floor_plan()
+    pieces = plan.build()
+    gritgeo.create_element(pieces)
+    gritgeo.output_world_scripts()
+
+def bplans():
+    gritgeo.reset_world_scripts()
+
+    last = cv.vector(0,0,0)
+    for x in range(20):
+        outline = bp.outline_test(last)
+        outline = [o.to_list() for o in outline]
+        pe = walls.perimeter(
+            rid_top_bottom_walls = False, 
+            gaped = False, corners = outline)
+        gritgeo.create_element(pe)
+        last.x += 25.0
+
+    gritgeo.output_world_scripts()
 
 
 

@@ -190,38 +190,32 @@ class block(node):
             rmfactored = int(maxbwid/rmfact)
             widbottom = max([rmfactored,minbwid])
             bwid = min([rm.randrange(widbottom,maxbwid), blen*2])
-
-            #sidesoff = blen if rdrtside else 0
             sidesoff = 0.0
             easement = int((bwid+0.5)/2.0)*easementsign +\
                 rm.randrange(2,15 +int(blen/2.0))*easementsign + sidebase
-            #easement = int((bwid+0.5)/2.0)*easementsign + sidebase
-            #easement = 0
             base = mpu.translate_vector(mpu.translate_vector(leadcorner[:],
                 mpu.scale_vector(segnorm[:],[easement,easement,easement])),
                 mpu.scale_vector(segtang[:],[sidesoff,sidesoff,sidesoff]))
-            #base = [50,50,0]
             bhei = 10.0
-            #stry = rm.randrange(int(-1.0*blen), int(seglen + blen))
             stry = rm.randrange(0, int(seglen))
-            #stry = seglen/2
-            #stry = 0
             xtry,ytry,ztry = mpu.translate_vector(base[:],
                 mpu.scale_vector(segtang[:],[stry,stry,stry]))
             corners = self.make_corners(xtry,ytry,ztry,blen,bwid,bhei,rdpitch)
-            boxtry = mpbb.bbox(position = [xtry,ytry,ztry], corners = corners)
-            return boxtry,blen,bwid,bhei
+            boxpos = [xtry,ytry,ztry]
+            boxtry = [mpbb.bbox(corners = corners)]
+            #boxtry = [mpbb.bbox(position = [xtry,ytry,ztry], corners = corners)]
+            return boxtry,boxpos,blen,bwid,bhei
 
         try_cnt = 0
         max_tries = 50
         tries_exceeded = False
-        boxtry,blen,bwid,bhei = get_random()
+        boxtry,boxpos,blen,bwid,bhei = get_random()
         while mpbb.intersects(bboxes, boxtry) and not tries_exceeded:
             try_cnt += 1
             tries_exceeded = try_cnt == max_tries
-            boxtry,blen,bwid,bhei = get_random()
+            boxtry,boxpos,blen,bwid,bhei = get_random()
         if tries_exceeded:return False,None,None,None,None
-        x, y, z = boxtry.position
+        x, y, z = boxpos
         ang_z = rdpitch
         return [x, y, z], blen, bwid, bhei, ang_z
         
@@ -274,8 +268,8 @@ class city(node):
 
     def make_terrain(self, *args, **kwargs):
         kwargs['parent'] = self
-        kwargs['splits'] = 8
-        kwargs['smooths'] = 5
+        kwargs['splits'] = 9
+        kwargs['smooths'] = 20
         kwargs['bboxes'] = self.bboxes
         ter = terrain(**kwargs)
         return [ter]
@@ -289,7 +283,7 @@ class city(node):
                 'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':20, 
+                'intersection_count':100, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
@@ -303,17 +297,14 @@ class city(node):
         blocks = self.make_blocks_from_roads(road_sys[0])
         pts_of_int = road_sys[0].terrain_points()
         for bl in blocks: pts_of_int.extend(bl.terrain_points())
-        terra = self.make_terrain(pts_of_interest = pts_of_int, 
-                region_bounds = road_sys[0].region_bounds)
-        ocean = [mpw.waters(position = [500,500,0],depth = 10,
-            sealevel = 0.0,length = 2000,width = 2000)]
+        sea_level = road_sys[0]._suggested_sea_level_
+        terra = self.make_terrain(sealevel = sea_level, 
+            pts_of_interest = pts_of_int, 
+            region_bounds = road_sys[0].region_bounds)
+        ocean = [mpw.waters(position = [0,0,0],depth = 20,
+                sealevel = sea_level,length = 4000,width = 4000)]
         parts = road_sys + blocks + terra + ocean
         return parts
-
-    def get_bbox(self):
-        print 'citys bbox requested!!!'
-        pdb.set_trace()
-        return self.road_system.get_bbox()
 
 class hashima(city):
 

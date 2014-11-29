@@ -3,6 +3,7 @@ import make_places.primitives as pr
 
 class waters(sg.node):
     def __init__(self, *args, **kwargs):
+        self._default_('grit_renderingdistance',10000,**kwargs)
         self._default_('length',100,**kwargs)
         self._default_('width',100,**kwargs)
         self._default_('sealevel',0.0,**kwargs)

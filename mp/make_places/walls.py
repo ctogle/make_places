@@ -1,10 +1,11 @@
 import make_places.fundamental as fu
-import mp_utils as mpu
 #from make_places.fundamental import element
 from make_places.scenegraph import node
 import make_places.scenegraph as scg
 import make_places.primitives as pr
 from make_places.primitives import unit_cube
+import mp_utils as mpu
+import mp_vector as cv
 
 import numpy as np
 
@@ -147,6 +148,30 @@ class perimeter(node):
             gaps = [[],[],[],[]]):
         rid = self.rid_top_bottom_walls
         walls = []
+
+        gcnt = len(gaps)
+        ccnt = len(corners)
+        if gcnt < ccnt:
+            gaps.extend([[]]*(ccnt-gcnt))
+            gapes.extend([False]*(ccnt-gcnt))
+
+        ww = self.wall_width
+        h = self.wall_height
+        for cdx in range(1,ccnt):
+            c1,c2 = corners[cdx-1],corners[cdx]
+            walls.append(wall(c1, c2, rid_top_bottom = rid, 
+                wall_width = ww, wall_height = h, 
+                wall_gaps = gaps[cdx-1], gaped = gapes[cdx-1]))
+
+        c1,c2 = corners[-1],corners[0]
+        walls.append(wall(c1, c2, rid_top_bottom = rid, 
+            wall_width = ww, wall_height = h, 
+            wall_gaps = gaps[cdx], gaped = gapes[cdx]))
+        return walls
+
+
+      
+        '''#
         c1 = corners[0]
         c2 = corners[1]
         c3 = corners[2]
@@ -170,6 +195,7 @@ class perimeter(node):
             wall_width = ww, wall_height = h, 
             wall_gaps = gaps[3], gaped = gapes[3]))
         return walls
+        '''#
 
 
 

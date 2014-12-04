@@ -307,14 +307,23 @@ def block():
     bboxes = rsys.get_bbox() + bl1.get_bbox() + bl2.get_bbox()
     ter = terr.terrain(
         pts_of_interest = pts_of_int, 
-        splits = 7, bboxes = bboxes)
+        splits = 8, bboxes = bboxes)
     #gritgeo.create_element(rsys,bl1)
     
     ocean = mpw.waters(position = cv.vector(500,500,0),
         depth = 10,sealevel = -30.0,length = 1000,width = 1000)
 
     gritgeo.create_element(ocean)
-    gritgeo.create_element(rsys,bl1,bl2,ter)
+    print 'made ocean'
+    gritgeo.create_element(rsys)
+    print 'made rsys'
+    gritgeo.create_element(bl1)
+    print 'made bl1'
+    gritgeo.create_element(bl2)
+    print 'made bl2'
+    gritgeo.create_element(ter)
+    print 'made ter'
+    #gritgeo.create_element(rsys,bl1,bl2,ter)
 
     gritgeo.output_world_scripts()
 
@@ -349,29 +358,18 @@ def terrain():
 def profile_terrain():
     prf.profile_function(terrain)
 
-def blgplan():
-    gritgeo.reset_world_scripts()
-    gritgeo.create_element(bp.building_plan().build())
-    gritgeo.output_world_scripts()
-
 def bplan():
     gritgeo.reset_world_scripts()
-
-    last = cv.vector(0,0,0)
-    for x in range(3):
-        plan = bp.floor_plan()
-        pieces = plan.build()
-        [p.translate(last) for p in pieces]
-        gritgeo.create_element(pieces)
-        last.z += 20.0
-
+    plan = bp.floor_plan()
+    pieces = plan.build()
+    gritgeo.create_element(pieces)
     gritgeo.output_world_scripts()
 
 def bplans():
     gritgeo.reset_world_scripts()
 
     last = cv.vector(0,0,0)
-    for x in range(3):
+    for x in range(20):
         outline = bp.outline_test(last)
         #outline = [o.to_list() for o in outline]
         pe = walls.perimeter(

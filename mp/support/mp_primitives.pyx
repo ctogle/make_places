@@ -27,9 +27,12 @@ cdef list vertices_from_data_c(list coords, list ncoords, list ucoords):
     cdef int ccnt = len(coords)
     cdef list vertices = []
     for vdx in range(ccnt):
-        newpos = cv.vector(*<list>coords[vdx])
-        newnorm = cv.vector(*<list>ncoords[vdx])
-        newuv = cv.vector2d(*<list>ucoords[vdx])
+        #newpos = cv.vector(*<list>coords[vdx])
+        #newnorm = cv.vector(*<list>ncoords[vdx])
+        #newuv = cv.vector2d(*<list>ucoords[vdx])
+        newpos = <cv.vector>coords[vdx]
+        newnorm = <cv.vector>ncoords[vdx]
+        newuv = <cv.vector2d>ucoords[vdx]
         new = vertex(newpos,newnorm,newuv)
         vertices.append(new)
     return vertices

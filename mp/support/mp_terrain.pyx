@@ -265,11 +265,14 @@ cdef class terrain_triangle:
         materials = ['grass2']
         data = self.face_data(depth, max_depth)
         for fdx,fdat in enumerate(data):
-            newverts = [f.position.to_list() for f in fdat]
-            v1v2 = mpu.v1_v2(newverts[0],newverts[1])
-            v1v3 = mpu.v1_v2(newverts[0],newverts[2])
-            newnorml = [mpu.normalize(mpu.cross(v1v2,v1v3)) for f in fdat]
-            newuvs = [[0,0],[1,0],[0,1]]
+            newverts = [f.position.copy() for f in fdat]
+            v1v2 = cv.v1_v2(newverts[0],newverts[1])
+            v1v3 = cv.v1_v2(newverts[0],newverts[2])
+            newnorml = [cv.cross(v1v2,v1v3).normalize() for f in fdat]
+            #newuvs = [[0,0],[1,0],[0,1]]
+            #newuvs = [[0,0],[1,0],[0,1]]
+            newuvs = [cv.vector2d(0,0),cv.vector2d(1,0),cv.vector2d(0,1)]
+            newuvs = [cv.vector2d(0,0),cv.vector2d(1,0),cv.vector2d(0,1)]
             verts.extend(newverts)
             nverts.extend(newnorml)
             uvs.extend(newuvs)
@@ -278,7 +281,7 @@ cdef class terrain_triangle:
         xmlfile = '.'.join(['terrain',
             str(get_terrain_number()),'mesh','xml'])
         pwargs = {
-            'position' : [0,0,0], 
+            'position' : cv.zero(), 
             'verts' : verts, 
             'nverts' : nverts, 
             'uvs' : uvs, 

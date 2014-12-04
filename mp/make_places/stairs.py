@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_vector as cv
 from make_places.scenegraph import node
 from make_places.floors import floor
 
@@ -21,7 +22,7 @@ class ramp(floor):
             prim = self.primitives[0]
             high_side = kwargs['high_side']
             differ = kwargs['differential']
-            prim.translate_face([0,0,differ],high_side)
+            prim.translate_face(cv.vector(0,0,differ),high_side)
 
 class shaft(node):
 
@@ -59,11 +60,11 @@ class shaft(node):
     def find_corners(self):
         pos = self.tform.position
         l,w = self.length,self.width
-        c1,c2,c3,c4 = pos[:],pos[:],pos[:],pos[:]
-        c2[0] += l
-        c3[0] += l
-        c3[1] += w
-        c4[1] += w
+        c1,c2,c3,c4 = pos.copy(),pos.copy(),pos.copy(),pos.copy()
+        c2.x += l
+        c3.x += l
+        c3.y += w
+        c4.y += w
         return [c1,c2,c3,c4]
 
     def ramps(self, *args, **kwargs):
@@ -74,11 +75,13 @@ class shaft(node):
         topology = []
 
         def get_pos_fb(odd):
-            bpos = [rl*odd-rl/2.0,0.0,0.0]
+            bpos = cv.vector(rl*odd-rl/2.0,0.0,0.0)
+            #bpos = [rl*odd-rl/2.0,0.0,0.0]
             return bpos, rl, rw
 
         def get_pos_rl(odd):
-            bpos = [0.0,rw*odd-rw/2.0,0.0]
+            bpos = cv.vector(0.0,rw*odd-rw/2.0,0.0)
+            #bpos = [0.0,rw*odd-rw/2.0,0.0]
             return bpos, rl, rw
 
         if self.direction == 'east':
@@ -94,7 +97,7 @@ class shaft(node):
         for fdx in range(flcnt):
             odd = fdx % 2.0
             rpos, rl, rw = get_pos(odd)
-            rpos[2] += floffset * fdx
+            rpos.z += floffset * fdx
             lside = sides[0] if odd else sides[1]
             hside = sides[1] if odd else sides[0]
             rparg = {

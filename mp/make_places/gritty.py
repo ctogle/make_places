@@ -1,5 +1,6 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
+import mp_vector as cv
 import make_places.user_info as ui
 
 
@@ -21,8 +22,10 @@ def create_primitive(*args, **kwargs):
 world_dir = ui.info['worlddir']
 textdir = '/solemn/textures'
 def create_prim(prim, name = None, center = False, 
-        world_rotation = [0,0,0], rdist = 200, 
+        world_rotation = None, rdist = 200, 
                 lodrdist = 2000, **kwargs):
+    if world_rotation is None:
+        world_rotation = cv.vector(0,0,0)
     prim.origin_to_centroid()
     # rotate coords backwards by world_rotation?
     w_position = prim.position
@@ -42,7 +45,10 @@ def create_prim(prim, name = None, center = False,
     mname = prim.gfxmesh_name
     cname = prim.colmesh_name
     if prim.is_lod: rdist = lodrdist
-    else: add_to_map(oname,tuple(w_position),tuple(w_rotation),oname)
+    else: add_to_map(oname,
+        w_position.to_tuple(),
+        w_rotation.to_tuple(),
+        oname)
     add_to_classes(oname, mname, cname, rdist, 
         has_lod = prim.has_lod, is_lod = prim.is_lod)
     add_to_materials(prim.materials)
@@ -188,11 +194,9 @@ def write_map_lines(obj, location, rotation, name):
     return lines
 
 def create_grit_meshes():
-    print 'converting'
     gdir = os.path.join(world_dir, 'convert.sh')
     subprocess.call([gdir, world_dir], shell = True)
     #subprocess.call('./convert.sh', shell = True)
-    print 'converted'
 
 executable_suffix = '.exe'
 executable_suffix = ''
@@ -317,8 +321,7 @@ def create_elem(elem, center = True):
     import make_places.scenegraph as sg
     sgr = sg.sgraph(nodes = [elem])
     sgr.make_scene_g(center = center)
-    #print('creating node', elem)
-    print 'creating node\n', elem
+    #print 'creating node\n', elem
 
 
 

@@ -1,7 +1,7 @@
 import mp_utils as mpu
 import mp_vector as cv
-from mp_utils import dot
-from mp_utils import magnitude
+#from mp_utils import dot
+#from mp_utils import magnitude
 
 from math import cos
 from math import sin
@@ -13,7 +13,7 @@ import random as rm
 import os, pdb
 
 PI = np.round(np.pi,8)
-zhat = cv.vector(0,0,1)
+#zhat = cv.vector(0,0,1)
 
 class base(object):
     def _default_(self, *args, **kwargs):
@@ -22,12 +22,6 @@ class base(object):
         if key in kwargs.keys():init = kwargs[key]
         if not key in self.__dict__.keys():
             self.__dict__[key] = init
-
-class vertex_________(object):
-    def __init__(self, pos, normal, uv):
-        self.pos = pos
-        self.normal = normal
-        self.uv = uv
 
 #def uniq(seq):
 #    # Not order preserving
@@ -54,11 +48,17 @@ def quadrant(theta):
     elif theta >= 2.0*PI: return quadrant(theta % (2.0*PI))
     else: print 'theta', theta, 'not found to be in any quadrant!'
       
+def to_rad(deg):
+    return (PI/180.0)*deg
+
+def to_deg(rad):
+    return (180.0/PI)*rad
 
 
 
 
 
+'''#
 def angle_between_xy(v1, v2):
     alpha1 = angle_from_xaxis_xy(v1)
     alpha2 = angle_from_xaxis_xy(v2)
@@ -107,11 +107,8 @@ def angle_from_xaxis(v1):
     else:ang = 0.0
     return ang    
 
-def to_rad(deg):
-    return (PI/180.0)*deg
+'''#
 
-def to_deg(rad):
-    return (180.0/PI)*rad
 
 
 

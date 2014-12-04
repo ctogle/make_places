@@ -1,6 +1,7 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
 import mp_bboxes as mpbb
+import mp_vector as cv
 import make_places.primitives as pr
 import make_places.scenegraph as sg
 import make_places.waters as mpw
@@ -94,11 +95,11 @@ class block(node):
         return self.bboxes
 
     def find_corners(self, pos, length, width):
-        c1, c2, c3, c4 = pos[:], pos[:], pos[:], pos[:]
-        c2[0] += length
-        c3[0] += length
-        c3[1] += width
-        c4[1] += width
+        c1, c2, c3, c4 = pos.copy(),pos.copy(),pos.copy(),pos.copy()
+        c2.x += length
+        c3.x += length
+        c3.y += width
+        c4.y += width
         return [c1, c2, c3, c4]
 
     def make_buildings_from_road(self, *args, **kwargs):
@@ -108,12 +109,16 @@ class block(node):
         corns = rd.segmented_vertices
         #print('segverts',corns)
         corncnt = len(corns)
-        zhat = [0,0,1]
-        thats = [mpu.normalize(mpu.v1_v2(corns[dx],corns[dx-1])) 
+        #zhat = [0,0,1]
+        zhat = cv.zhat
+        thats = [cv.v1_v2(corns[dx],corns[dx-1]).normalize()  
                 for dx in range(1,corncnt)]
-        rdnorms = [mpu.cross(that,zhat) for that in thats]
+        rdnorms = [cv.cross(that,zhat) for that in thats]
+        #thats = [mpu.normalize(mpu.v1_v2(corns[dx],corns[dx-1])) 
+        #        for dx in range(1,corncnt)]
+        #rdnorms = [mpu.cross(that,zhat) for that in thats]
+
         bcnt = self.building_count
-        #bcnt = 10
         buildings = []
         reuse_data = {'bcnt':bcnt, 'blargs':[]}
         for bdx in range(bcnt):
@@ -136,7 +141,7 @@ class block(node):
                     'wall_width':0.4, 
                     'wall_height':4.0, 
                     'floors':flcnt, 
-                    'rotation':[0,0,ang], 
+                    'rotation':cv.vector(0,0,ang), 
                         }
                 reuse_data['blargs'].append(blarg)
                 buildings.append(building(**blarg))
@@ -156,9 +161,12 @@ class block(node):
         segcnt = len(rdnorms)
         segdx = rm.randrange(segcnt)
         leadcorner = corners[segdx]
-        seglen = mpu.distance(corners[segdx+1],leadcorner)
+        seglen = cv.distance(corners[segdx+1],leadcorner)
+        if int(seglen) == 0: seglen += 1.0
+        #    print corners[segdx+1],leadcorner,seglen
         segnorm = rdnorms[segdx]
-        segtang = mpu.normalize(mpu.v1_v2(leadcorner,corners[segdx+1]))
+        segtang = cv.v1_v2(leadcorner,corners[segdx+1]).normalize()
+        #segtang = mpu.normalize(mpu.v1_v2(leadcorner,corners[segdx+1]))
 
         minblen = 20
         minbwid = 20
@@ -177,7 +185,7 @@ class block(node):
             #sidebase = 1.0*rdwidth
             sidebase = 1.0*rdwidth/2.0
             easementsign = 1.0
-        rdpitch = fu.angle_from_xaxis(segtang)
+        rdpitch = cv.angle_from_xaxis(segtang)
         #rdpitch = fu.angle_from_xaxis(segtang) - sidepitch
         #rdpitch = np.pi/6
 
@@ -193,18 +201,22 @@ class block(node):
             sidesoff = 0.0
             easement = int((bwid+0.5)/2.0)*easementsign +\
                 rm.randrange(2,15 +int(blen/2.0))*easementsign + sidebase
-            base = mpu.translate_vector(mpu.translate_vector(leadcorner[:],
-                mpu.scale_vector(segnorm[:],[easement,easement,easement])),
-                mpu.scale_vector(segtang[:],[sidesoff,sidesoff,sidesoff]))
+            base = leadcorner.copy().translate(segtang.copy().scale_u(sidesoff)).\
+                                    translate(segnorm.copy().scale_u(easement))
+            #base = mpu.translate_vector(mpu.translate_vector(leadcorner[:],
+            #    mpu.scale_vector(segnorm[:],[easement,easement,easement])),
+            #    mpu.scale_vector(segtang[:],[sidesoff,sidesoff,sidesoff]))
             bhei = 10.0
             stry = rm.randrange(0, int(seglen))
-            xtry,ytry,ztry = mpu.translate_vector(base[:],
-                mpu.scale_vector(segtang[:],[stry,stry,stry]))
-            corners = self.make_corners(xtry,ytry,ztry,blen,bwid,bhei,rdpitch)
-            boxpos = [xtry,ytry,ztry]
+            
+            #xtry,ytry,ztry = mpu.translate_vector(base[:],
+            #    mpu.scale_vector(segtang[:],[stry,stry,stry]))
+            postry = base.copy().translate(segtang.copy().scale_u(stry))
+            corners = self.make_corners(postry,blen,bwid,bhei,rdpitch)
+            #boxpos = [xtry,ytry,ztry]
             boxtry = [mpbb.bbox(corners = corners)]
             #boxtry = [mpbb.bbox(position = [xtry,ytry,ztry], corners = corners)]
-            return boxtry,boxpos,blen,bwid,bhei
+            return boxtry,postry,blen,bwid,bhei
 
         try_cnt = 0
         max_tries = 50
@@ -215,17 +227,24 @@ class block(node):
             tries_exceeded = try_cnt == max_tries
             boxtry,boxpos,blen,bwid,bhei = get_random()
         if tries_exceeded:return False,None,None,None,None
-        x, y, z = boxpos
+        #x, y, z = boxpos
         ang_z = rdpitch
-        return [x, y, z], blen, bwid, bhei, ang_z
+        return boxpos, blen, bwid, bhei, ang_z
+        #return [x, y, z], blen, bwid, bhei, ang_z
         
-    def make_corners(self,x,y,z,l,w,h,theta):
+    #def make_corners(self,x,y,z,l,w,h,theta):
+    def make_corners(self,pos,l,w,h,theta):
         hl = l/2.0
         hw = w/2.0
-        corners = [[-hl,-hw,0],[hl,-hw,0],[hl,hw,0],[-hl,hw,0]]
+        #corners = [[-hl,-hw,0],[hl,-hw,0],[hl,hw,0],[-hl,hw,0]]
+        corners = [
+            cv.vector(-hl,-hw,0), 
+            cv.vector( hl,-hw,0), 
+            cv.vector( hl, hw,0), 
+            cv.vector(-hl, hw,0)]
         #corners = [[0,0,0],[l,0,0],[l,w,0],[0,w,0]]
-        mpu.rotate_z_coords(corners,theta)
-        mpu.translate_coords(corners,[x,y,z])
+        cv.rotate_z_coords(corners,theta)
+        cv.translate_coords(corners,pos)
         return corners
 
     def get_building_floor_count(self, *args, **kwargs):
@@ -280,7 +299,12 @@ class city(node):
         else:
             rsargs = {
                 'name':'road_system', 
-                'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
+                'seeds':[
+                    cv.vector(0,-1000,0),
+                    cv.vector(1000,0,0),
+                    cv.vector(-1000,0,0),
+                    cv.vector(0,1000,0)], 
+                #'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
                 #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
                 'intersection_count':100, 
@@ -301,7 +325,7 @@ class city(node):
         terra = self.make_terrain(sealevel = sea_level, 
             pts_of_interest = pts_of_int, 
             region_bounds = road_sys[0].region_bounds)
-        ocean = [mpw.waters(position = [0,0,0],depth = 20,
+        ocean = [mpw.waters(position = cv.zero(),depth = 20,
                 sealevel = sea_level,length = 4000,width = 4000)]
         parts = road_sys + blocks + terra + ocean
         return parts

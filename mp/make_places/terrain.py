@@ -2,6 +2,7 @@ import make_places.fundamental as fu
 import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_terrain as mpt
+import mp_vector as cv
 from make_places.scenegraph import node
 from make_places.primitives import arbitrary_primitive
 import make_places.profiler as prf
@@ -250,11 +251,15 @@ class terrain_triangle____(fu.base):
         data = self.face_data(depth, max_depth)
         for fdx,fdat in enumerate(data):
             #newverts = [dcopy(f.position) for f in fdat]
-            newverts = [f.position[:] for f in fdat]
-            v1v2 = mpu.v1_v2(newverts[0],newverts[1])
-            v1v3 = mpu.v1_v2(newverts[0],newverts[2])
-            newnorml = [mpu.normalize(mpu.cross(v1v2,v1v3)) for f in fdat]
-            newuvs = [[0,0],[1,0],[0,1]]
+            newverts = [f.position.copy() for f in fdat]
+            v1v2 = cv.v1_v2(newverts[0],newverts[1])
+            v1v3 = cv.v1_v2(newverts[0],newverts[2])
+            newnorml = [cv.cross(v1v2,v1v3).normalize() for f in fdat]
+            #newuvs = [[0,0],[1,0],[0,1]]
+            newuvs = [
+                cv.vector2d(0,0),
+                cv.vector2d(1,0),
+                cv.vector2d(0,1)]
             verts.extend(newverts)
             nverts.extend(newnorml)
             uvs.extend(newuvs)
@@ -263,7 +268,7 @@ class terrain_triangle____(fu.base):
         xmlfile = '.'.join(['terrain',
             str(get_terrain_number()),'mesh','xml'])
         pwargs = {
-            'position' : [0,0,0], 
+            'position' : cv.zero(), 
             'verts' : verts, 
             'nverts' : nverts, 
             'uvs' : uvs, 
@@ -361,7 +366,7 @@ def make_terrain____(initial_tps,splits = 2,smooths = 25,
 
 class terrain(node):
     def __init__(self, *args, **kwargs):
-        kwargs['uv_scales'] = [0.1,0.1,0.1]
+        kwargs['uv_scales'] = cv.one().scale_u(0.1)#0.1,0.1,0.1]
         self._default_('sea_level',0.0,**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)

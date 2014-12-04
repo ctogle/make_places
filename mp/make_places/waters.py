@@ -1,5 +1,6 @@
 import make_places.scenegraph as sg
 import make_places.primitives as pr
+import mp_vector as cv
 
 class waters(sg.node):
     def __init__(self, *args, **kwargs):
@@ -13,8 +14,8 @@ class waters(sg.node):
 
     def make_waters(self, *args, **kwargs):
         wcube = pr.ucube()
-        wcube.scale([self.length,self.width,self.depth])
-        wcube.translate([0,0,self.sealevel-self.depth])
+        wcube.scale(cv.vector(self.length,self.width,self.depth))
+        wcube.translate_z(self.sealevel-self.depth)
         wcube.assign_material('ocean')
         return [wcube]
 

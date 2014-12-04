@@ -13,12 +13,15 @@ cimport mp_vector as cv
 
 stuff = 'hi'
 
-cdef bint overlap(cv.vector2d rng1, cv.vector2d rng2):
+cdef bint overlap_c(cv.vector2d rng1, cv.vector2d rng2):
     if rng1.y < rng2.x: return 0
     elif rng2.y < rng1.x: return 0
     else: return 1
 
-cdef cv.vector2d project(list verts, cv.vector axis):
+cpdef bint overlap(cv.vector2d rng1, cv.vector2d rng2):
+    return overlap_c(rng1, rng2)
+
+cdef cv.vector2d project_c(list verts, cv.vector axis):
     cdef cv.vector v = verts[0]
     cdef float min_ = cv.dot_c(v,axis)
     cdef float max_ = min_
@@ -31,6 +34,9 @@ cdef cv.vector2d project(list verts, cv.vector axis):
         if val < min_: min_ = val
         if val > max_: max_ = val
     return cv.vector2d(min_,max_)
+
+cpdef cv.vector2d project(list verts, cv.vector axis):
+    return project_c(verts, axis)
 
 cdef bint separating_axis(bb1,bb2):
     cdef list ns1 = bb1.edgenorms
@@ -45,17 +51,17 @@ cdef bint separating_axis(bb1,bb2):
     cdef cv.vector2d proj2
     for egdx in range(egcnt1):
         edgenorm = <cv.vector>ns1[egdx]
-        proj1 = <cv.vector2d>project(bb1.corners,edgenorm)
-        proj2 = <cv.vector2d>project(bb2.corners,edgenorm)
-        if not <bint>overlap(proj1,proj2):
+        proj1 = <cv.vector2d>project_c(bb1.corners,edgenorm)
+        proj2 = <cv.vector2d>project_c(bb2.corners,edgenorm)
+        if not <bint>overlap_c(proj1,proj2):
             return 1
             #return 0
     for egdx in range(egcnt2):
         edgenorm = <cv.vector>ns2[egdx]
         #edgenorm = <cv.vector>edgenorms[egdx]
-        proj1 = <cv.vector2d>project(bb1.corners,edgenorm)
-        proj2 = <cv.vector2d>project(bb2.corners,edgenorm)
-        if not <bint>overlap(proj1,proj2):
+        proj1 = <cv.vector2d>project_c(bb1.corners,edgenorm)
+        proj2 = <cv.vector2d>project_c(bb2.corners,edgenorm)
+        if not <bint>overlap_c(proj1,proj2):
             return 1
             #return 0
     return 0
@@ -113,7 +119,8 @@ cdef class bbox:
 
     def __init__(self, *args, **kwargs):
         # corners are world space coordinates
-        self.corners = [cv.vector(*c) for c in kwargs['corners']]
+        self.corners = kwargs['corners']
+        #self.corners = [cv.vector(*c) for c in kwargs['corners']]
         self.edgenorms = get_norms(self.corners)
         self.edgecount = len(self.edgenorms)
         self.center = cv.com(self.corners)

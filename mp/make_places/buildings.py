@@ -2,6 +2,7 @@ from make_places.scenegraph import node
 import make_places.fundamental as fu
 import mp_utils as mpu
 import mp_bboxes as mpbb
+import mp_vector as cv
 import make_places.primitives as pr
 from make_places.stairs import ramp
 from make_places.stairs import shaft
@@ -59,7 +60,8 @@ class story(node):
         #pos = fl.tform.position[0]
         pos = fl.tform.position
         #pos[2] -= self.floor_height
-        lod.scale([l,w,h])
+        lod.scale(cv.vector(l,w,h))
+        #lod.scale([l,w,h])
         lod.rotate_z(zrot)
         lod.translate(pos)
         #lod.is_lod = True
@@ -83,7 +85,7 @@ class story(node):
         if self.floor_number > -1:
             for sh in self.shafts:
                 gaps.extend(sh.floor_gaps)
-        flpos = [0,0,0]
+        flpos = cv.zero()
         flargs = {
             'uv_parent':self, 
             'position':flpos, 
@@ -106,7 +108,7 @@ class story(node):
             for sh in self.shafts:
                 gaps.extend(sh.floor_gaps)
         czpos = self.wall_height+self.ceiling_height#+self.floor_height
-        flpos = [0,0,czpos]
+        flpos = cv.vector(0,0,czpos)
         flargs = {
             'uv_parent':self, 
             'position':flpos, 
@@ -198,8 +200,8 @@ class wedged_roof(node):
         if flip:
             seg1.rotate_z(fu.PI/2.0)
             seg2.rotate_z(fu.PI/2.0)
-        seg1.scale([l,w,h])
-        seg2.scale([l,w,h])
+        seg1.scale(cv.vector(l,w,h))
+        seg2.scale(cv.vector(l,w,h))
         return [seg1,seg2]
 
 class rooftop(story):
@@ -224,7 +226,7 @@ class rooftop(story):
                             int(max([flleng,flwidt])+1))
 
         czpos = self.wall_height#+self.ceiling_height#+self.floor_height
-        rfpos = [0,0,czpos]
+        rfpos = cv.vector(0,0,czpos)
         rfargs = {
             #'uv_parent':self, 
             'position':rfpos, 
@@ -315,7 +317,7 @@ class building(node):
         self._default_('width',30,**kwargs)
         self._default_('tform',
             self.def_tform(*args,**kwargs),**kwargs)
-        kwargs['uv_scales'] = [2,2,2]
+        kwargs['uv_scales'] = cv.vector(2,2,2)
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('materials',['imgtex'],**kwargs)
@@ -346,14 +348,17 @@ class building(node):
         bname = self.name
         #bname = self.building_name
         bump = 0.0
-        bpos = [0,0,bump]
+        bpos = cv.vector(0,0,bump)
         ww = self.wall_width
         basement_floor_height = self.floor_height
         basement_ceiling_height = self.ceiling_height
         basement_wall_height = 10
         baheight = basement_ceiling_height + basement_wall_height + basement_floor_height
         #baheight = basement_floor_height + basement_wall_height
-        mpu.translate_vector(bpos,[0,0,-baheight])
+
+        bpos.translate_z(-baheight)
+        #mpu.translate_vector(bpos,cv.vector(0,0,-baheight))
+
         #[s.translate([0,0,-baheight]) for s in self.shafts]
         baargs = {
             #'parent':self, 
@@ -376,6 +381,7 @@ class building(node):
         stheight = self.wall_height + self.floor_height + self.ceiling_height
         best_number = int(((self.length+self.width)/2.0)/stheight)
         best_number = min([best_number,max_best_number])
+        if best_number <= 0: best_number = 1
         dex0 = 0
         batches = []
         stbargs = []
@@ -392,12 +398,12 @@ class building(node):
 
             b0 = batches[-1][0]
             for b in batches[-1][1:]:
-                b.tform.position[2] -= b0.tform.position[2]
-            b0.tform.position[2] = b0_z
-            stbatpos = b0.tform.position[:]
-            stbatpos[2] = b0_z
+                b.tform.position.z -= b0.tform.position.z
+            b0.tform.position.z = b0_z
+            stbatpos = b0.tform.position.copy()
+            stbatpos.z = b0_z
             b0_z += len(batches[-1])*stheight
-            b0.tform.position[2] = 0.0
+            b0.tform.position.z = 0.0
 
             stbargs.append({
                 'name':'_storybatch_'+str(len(batches)), 
@@ -415,9 +421,10 @@ class building(node):
 
     def terrain_points(self):
         tpts = self.find_corners()
-        mpu.translate_coords(tpts,[0,0,-0.5])
-        center = mpu.center_of_mass(tpts)
-        mpu.translate_vector(center,[0,0,-0.5])
+        cv.translate_coords(tpts,cv.vector(0,0,-0.5))
+        center = cv.center_of_mass(tpts)
+        center.translate(cv.zero().translate_z(-0.5))
+        #mpu.translate_vector(center,cv.vector(0,0,-0.5))
         #fu.translate_coords(tpts,[0,0,9])
         tpts = mpu.dice_edges(tpts, dices = 1)
         tpts.append(center)
@@ -431,8 +438,8 @@ class building(node):
         shargs = [{
             #'parent':self, 
             'uv_parent':self, 
-            'position':[0,0,0], 
-            'rotation':[0,0,0], 
+            'position':cv.zero(),
+            'rotation':cv.zero(), 
             'wall_height':self.wall_height, 
             'floor_height':self.floor_height, 
             'ceiling_height':self.ceiling_height, 
@@ -453,26 +460,26 @@ class building(node):
     def find_corners(self):
         length = self.length
         width = self.width
-        pos = [0.0,0.0,0.0]
-        c1, c2, c3, c4 = pos[:], pos[:], pos[:], pos[:]
-        c1[0] -= length/2.0
-        c1[1] -= width/2.0
-        c2[0] += length/2.0
-        c2[1] -= width/2.0
-        c3[0] += length/2.0
-        c3[1] += width/2.0
-        c4[0] -= length/2.0
-        c4[1] += width/2.0
+        pos = cv.zero()
+        c1, c2, c3, c4 = pos.copy(),pos.copy(),pos.copy(),pos.copy()
+        c1.x -= length/2.0
+        c1.y -= width/2.0
+        c2.x += length/2.0
+        c2.y -= width/2.0
+        c3.x += length/2.0
+        c3.y += width/2.0
+        c4.x -= length/2.0
+        c4.y += width/2.0
         corncoords = [c1, c2, c3, c4]
-        zang = self.tform.rotation[2]
-        mpu.rotate_z_coords(corncoords,zang)
-        mpu.translate_coords(corncoords,self.tform.position)#this doesnt need to be true()??!?!
+        zang = self.tform.rotation.z
+        cv.rotate_z_coords(corncoords,zang)
+        cv.translate_coords(corncoords,self.tform.position)#this doesnt need to be true()??!?!
         return [c1, c2, c3, c4]
 
     def make_floors_from_shafts(self, *args, **kwargs):
         shafts = self.shafts
         bname = self.name
-        bpos = [0.0,0.0,0.0]
+        bpos = cv.zero()
         ww = self.wall_width
         l,w = self.length,self.width
 
@@ -503,8 +510,8 @@ class building(node):
             fheight = flheits[fdx]
             cheight = clheits[fdx]
             wheight = flwlhts[fdx]
-            fl_pos = bpos[:]
-            fl_pos[2] += bump
+            fl_pos = bpos.copy()
+            fl_pos.z += bump
             stheight = wheight + fheight + cheight
             bump += stheight
             stargs = {
@@ -523,10 +530,10 @@ class building(node):
             floors.append(story(fdx, **stargs))
 
         roof_name = bname + '_roof_'
-        fl_pos = bpos[:]
+        fl_pos = bpos.copy()
         #fl_pos[2] += stheight*(flcnt)
         #bump += floors[-1].ceiling_height
-        fl_pos[2] += bump
+        fl_pos.z += bump
         rfarg = {
             'theme':self.theme, 
             'parent':self, 

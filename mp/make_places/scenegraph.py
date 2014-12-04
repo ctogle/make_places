@@ -1,9 +1,11 @@
 import make_places.fundamental as fu
-import mp_utils as mpu
-from make_places.fundamental import base
 import make_places.primitives as pr
 import make_places.blend_in as blgeo
 import make_places.gritty as gritgeo
+
+import mp_utils as mpu
+import mp_vector as cv
+from mp_vector import vector
 
 from copy import deepcopy as dcopy
 import numpy as np
@@ -14,27 +16,26 @@ import pdb
 
 
 
-class tform(base):
+class tform(fu.base):
     def true(self):
         # should return a tform to world space
-        nr = self.rotation[:]
+        np = self.position.copy()
+        nr = self.rotation.copy()
+        ns = self.scales.copy()
         if self.parent:
             tpar = self.parent.true()
-            np = mpu.rotate_z_coord(self.position[:],tpar.rotation[2])
-            mpu.translate_vector(np,tpar.position)
-            mpu.translate_vector(nr,tpar.rotation)
-            ns = mpu.scale_vector(self.scales[:],tpar.scales)
-        else:
-            np = self.position[:]
-            ns = self.scales[:]
+            np.rotate_z(tpar.rotation.z)
+            np.translate(tpar.position)
+            nr.translate(tpar.rotation)
+            ns.scale(tpar.scales)
         new = tform(self.owner,position = np,rotation = nr,scales = ns)
         return new
 
     def __init__(self, *args, **kwargs):
         self.owner = args[0]
-        self._default_('position',[0,0,0],**kwargs)
-        self._default_('rotation',[0,0,0],**kwargs)
-        self._default_('scales',[1,1,1],**kwargs)
+        self._default_('position',vector(0,0,0),**kwargs)
+        self._default_('rotation',vector(0,0,0),**kwargs)
+        self._default_('scales',vector(1,1,1),**kwargs)
         self._default_('parent',None,**kwargs)
         self._default_('children',[],**kwargs)
         #for ch in self.children: ch.parent = self
@@ -49,7 +50,7 @@ class tform(base):
 class uv_tform(tform):
     pass
 
-class sgraph(base):
+class sgraph(fu.base):
     def __init__(self, *args, **kwargs):
         self._default_('nodes',[],**kwargs)
 
@@ -75,7 +76,7 @@ class sgraph(base):
             nd.make_g(center = center)
 
 _node_count_ = 0
-class node(base):
+class node(fu.base):
     def __str__(self,bump = -1):
         bump += 1
         tf = self.tform
@@ -90,18 +91,20 @@ class node(base):
         return strr
 
     def translate(self, v):
-        mpu.translate_vector(self.tform.position, v)
+        self.tform.position.translate(v)
 
     def rotate(self, v):
-        mpu.translate_vector(self.tform.rotation, v)
+        print 'is node.rotate being used??'
+        self.tform.rotation.translate(v)
 
     def def_tform(self,*args,**kwargs):
         def _def(ke,de):
             if ke in kwargs.keys(): return kwargs[ke]
             else: return de
-        pos = _def('position',[0,0,0])
-        rot = _def('rotation',[0,0,0])
-        scl = _def('scales',[1,1,1])
+        # should only instantiate these vectors if needed
+        pos = _def('position',vector(0,0,0))
+        rot = _def('rotation',vector(0,0,0))
+        scl = _def('scales',vector(1,1,1))
         if 'parent' in kwargs.keys():
             tpar = kwargs['parent'].tform
         else: tpar = None
@@ -115,9 +118,9 @@ class node(base):
         def _def(ke,de):
             if ke in kwargs.keys(): return kwargs[ke]
             else: return de
-        pos = _def('uv_position',[0,0,0])
-        rot = _def('uv_rotation',[0,0,0])
-        scl = _def('uv_scales',[1,1,1])
+        pos = _def('uv_position',vector(0,0,0))
+        rot = _def('uv_rotation',vector(0,0,0))
+        scl = _def('uv_scales',vector(1,1,1))
         if 'uv_parent' in kwargs.keys():
             tpar = kwargs['uv_parent'].uv_tform
         else: tpar = None
@@ -148,8 +151,7 @@ class node(base):
         tpm = prim
         tpm.scale(ttf.scales)
         tpm.worldly_uvs(uv_ttf)
-        tpm.scale(ttf.scales)
-        tpm.rotate_z(ttf.rotation[2])
+        tpm.rotate_z(ttf.rotation.z)
         tpm.translate(ttf.position)
         kwargs['name'] = self.name
         kwargs['rdist'] = self.grit_renderingdistance
@@ -199,42 +201,13 @@ class node(base):
             final_lod_prim = pr.sum_primitives(self.lod_primitives)
             self.lod_primitives = [final_lod_prim]
 
-    '''#
-    def consume_children(self):
-        final = self.consume()
-        print 'consumed!', len(self.primitives), self.name
-        newpms = []
-        newlodpms = []
-        for ch in self.tform.children:
-            old_rent = self.tform.parent
-            #old_pos = self.tform.position
-            self.tform.parent = None
-            #self.tform.position = [0,0,0]
-            newpms.extend(ch.owner.worldly_children())
-            newlodpms.extend(ch.owner.lod_worldly_children())
-            #newpms.extend(self.worldly_children())
-            #newlodpms.extend(self.lod_worldly_children())
-            self.tform.parent = old_rent
-            #self.tform.position = old_pos
-        self.primitives.extend(newpms)
-        #self.primitives = self.worldly_children()
-        if self.primitives:
-            final_prim = pr.sum_primitives(self.primitives)
-            self.primitives = [final_prim]
-        self.lod_primitives.extend(newlodpms)
-        if self.lod_primitives:
-            lod_final_prim = pr.sum_primitives(self.lod_primitives)
-            self.lod_primitives = [lod_final_prim]
-            if self.primitives: self.primitives[0].has_lod = True
-        print 'consumed!', len(self.primitives), self.name
-    '''#
-
     def terrain_points(self):
         return []
 
     def assign_material(self, mat, propagate = True):
         if propagate:
-            for ch in self.tform.children: ch.owner.assign_material(mat)
+            for ch in self.tform.children:
+                ch.owner.assign_material(mat)
         for p in self.primitives: p.assign_material(mat)
         for p in self.lod_primitives: p.assign_material(mat)
 
@@ -245,7 +218,9 @@ class node(base):
         return nam
 
     def __init__(self, *args, **kwargs):
-        self._default_('name',self.get_name(),**kwargs)
+        if kwargs.has_key('name'): defname = self.get_name()
+        else: defname = None
+        self._default_('name',defname,**kwargs)
         self._default_('grit_renderingdistance',250,**kwargs)
         self._default_('grit_lod_renderingdistance',2500,**kwargs)
         self._default_('consumes_children',False,**kwargs)
@@ -268,7 +243,6 @@ class node(base):
             apcnt = pcnt
         else: apcnt = pcnt
 
-        #for pm,lpm in zip(self.primitives,self.lod_primitives):
         for pmdx in range(apcnt):
             pm = self.primitives[pmdx]
             lpm = self.lod_primitives[pmdx]
@@ -286,9 +260,14 @@ class node(base):
 
     def make_g(self, *args, **kwargs):
         if self.consumes_children: self.consume()
-        #if self.consumes_children: self.consume_children()
         else: [ch.owner.make_g(*args, **kwargs) for ch in self.tform.children]
         self.make_primitives_in_scene(gritgeo)
+
+
+
+
+
+
 
 
 

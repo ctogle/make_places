@@ -1,6 +1,7 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
 import mp_bboxes as mpbb
+import mp_vector as cv
 import make_places.primitives as pr
 #from make_places.fundamental import element
 from make_places.scenegraph import node
@@ -26,15 +27,23 @@ cardinal_directions = [
     'south', 'southwest', 
     'west', 'northwest']
 cardinal_norms = [
-    [0,1,0],mpu.normalize([1,1,0]),
-    [1,0,0],mpu.normalize([1,-1,0]), 
-    [0,-1,0],mpu.normalize([-1,-1,0]), 
-    [-1,0,0],mpu.normalize([-1,1,0])]
+    cv.yhat.copy(),cv.vector(1,1,0).normalize(),
+    cv.xhat.copy(),cv.vector(1,-1,0).normalize(),
+    cv.yhat.copy().flip(),cv.vector(-1,-1,0).normalize(),
+    cv.xhat.copy().flip(),cv.vector(-1,1,0).normalize()]
+#    [1,0,0],mpu.normalize([1,-1,0]), 
+#    [0,-1,0],mpu.normalize([-1,-1,0]), 
+#    [-1,0,0],mpu.normalize([-1,1,0])]
+#cardinal_norms = [
+#    [0,1,0],mpu.normalize([1,1,0]),
+#    [1,0,0],mpu.normalize([1,-1,0]), 
+#    [0,-1,0],mpu.normalize([-1,-1,0]), 
+#    [-1,0,0],mpu.normalize([-1,1,0])]
 
 class vehicle_primitive(arbitrary_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml') 
     #vehicledata = pr.primitive_data_from_xml(vehiclexml)
-    offset = [0,0,0]
+    offset = cv.zero()
 
     def __init__(self, *args, **kwargs):
         pvehdata = pr.primitive_data_from_xml(self.vehiclexml)
@@ -51,7 +60,7 @@ class truck_primitive(vehicle_primitive):
 class taxi_primitive(vehicle_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'Body.mesh.xml')
     #vehicledata = pr.primitive_data_from_xml(vehiclexml)
-    offset = [0,0,0.5]
+    offset = cv.vector(0,0,0.5)
 
 class car_batch(node):
 
@@ -69,7 +78,7 @@ class car_batch(node):
         cars = []
         for cgs in cargs:
             new = rm.choice(self.possible_vehicles)()
-            new.rotate_z(cgs['rotation'][2])
+            new.rotate_z(cgs['rotation'].z)
             new.translate(cgs['position'])
             cars.append(new)
         return cars
@@ -89,14 +98,14 @@ class intersection(node):
         node.__init__(self, *args, **kwargs)
 
     def find_corners(self):
-        v1 = [ clip_length, clip_length*tan(fu.to_rad(22.5)),0]
-        v2 = [ clip_length,-clip_length*tan(fu.to_rad(22.5)),0]
-        v3 = [-clip_length, clip_length*tan(fu.to_rad(22.5)),0]
-        v4 = [-clip_length,-clip_length*tan(fu.to_rad(22.5)),0]
-        v5 = [ clip_length*tan(fu.to_rad(22.5)), clip_length,0]
-        v6 = [-clip_length*tan(fu.to_rad(22.5)), clip_length,0]
-        v7 = [ clip_length*tan(fu.to_rad(22.5)),-clip_length,0]
-        v8 = [-clip_length*tan(fu.to_rad(22.5)),-clip_length,0]
+        v1 = cv.vector( clip_length, clip_length*tan(fu.to_rad(22.5)),0)
+        v2 = cv.vector( clip_length,-clip_length*tan(fu.to_rad(22.5)),0)
+        v3 = cv.vector(-clip_length, clip_length*tan(fu.to_rad(22.5)),0)
+        v4 = cv.vector(-clip_length,-clip_length*tan(fu.to_rad(22.5)),0)
+        v5 = cv.vector( clip_length*tan(fu.to_rad(22.5)), clip_length,0)
+        v6 = cv.vector(-clip_length*tan(fu.to_rad(22.5)), clip_length,0)
+        v7 = cv.vector( clip_length*tan(fu.to_rad(22.5)),-clip_length,0)
+        v8 = cv.vector(-clip_length*tan(fu.to_rad(22.5)),-clip_length,0)
         corners = [v1, v2, v3, v4, v5, v6, v7, v8]
         return corners
 
@@ -105,13 +114,12 @@ class intersection(node):
         #rh2 = self.road_height/2.0
         rh2 = 0.4
         corners = self.find_corners()
-        center = mpu.center_of_mass(corners)
-        mpu.translate_vector(center,[0,0,-0.5])
+        center = cv.center_of_mass(corners).translate_z(-0.5)
+        #mpu.translate_vector(center,[0,0,-0.5])
         corners = mpu.dice_edges(corners, dices = 1)
         corners.append(center)
         position = self.tform.true().position
-        x,y,z = position
-        mpu.translate_coords(corners,[x,y,z-rh2])
+        cv.translate_coords(corners,position.copy().translate_z(-rh2))
         return corners
 
     def place_vehicles(self, cnt = 2):
@@ -119,16 +127,16 @@ class intersection(node):
         rotz2 = rm.randrange(12) * fu.to_rad(30.0)
         rotz3 = rm.randrange(12) * fu.to_rad(30.0)
         trargs1 = {
-            'position':[0,0,0], 
-            'rotation':[0,0,rotz1], 
+            'position':cv.zero(), 
+            'rotation':cv.vector(0,0,rotz1), 
                 }
         trargs2 = {
-            'position':[10,10,0], 
-            'rotation':[0,0,rotz2], 
+            'position':cv.vector(10,10,0), 
+            'rotation':cv.vector(0,0,rotz2), 
                 }
         trargs3 = {
-            'position':[-10,-10,0], 
-            'rotation':[0,0,rotz3], 
+            'position':cv.vector(-10,-10,0), 
+            'rotation':cv.vector(0,0,rotz3), 
                 }
         trk_batch = car_batch(parent = self, 
             cargs = [trargs1,trargs2,trargs3])
@@ -142,9 +150,9 @@ class intersection(node):
         clipln = clip_length
         octscl = clipln / cos(fu.to_rad(octang))
         uo = uoctagon()
-        uo.scale([octscl,octscl,rh])
+        uo.scale(cv.vector(octscl,octscl,rh))
         rh = 0.25
-        uo.translate([0,0,-rh-2.0])
+        uo.translate_z(-rh-2.0)
         #uo.translate_face([0,0,-rh],'top')
         segs.append(uo)
         return segs
@@ -154,8 +162,7 @@ class intersection(node):
         #corners = [[0,0,0],[50,0,0],[50,50,0],[0,50,0]]
         #fu.rotate_z_coords(corners,theta)
         position = self.tform.true().position
-        x,y,z = position
-        mpu.translate_coords(corners,[x,y,z])
+        cv.translate_coords(corners,position)
         bboxes = [mpbb.bbox(corners = corners)]
         #bboxes = [fu.bbox(corners = corners)]
         return bboxes
@@ -171,12 +178,12 @@ class road_segment_primitive(arbitrary_primitive):
         self._scale_uvs_ = False
 
     def find_faces(self):
-        fronts = [v for v in self.coords if v[1] < 0.0]
-        backs = [v for v in self.coords if v[1] > 0.0]
-        lefts = [v for v in self.coords if v[0] < 0.0]
-        rights = [v for v in self.coords if v[0] > 0.0]
-        bottoms = [v for v in self.coords if v[2] <= 0.0]
-        tops = [v for v in self.coords if v[2] > 0.0]
+        fronts = [v for v in self.coords if v.y < 0.0]
+        backs = [v for v in self.coords if v.y > 0.0]
+        lefts = [v for v in self.coords if v.x < 0.0]
+        rights = [v for v in self.coords if v.x > 0.0]
+        bottoms = [v for v in self.coords if v.z <= 0.0]
+        tops = [v for v in self.coords if v.z > 0.0]
         facedict = {
             'front':fronts, 
             'back':backs, 
@@ -190,17 +197,17 @@ class road_segment_primitive(arbitrary_primitive):
     def translate_face(self, vect, face = 'top'):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
-        mpu.translate_coords(face_coords, vect)
+        cv.translate_coords(face_coords, vect)
         self.calculate_normals()
         self.modified = True
 
     def rotate_z_face(self, ang_z, face = 'top'):
         cfaces = self.coords_by_face
         face_coords = cfaces[face]
-        foff = mpu.center_of_mass(face_coords)
-        mpu.translate_coords(face_coords, mpu.flip(foff))
-        mpu.rotate_z_coords(face_coords, ang_z)
-        mpu.translate_coords(face_coords, foff)
+        foff = cv.center_of_mass(face_coords)
+        cv.translate_coords(face_coords, cv.flip(foff))
+        cv.rotate_z_coords(face_coords, ang_z)
+        cv.translate_coords(face_coords, foff)
         self.calculate_normals()
         self.modified = True
 
@@ -211,7 +218,7 @@ class road(node):
     road_prim_type = road_segment_primitive
 
     def __init__(self, *args, **kwargs):
-        kwargs['uv_scales'] = [1,1,1]
+        kwargs['uv_scales'] = cv.one()
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',1000,**kwargs)
@@ -228,7 +235,7 @@ class road(node):
         node.__init__(self, *args, **kwargs)
 
     def pick_seg_count(self, vs):
-        ds = mpu.distance(vs[0],vs[-1])
+        ds = cv.distance(vs[0],vs[-1])
         seglen = 15
         return int(ds/seglen)
 
@@ -239,10 +246,11 @@ class road(node):
     def terrain_points(self):
         tpts = []
         for corns in self.corners:
-            tcorns = mpu.translate_coords(corns[:],[0,0,-0.25])
+            tcorns = corns[:]
+            cv.translate_coords_z(corns[:],-0.25)
             tcorns = mpu.dice_edges(tcorns, dices = 1)
             mcorns = [tcorns[3],tcorns[7]]
-            mpu.translate_coords(mcorns,[0,0,-0.25])
+            cv.translate_coords_z(mcorns,-0.25)
             tpts.extend([tc for tc in tcorns if not tc in tpts])
         return tpts
         
@@ -258,16 +266,19 @@ class road(node):
     def make_corners(self, p1, p2):
         widt = self.road_width
         
-        p1_p2 = mpu.v1_v2(p1,p2)
-        leng = mpu.magnitude(p1_p2)
-        p1_p2 = mpu.normalize(p1_p2)
+        p1_p2 = cv.v1_v2(p1,p2)
+        leng = cv.magnitude(p1_p2)
+        p1_p2.normalize()
         
-        ang_z = fu.angle_from_xaxis(p1_p2)
-        corns = [[0,-widt/2.0,0],[leng,-widt/2.0,0],
-                [leng,widt/2.0,0],[0,widt/2.0,0]]
-        mpu.rotate_z_coords(corns,ang_z)
-        mpu.translate_coords(corns,p1)
-        mpu.translate_coords(corns[1:3],[0,0,p2[2]-p1[2]])
+        ang_z = cv.angle_from_xaxis_xy(p1_p2)
+        corns = [
+            cv.vector(0,-widt/2.0,0),
+            cv.vector(leng,-widt/2.0,0),
+            cv.vector(leng,widt/2.0,0),
+            cv.vector(0,widt/2.0,0)]
+        cv.rotate_z_coords(corns,ang_z)
+        cv.translate_coords(corns,p1)
+        cv.translate_coords_z(corns[1:3],p2.z-p1.z)
         return corns
 
     def get_bbox(self):
@@ -302,8 +313,8 @@ class road(node):
             enp = kwargs['end']
         dirs = kwargs['directions']
         norms = self.get_cardinal_normals(dirs)
-        self.stnorm = norms[0]
-        self.ednorm = mpu.flip(norms[1])
+        self.stnorm = norms[0].copy()
+        self.ednorm = norms[1].copy().flip()
 
         segdice = True
         verts = [stp,enp]
@@ -314,14 +325,18 @@ class road(node):
         self.segment_count = scnt
         def bend(vs):
             tips = vs[:2] + vs[-2:]
-            cox,coy,coz = [list(i) for i in zip(*tips)]
+            #cox,coy,coz = [list(i) for i in zip(*tips)]
+            cox = [t.x for t in tips]
+            coy = [t.y for t in tips]
+            coz = [t.z for t in tips]
+            #cox,coy,coz = [list(i) for i in zip(*tips)]
             tim = [0.0,1.0,2.0,3.0]
             alpha = 1.0/2.0
             mpu.parameterize_time(tips,tim,alpha)
             cox = mpu.catmull_rom(cox,tim,scnt)
             coy = mpu.catmull_rom(coy,tim,scnt)
             coz = mpu.catmull_rom(coz,tim,scnt)
-            new = [list(i) for i in zip(cox,coy,coz)]
+            new = [cv.vector(*i) for i in zip(cox,coy,coz)]
             return new
 
         if segdice: verts = bend(verts)
@@ -330,23 +345,28 @@ class road(node):
 
     def add_tips(self,verts,n1,n2):
         clip = 25
-        v1 = verts[0][:]
-        v2 = verts[1][:]
+        v1 = verts[0].copy()
+        v2 = verts[1].copy()
         cl1,cl2 = clip,clip
-        mpu.translate_vector(v1,mpu.scale_vector(n1[:],[cl1,cl1,cl1]))
-        mpu.translate_vector(v2,mpu.scale_vector(n2[:],[cl2,cl2,cl2]))
+        v1.translate(n1.copy().scale_u(cl1))
+        v2.translate(n2.copy().scale_u(cl2))
+        #mpu.translate_vector(v1,mpu.scale_vector(n1[:],[cl1,cl1,cl1]))
+        #mpu.translate_vector(v2,mpu.scale_vector(n2[:],[cl2,cl2,cl2]))
         verts.extend([v1, v2])
         verts.append(verts.pop(-3))
         return verts
 
     def clip_tips(self,verts,n1,n2):
         cl = self.clip_length
-        v1 = mpu.translate_vector(verts[0][:],
-            mpu.scale_vector(n1[:],[cl,cl,cl]))
-        v2 = mpu.translate_vector(verts[-1][:],
-            mpu.scale_vector(n2[:],[cl,cl,cl]))
+        v1 = verts[0].copy().translate(n1.copy().scale_u(cl))
+        v2 = verts[-1].copy().translate(n2.copy().scale_u(cl))
+        #v1 = mpu.translate_vector(verts[0][:],
+        #    mpu.scale_vector(n1[:],[cl,cl,cl]))
+        #v2 = mpu.translate_vector(verts[-1][:],
+        #    mpu.scale_vector(n2[:],[cl,cl,cl]))
         verts[0] = v1
-        verts[1] = v2
+        verts[-1] = v2
+        #verts[1] = v2
         return verts
 
     def make_segments(self, *args, **kwargs):
@@ -359,11 +379,12 @@ class road(node):
         angs = []
         for sgdx in range(1,vcnt):            
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            tangs.append(mpu.normalize(mpu.v1_v2(p1,p2)))
+            tangs.append(cv.v1_v2(p1,p2).normalize())
+            #tangs.append(mpu.normalize(mpu.v1_v2(p1,p2)))
         tangs.append(self.ednorm)
         for tgdx in range(1,vcnt+1):
             t1,t2 = tangs[tgdx-1],tangs[tgdx]
-            a12 = fu.angle_between_xy(t1,t2)
+            a12 = cv.angle_between_xy(t1,t2)
             sign = 0.0 if a12 == 0.0 else a12/abs(a12)
             if abs(a12) > np.pi/2:
                 a12 = 0.0
@@ -379,21 +400,22 @@ class road(node):
         return segments
 
     def make_segment(self, p1, p2, widt, depth, a1, a2, leg = False):
-        leng = mpu.distance_xy(p1,p2)
-        p1_p2 = mpu.normalize(mpu.v1_v2(p1,p2))
-        zdiff = p2[2] - p1[2]
-        ang_z = fu.angle_from_xaxis_xy(p1_p2)
+        leng = cv.distance_xy(p1,p2)
+        p1_p2 = cv.v1_v2(p1,p2).normalize()
+        #p1_p2 = mpu.normalize(mpu.v1_v2(p1,p2))
+        zdiff = p2.z - p1.z
+        ang_z = cv.angle_from_xaxis_xy(p1_p2)
         #strip = ucube()
         strip = self.road_prim_type()#road_segment_primitive()
         #strip = road_segment_primitive()
-        strip.scale([leng,widt,depth])
-        strip.scale_uvs([leng/widt,1,1])
-        strip.translate([leng/2.0,0,-depth])
+        strip.scale(cv.vector(leng,widt,depth))
+        strip.scale_uvs(cv.vector(leng/widt,1,1))
+        strip.translate(cv.vector(leng/2.0,0,-depth))
         strip.rotate_z(ang_z)
         theta1 = -1.0*a1/2.0
         theta2 =      a2/2.0
         strip.rotate_z_face(theta1, 'left')
-        strip.translate_face([0,0,zdiff], 'right')
+        strip.translate_face(cv.vector(0,0,zdiff), 'right')
         strip.rotate_z_face(theta2, 'right')
         strip.translate(p1)
         return [strip]
@@ -408,7 +430,7 @@ class road_system(node):
             [90*x for x in range(4)], **kwargs)
         self._default_('growth_tips', 5, **kwargs)
         self._default_('region_bounds',[(0,1000),(0,1000)],**kwargs)
-        self._default_('seeds',[[0,0,0],[1000,1000,0]],**kwargs)
+        self._default_('seeds',[cv.zero(),cv.vector(1000,1000,0)],**kwargs)
         self._default_('intersection_count',20,**kwargs)
         rwidth = 2*clip_length*tan(fu.to_rad(22.5))
         self._default_('road_width', rwidth, **kwargs)
@@ -469,27 +491,37 @@ class road_system(node):
         def good_dir(tip, ang):
             link = rm.choice(range(linkmin,linkmax,50))
             #link = rm.randrange(linkmin,linkmax)
-            tippos = tip['position'][:]
-            angrad = (np.pi/180.0)*ang
+            tippos = tip['position'].copy()
+            #angrad = (np.pi/180.0)*ang
+            angrad = fu.to_rad(ang)
             z_off_min = -25
             z_off_max =  25
             z_offset = rm.randrange(z_off_min, z_off_max)
-            offset = [link*cos(angrad),link*sin(angrad),z_offset]
-            newtip = mpu.translate_vector(tippos, offset)
-            if not mpu.in_region(region_bounds, newtip):
+            offset = cv.vector(link*cos(angrad),link*sin(angrad),z_offset)
+            tippos.translate(offset)
+            #newtip = mpu.translate_vector(tippos, offset)
+            if not mpu.in_region(region_bounds, tippos):
                 return False,None
             for ipos in [i['position'] for i in interargs]:
-                d = mpu.distance(newtip, ipos)
+                d = cv.distance(tippos, ipos)
                 if d < linkmin: return False,None
-            return True,newtip
+            return True,tippos
+            #newtip = mpu.translate_vector(tippos, offset)
+            #if not mpu.in_region(region_bounds, newtip):
+            #    return False,None
+            #for ipos in [i['position'] for i in interargs]:
+            #    d = mpu.distance(newtip, ipos)
+            #    if d < linkmin: return False,None
+            #return True,newtip
 
         def get_angle(tip):
             nodes = [i['position'] for i in interargs]
-            cmass = [np.mean([s[0] for s in nodes]), np.mean([s[1]
-                for s in nodes]), np.mean([s[2] for s in nodes])]
+            cmass = cv.center_of_mass(nodes)
+            #cmass = [np.mean([s[0] for s in nodes]), np.mean([s[1]
+            #    for s in nodes]), np.mean([s[2] for s in nodes])]
             #cmass = [0,0,0]
-            cmass_ang = fu.to_deg(fu.angle_from_xaxis(
-                mpu.v1_v2(tip['position'],cmass)))
+            cmass_ang = fu.to_deg(cv.angle_from_xaxis(
+                cv.v1_v2(tip['position'],cmass)))
             tangs = angs[:]
             angdists = [abs(x-cmass_ang) for x in tangs]
             closestang = tangs[angdists.index(min(angdists))]
@@ -528,7 +560,7 @@ class road_system(node):
             tip = rm.choice(tips[bdx])
             newpos = place_inter(tip)
             if not newpos is None:
-                sealevelvals.append(newpos[2])
+                sealevelvals.append(newpos.z)
                 interargs.append({
                     'position' : newpos, 
                         })
@@ -588,7 +620,7 @@ class road_system(node):
         self.reuse_data['topology'] = topology
         return elements
 
-    def make_primitives_from_blocks(self, *args, **kwargs):
+    def make_primitives_from_blocks_______(self, *args, **kwargs):
         prims = []
         # given a list of blocks, determine a set of roads which bounds them
         # assume them do not overlap, and that a road should bound each
@@ -638,8 +670,9 @@ class highway(road):
     road_prim_type = highway_segment_primitive
 
     def terrain_points(self):
-        tpts = [mpu.translate_vector(l,[0,0,5]) 
-                for l in self.leg_positions]
+        tpts = [l.translate_z(5) for l in self.leg_positions]
+        #tpts = [mpu.translate_vector(l,[0,0,5]) 
+        #        for l in self.leg_positions]
         return tpts
         
     def make_segments(self, *args, **kwargs):
@@ -653,18 +686,19 @@ class highway(road):
         alpha = 1.0/2.0
         tips = sverts[:2] + sverts[-2:]
         #tips = sverts[1:3] + sverts[-3:-1]
-        coz = [t[2] for t in tips]
+        coz = [t.z for t in tips]
         mpu.parameterize_time(tips,tim,alpha)
         coz = mpu.catmull_rom(coz,tim,scnt)
-        for sv,co in zip(sverts[1:-1],coz): sv[2] = min(co,sv[2]+20)
+        for sv,co in zip(sverts[1:-1],coz): sv.z = min(co,sv.z+20)
         rdsegs = road.make_segments(self, *args, **kwargs)
         return rdsegs
 
     def make_leg(self, v):
         leg = pr.ucube()
         leg_leng = 20
-        leg.scale([5,5,leg_leng])
-        leg_pos = [v[0],v[1],v[2]-leg_leng-2.0]
+        leg.scale(cv.vector(5,5,leg_leng))
+        leg_pos = v.copy().translate_z(-leg_leng-2.0)
+        #leg_pos = [v[0],v[1],v[2]-leg_leng-2.0]
         leg.translate(leg_pos)
         self.leg_positions.append(leg_pos)
         return leg
@@ -672,7 +706,7 @@ class highway(road):
     def make_segment(self, p1, p2, widt, depth, a1, a2, leg = False):
         depth = 8 # unacceptable...
         rs = road.make_segment(self,p1,p2,widt,depth,a1,a2)
-        [r.translate([0,0,1.75]) for r in rs]# unacceptable...
+        [r.translate_z(1.75) for r in rs]# unacceptable...
         # use a bbox check to decide to place a leg or not
         if not leg: return rs
         leg = self.make_leg(p1)
@@ -696,20 +730,20 @@ def north_check(topology,topo,seek_fov,linkmax):
     potentials = []
     ndists = []
     tthresh = 50
-    max_slope = 0.5
+    max_slope = 0.25
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
-            if tpos[1] < pnpos[1]:
-                ndist = float(pnpos[1] - tpos[1])
+            if tpos.y < pnpos.y:
+                ndist = float(pnpos.y - tpos.y)
                 
-                zdiff = abs(tpos[2] - pnpos[2])
+                zdiff = abs(tpos.z - pnpos.z)
                 slope = zdiff/abs(ndist)
                 if slope > max_slope: continue
 
                 if ndist < linkmax:
-                    tdist = float(pnpos[0] - tpos[0])
+                    tdist = float(pnpos.x - tpos.x)
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))
                     if pn_fov_theta < seek_fov/2.0:
                         if abs(tdist) <= tthresh:
@@ -730,18 +764,18 @@ def south_check(topology,topo,seek_fov,linkmax):
     potentials = []
     ndists = []
     tthresh = 50
-    max_slope = 0.5
+    max_slope = 0.25
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
-            if tpos[1] > pnpos[1]:
-                ndist = -1*float(pnpos[1] - tpos[1])
-                zdiff = abs(tpos[2] - pnpos[2])
+            if tpos.y > pnpos.y:
+                ndist = -1*float(pnpos.y - tpos.y)
+                zdiff = abs(tpos.z - pnpos.z)
                 slope = zdiff/abs(ndist)
                 if slope > max_slope: continue
                 if ndist < linkmax:
-                    tdist = float(pnpos[0] - tpos[0])
+                    tdist = float(pnpos.x - tpos.x)
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))
                     if pn_fov_theta < seek_fov/2.0:
                         if abs(tdist) <= tthresh:
@@ -761,21 +795,19 @@ def east_check(topology,topo,seek_fov,linkmax):
     tpos = topo['inter']['position']
     potentials = []
     ndists = []
-    normdx = 0
-    trandx = 1
     tthresh = 50
-    max_slope = 0.5
+    max_slope = 0.25
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
-            if tpos[normdx] < pnpos[normdx]:
-                ndist = float(pnpos[normdx] - tpos[normdx])
-                zdiff = abs(tpos[2] - pnpos[2])
+            if tpos.x < pnpos.x:
+                ndist = float(pnpos.x - tpos.x)
+                zdiff = abs(tpos.z - pnpos.z)
                 slope = zdiff/abs(ndist)
                 if slope > max_slope: continue
                 if ndist < linkmax:
-                    tdist = float(pnpos[trandx] - tpos[trandx])
+                    tdist = float(pnpos.y - tpos.y)
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))
                     if pn_fov_theta < seek_fov/2.0:
                         if abs(tdist) <= tthresh:
@@ -798,18 +830,18 @@ def west_check(topology,topo,seek_fov,linkmax):
     normdx = 0
     trandx = 1
     tthresh = 50
-    max_slope = 0.5
+    max_slope = 0.25
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
             pnpos = pntopo['inter']['position']
-            if tpos[normdx] > pnpos[normdx]:
-                ndist = -1*float(pnpos[normdx] - tpos[normdx])
-                zdiff = abs(tpos[2] - pnpos[2])
+            if tpos.x > pnpos.x:
+                ndist = -1*float(pnpos.x - tpos.x)
+                zdiff = abs(tpos.z - pnpos.z)
                 slope = zdiff/abs(ndist)
                 if slope > max_slope: continue
                 if ndist < linkmax:
-                    tdist = float(pnpos[trandx] - tpos[trandx])
+                    tdist = float(pnpos.y - tpos.y)
                     pn_fov_theta = fu.to_deg(np.arctan(abs(tdist)/ndist))
                     if pn_fov_theta < seek_fov/2.0:
                         if abs(tdist) <= tthresh:

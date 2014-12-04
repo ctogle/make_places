@@ -2,6 +2,9 @@
 # cython: profile=False
 #cimport cython
 
+cimport mp_vector as cv
+import mp_vector as cv
+
 from libc.math cimport sqrt
 from libc.math cimport cos
 from libc.math cimport sin
@@ -19,14 +22,30 @@ import random as rm
 
 stuff = 'hi'
 
-cpdef list v1_v2(list v1, list v2):
+def make_corners(pos,l,w,theta):
+    hl = l/2.0
+    hw = w/2.0
+    corners = [
+        cv.vector(-hl,-hw,0), 
+        cv.vector( hl,-hw,0), 
+        cv.vector( hl, hw,0), 
+        cv.vector(-hl, hw,0)]
+    cv.rotate_z_coords(corners,theta)
+    cv.translate_coords(corners,pos)
+    return corners
+
+
+
+
+'''#
+cpdef list v1_v2____(list v1, list v2):
     cdef list v1_v2_ = [v2[0]-v1[0],v2[1]-v1[1],v2[2]-v1[2]]
     return v1_v2_
 
-cpdef float magnitude(list vect):
+cpdef float magnitude_____(list vect):
     return sqrt(dot(vect,vect))
 
-cpdef float distance_xy(list v1,list v2):
+cpdef float distance_xy______(list v1,list v2):
     cdef float dx
     cdef float dy
     cdef float ds
@@ -35,10 +54,10 @@ cpdef float distance_xy(list v1,list v2):
     ds = (dx**2 + dy**2)**(0.5)
     return ds
 
-cpdef float distance(list v1,list v2):
+cpdef float distance_____(list v1,list v2):
     return magnitude(v1_v2(v1,v2))
 
-cdef list com(list coords):
+cdef list com______(list coords):
     cdef int ccnt = len(coords)
     cdef float ccntf = float(ccnt)
     cdef int cdx = 0
@@ -53,17 +72,17 @@ cdef list com(list coords):
         z += coo[2]
     return [x/ccntf,y/ccntf,z/ccntf]
 
-cpdef list center_of_mass(list coords):
+cpdef list center_of_mass________(list coords):
     return com(coords)
 
-cpdef list cross(list v1, list v2):
+cpdef list cross_____(list v1, list v2):
     cdef float cx = v1[1]*v2[2]-v1[2]*v2[1]
     cdef float cy = v1[2]*v2[0]-v1[0]*v2[2]
     cdef float cz = v1[0]*v2[1]-v1[1]*v2[0]
     cdef list res = [cx,cy,cz]
     return res
 
-cpdef float dot(list v1, list v2):
+cpdef float dot_____(list v1, list v2):
     cdef float xp
     cdef float yp
     cdef float zp
@@ -74,64 +93,9 @@ cpdef float dot(list v1, list v2):
     res = xp + yp + zp
     return res
 
-'''#
-cpdef tuple project____(list verts, list axis):
-    cdef float min_ = dot(verts[0],axis)
-    cdef float max_ = min_
-    cdef int vcnt = len(verts)
-    cdef int vdx
-    cdef float val
-    for vdx in range(1,vcnt):
-    #for v in verts[1:]:
-        v = verts[vdx]
-        val = dot(v,axis)
-        if val < min_: min_ = val
-        if val > max_: max_ = val
-    return (min_,max_)
 
-cpdef bint overlap_____(rng1,rng2):
-    if max(rng1) < min(rng2): return 0
-    elif max(rng2) < min(rng1): return 0
-    else: return 1
 
-'''#
-'''#
-cpdef bint separating_axis_____(bb1,bb2):
-    cdef list ns1 = bb1.edgenorms
-    cdef list ns2 = bb2.edgenorms
-    cdef list edgenorms = ns1 + ns2
-    cdef list edgenorm
-    cdef int egcnt = len(edgenorms)
-    cdef int egdx
-    cdef tuple proj1
-    cdef tuple proj2
-    for egdx in range(egcnt):
-        edgenorm = edgenorms[egdx]
-        proj1 = project(bb1.corners,edgenorm)
-        proj2 = project(bb2.corners,edgenorm)
-        if not overlap(proj1,proj2): return 0
-    return 1
 
-cpdef list get_norms_______(list verts):
-    cdef list norms = []
-    #zhat = [0,0,1]
-    cdef int vcnt = len(verts)
-    cdef int vdx
-    cdef list v1
-    cdef list v2
-    cdef float dx
-    cdef float dy
-    cdef float dv
-    cdef list norm
-    for vdx in range(1,vcnt):
-        v1,v2 = verts[vdx-1],verts[vdx]
-        dx = v2[0] - v1[0]
-        dy = v2[1] - v1[1]
-        dv = sqrt(dx**2 + dy**2)
-        norm = [dy/dv,-dx/dv,0]
-        norms.append(norm)
-    return norms
-'''#
 
 cpdef int find_closest_xy(list one,list bunch,int bcnt,float close_enough):
     #cdef int bcnt = len(bunch)
@@ -157,14 +121,16 @@ cpdef list find_in_radius(list pt,list verts,float radius = 10):
         vt = verts[vdx]
         if distance(pt,vt) < radius: in_.append(vt)
     return in_
+'''#
 
 cpdef list parameterize_time(list points,list time,float alpha):
     cdef float total = 0.0
     cdef int idx
     cdef list v1v2
     for idx in range(1,4):
-        v1v2 = v1_v2(points[idx-1],points[idx])
-        total += magnitude(v1v2)**(2.0*alpha)
+        #v1v2 = v1_v2(points[idx-1],points[idx])
+        #total += magnitude(v1v2)**(2.0*alpha)
+        total += cv.v1_v2_c(points[idx-1],points[idx]).magnitude()**(2.0*alpha)
         time[idx] = total
 
 cpdef list catmull_rom(list P,list T,int tcnt):
@@ -212,6 +178,7 @@ cpdef list offset_faces(list faces, int offset):
             fa[tfdx] += offset
     return faces
 
+'''#
 cpdef list translate_coords(list coords, list vect):
     for coo in coords:
         for dx in range(3):
@@ -295,6 +262,7 @@ cpdef list normalize(list vect):
 cpdef list flip(list v1):
     cdef list res = [-1.0*v for v in v1] 
     return res
+'''#
 
 def point_slope(x1,x2,y1,y2):
     if x1 == x2: return None
@@ -308,7 +276,8 @@ def line_y_intersect(pt,m):
     return y - run
 
 def in_range(x, rng):
-    in_ = x > min(rng) and x < max(rng)
+    in_ = x > rng[0] and x < rng[1]
+    #in_ = x > min(rng) and x < max(rng)
     return in_
 
 def segments_intersect(s1,s2):
@@ -341,19 +310,33 @@ def segments_intersect(s1,s2):
 
 def in_region(regi,pt):
     for dx in range(len(regi)):
-        if not in_range(pt[dx],regi[dx]):
+        if   dx == 0: val = pt.x
+        elif dx == 1: val = pt.y
+        elif dx == 2: val = pt.z
+        if not in_range(val,regi[dx]):
+        #if not in_range(pt[dx],regi[dx]):
             return False
     return True
 
-def dice_edges(verts, dices = 3):
+cpdef list dice_edges(list verts, int dices = 3):
     vcnt = len(verts)
     for di in range(dices):
         newpts = []
         for tdx in range(1,vcnt):
-            pair = verts[tdx-1],verts[tdx]
-            mpt = midpoint(*pair)
-            newpts.extend([pair[0],mpt])
-        newpts.extend([newpts[-1],midpoint(newpts[-1],verts[0])])
+            p1 = verts[tdx-1]
+            p2 = verts[tdx]
+            mpt = cv.midpoint_c(p1,p2)
+            #pair = verts[tdx-1],verts[tdx]
+            #mpt = cv.midpoint_c(*pair)
+            #newpts.extend([p1,mpt])
+            newpts.append(p1)
+            newpts.append(mpt)
+        p1 = newpts[-1]
+        p2 = verts[0]
+        mpt = cv.midpoint_c(p1,p2)
+        newpts.append(p1)
+        newpts.append(mpt)
+        #newpts.extend([newpts[-1],cv.midpoint_c(newpts[-1],verts[0])])
         verts = newpts
     return verts
 

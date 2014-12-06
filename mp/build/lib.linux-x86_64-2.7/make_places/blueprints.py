@@ -754,11 +754,8 @@ class floor_plan(blueprint):
         sections = 25
         self.main_space()
         for sect in range(sections):
-            grew = self.grow()
-            if grew is False: print 'growth rejected'
-            elif grew is None:
-                print 'division aborted'
-                break
+            if not self.grow(): print 'growth rejected'
+            #if not self.grow(): break
         print '\n\tgrew', sect, 'of', sections
         #self.join_walls()
 

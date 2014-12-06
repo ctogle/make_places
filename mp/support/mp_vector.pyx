@@ -422,6 +422,10 @@ cdef float distance_c(vector v1, vector v2):
 cpdef float distance(vector v1, vector v2):
     return distance_c(v1, v2)
 
+cpdef bint near(vector v1, vector v2):
+    cdef bint isnear = distance_c(v1,v2) < 0.01
+    return isnear
+
 cdef int find_closest_xy_c(vector one,list bunch,int bcnt,float close_enough):
     cdef float nearest = 100000000.0
     cdef float ds = nearest

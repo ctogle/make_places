@@ -21,16 +21,23 @@ def create_primitive(*args, **kwargs):
     
 world_dir = ui.info['worlddir']
 textdir = '/solemn/textures'
+last_origin = None
 def create_prim(prim, name = None, center = False, 
         world_rotation = None, rdist = 200, 
                 lodrdist = 2000, **kwargs):
+    global last_origin
     if world_rotation is None:
         world_rotation = cv.vector(0,0,0)
-    prim.origin_to_centroid()
-    # rotate coords backwards by world_rotation?
-    w_position = prim.position
+
+    if prim.is_lod:
+        prim.origin = last_origin
+        last_origin = prim.reposition_origin()
+    else:
+        last_origin = prim.reposition_origin()
+
+    w_position = prim.origin
     w_rotation = world_rotation
-    #is_new = create_grit_mesh(prim)
+    # rotate coords backwards by world_rotation?
 
     xml, is_new = prim.write_as_xml()
     if is_new:
@@ -44,11 +51,11 @@ def create_prim(prim, name = None, center = False,
     else: oname = name + gnum
     mname = prim.gfxmesh_name
     cname = prim.colmesh_name
-    if prim.is_lod: rdist = lodrdist
-    else: add_to_map(oname,
-        w_position.to_tuple(),
-        w_rotation.to_tuple(),
-        oname)
+    if prim.is_lod:
+        rdist = lodrdist
+    else:
+        add_to_map(oname,w_position.to_tuple(),
+            w_rotation.to_tuple(),oname)
     add_to_classes(oname, mname, cname, rdist, 
         has_lod = prim.has_lod, is_lod = prim.is_lod)
     add_to_materials(prim.materials)

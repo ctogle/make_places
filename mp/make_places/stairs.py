@@ -121,6 +121,17 @@ class shaft(node):
     def ramps(self, *args, **kwargs):
         comps = []
 
+        spos = cv.zero()
+        flcnt = self.floors
+        for fdx in range(flcnt):
+            flh = self.floor_heights[fdx]
+            clh = self.ceiling_heights[fdx]
+            wh = self.wall_heights[fdx]
+            shoff = flh + clh + wh
+            rparg = (spos.copy(),flh,clh,wh,0,0)
+            comps.extend(self.build_floor(*rparg))
+            spos.z += shoff
+
         spos = cv.zero()   
         flcnt = self.floors
         for fdx in range(flcnt):

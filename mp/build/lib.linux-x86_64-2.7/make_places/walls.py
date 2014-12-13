@@ -60,6 +60,9 @@ class wall(node):
             wall_.remove_face('top','bottom')
         length = cv.distance_xy(v1,v2)
         wall_.scale(cv.vector(length, self.wall_width, self.wall_height))
+
+        #wall_.scale_uvs(cv.one().scale_u(0.01))
+
         wall_.translate_x(length/2.0)
         wall_.rotate_z(self.angle)
         wall_.translate(pos)

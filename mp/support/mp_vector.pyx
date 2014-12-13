@@ -118,10 +118,14 @@ cdef class vector:
     #def __eq__(self, other):
     def __richcmp__(self, other, comparator):
     #def __cmp__(self, other):
-        xeq = self.x == other.x
-        yeq = self.y == other.y
-        zeq = self.z == other.z
-        return xeq and yeq and zeq
+        if self.x == other.x:
+            if self.y == other.y:
+                if self.z == other.z: return True
+        return False
+        #xeq = self.x == other.x
+        #yeq = self.y == other.y
+        #zeq = self.z == other.z
+        #return xeq and yeq and zeq
 
     #def __ne__(self, other):
     #    xeq = self.x != other.x

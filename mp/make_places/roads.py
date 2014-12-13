@@ -31,23 +31,13 @@ cardinal_norms = [
     cv.xhat.copy(),cv.vector(1,-1,0).normalize(),
     cv.yhat.copy().flip(),cv.vector(-1,-1,0).normalize(),
     cv.xhat.copy().flip(),cv.vector(-1,1,0).normalize()]
-#    [1,0,0],mpu.normalize([1,-1,0]), 
-#    [0,-1,0],mpu.normalize([-1,-1,0]), 
-#    [-1,0,0],mpu.normalize([-1,1,0])]
-#cardinal_norms = [
-#    [0,1,0],mpu.normalize([1,1,0]),
-#    [1,0,0],mpu.normalize([1,-1,0]), 
-#    [0,-1,0],mpu.normalize([-1,-1,0]), 
-#    [-1,0,0],mpu.normalize([-1,1,0])]
 
 class vehicle_primitive(arbitrary_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml') 
-    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
     offset = cv.zero()
 
     def __init__(self, *args, **kwargs):
         pvehdata = pr.primitive_data_from_xml(self.vehiclexml)
-        #pvehdata = self.vehicledata
         arbitrary_primitive.__init__(self, *args, **pvehdata)
         self._default_('tag','_vehicle_',**kwargs)
         self._scale_uvs_ = False
@@ -55,11 +45,9 @@ class vehicle_primitive(arbitrary_primitive):
 
 class truck_primitive(vehicle_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml')
-    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
 
 class taxi_primitive(vehicle_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'Body.mesh.xml')
-    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
     offset = cv.vector(0,0,0.5)
 
 class car_batch(node):

@@ -34,9 +34,11 @@ def make_corners(pos,l,w,theta):
     cv.translate_coords(corners,pos)
     return corners
 
-
-
-
+def subset(superset, sub):
+    for su in sub:
+        if not su in superset:
+             return False
+    return True
 
 cpdef list parameterize_time(list points,list time,float alpha):
     cdef float total = 0.0

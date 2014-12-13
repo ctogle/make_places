@@ -67,7 +67,10 @@ cdef bint separating_axis(bb1,bb2):
     return 0
     #return 1
 
-cdef list get_norms(list verts):
+cdef float distance_to_edge_c(pt,e1,e2):
+    print 'not implemented'
+
+cdef list get_norms_c(list verts):
     cdef list norms = []
     cdef int vcnt = len(verts)
     cdef int vdx
@@ -77,14 +80,20 @@ cdef list get_norms(list verts):
     cdef float dy
     cdef float dv
     cdef cv.vector norm
-    for vdx in range(1,vcnt):
+    # IS THIS MISSING THE LAST NORM!!!?
+    #for vdx in range(1,vcnt):
+    for vdx in range(vcnt):
         v1,v2 = verts[vdx-1],verts[vdx]
         dx = v2.x - v1.x
         dy = v2.y - v1.y
         dv = sqrt(dx**2 + dy**2)
         norm = cv.vector(dy/dv,-dx/dv,0)
         norms.append(norm)
+    norms.append(norms.pop(0))
     return norms
+
+cpdef list get_norms(list verts):
+    return get_norms_c(verts)
 
 cpdef bint intersects(list boxes1, list boxes2):
     cdef int bcnt1 = len(boxes1)
@@ -104,7 +113,7 @@ cpdef bint intersects(list boxes1, list boxes2):
             br2 = box2.radius
 
             bbdist = cv.distance_xy_c(box1.center,box2.center)
-            if bbdist < br1 + br2:
+            if bbdist <= br1 + br2:
                 if not separating_axis(box2,box1):
                     return 1
     return 0
@@ -121,7 +130,7 @@ cdef class bbox:
         # corners are world space coordinates
         self.corners = kwargs['corners']
         #self.corners = [cv.vector(*c) for c in kwargs['corners']]
-        self.edgenorms = get_norms(self.corners)
+        self.edgenorms = get_norms_c(self.corners)
         self.edgecount = len(self.edgenorms)
         self.center = cv.com(self.corners)
         cvs = [cv.v1_v2_c(self.center,v) for v in self.corners]

@@ -258,11 +258,15 @@ def buildfew():
     ang = np.pi/6
     bargs = [{
         'position':cv.vector(10,50,10), 
+        'length':40, 
+        'width':40, 
             }, {
+        'length':40, 
+        'width':40, 
         'position':cv.vector(-10,-10,0), 
         'rotation':cv.vector(0,0,ang), 
             }]
-    built = [blg.building(**ba) for ba in bargs]
+    built = [blg.newbuilding(**ba) for ba in bargs]
     gritgeo.create_element(built)
     gritgeo.output_world_scripts()
 
@@ -283,17 +287,17 @@ def block():
             }
     rsys = roads.road_system(**rsargs)
     rd = rsys.roads[1]
+    bboxes = rd.get_bbox()
     b1 = {
         'name':'block1',
         'road':rd, 
-        'bboxes':rd.get_bbox(),
+        'bboxes':bboxes,
         'side':'right',
         'theme':'suburbs', 
-        #'reuse':True,
             }
     b2 = {
         'road':rd, 
-        'bboxes':rd.get_bbox(),
+        'bboxes':bboxes,
         'side':'left',
             }
     bl1 = cities.block(**b1)
@@ -302,19 +306,14 @@ def block():
         rsys.terrain_points() +\
         bl1.terrain_points() +\
         bl2.terrain_points()
-    #corners = [[0,0,0],[200,0,0],[200,200,0],[0,200,0]]
-    #bboxes = [mpbb.bbox(corners = corners)]
-    bboxes = rsys.get_bbox() + bl1.get_bbox() + bl2.get_bbox()
-    ter = terr.terrain(
+    ter = terr.terrain(smooths = 100, 
         pts_of_interest = pts_of_int, 
-        splits = 7, bboxes = bboxes)
-    #gritgeo.create_element(rsys,bl1)
+        splits = 5, bboxes = bboxes)
     
     ocean = mpw.waters(position = cv.vector(500,500,0),
-        depth = 10,sealevel = -30.0,length = 1000,width = 1000)
+        depth = 50,sealevel = -30.0,length = 2000,width = 2000)
 
-    gritgeo.create_element(ocean)
-    gritgeo.create_element(rsys,bl1,bl2,ter)
+    gritgeo.create_element(rsys,bl1,bl2,ter,ocean)
 
     gritgeo.output_world_scripts()
 
@@ -342,7 +341,7 @@ def add_prims():
 
 def terrain():
     gritgeo.reset_world_scripts()
-    ter = terr.terrain(splits = 4)
+    ter = terr.terrain(splits = 8)
     gritgeo.create_element(ter)
     gritgeo.output_world_scripts()
 
@@ -351,7 +350,10 @@ def profile_terrain():
 
 def blgplan():
     gritgeo.reset_world_scripts()
-    gritgeo.create_element(bp.building_plan().build())
+    newblg = blg.newbuilding()
+    #    position = cv.vector(10,10,-10), 
+    #    rotation = cv.vector(0,0,fu.PI/3.0))
+    gritgeo.create_element(newblg)
     gritgeo.output_world_scripts()
 
 def bplan():
@@ -382,7 +384,33 @@ def bplans():
 
     gritgeo.output_world_scripts()
 
+def testlod():
+    gritgeo.reset_world_scripts()
+    
+    p = cv.zero()
+    l = 10
+    w = 20
 
+    pieces = []
+    fargs = {
+        'position':p.copy(), 
+        'length':l,
+        'width':w, 
+            }
+    pieces.append(floors.floor(**fargs))
+
+    piece = pr.ucube(is_lod = True)
+    piecenode = sg.node(
+        position = p.copy().translate_z(-1.0), 
+        scales = cv.vector(l,w,10), 
+        lod_primitives = [piece])
+    pieces.append(piecenode)
+
+    no = sg.node(name = 'somenodename',
+        children = pieces,consumes_children = True)
+
+    gritgeo.create_element(no)
+    gritgeo.output_world_scripts()
 
 
 

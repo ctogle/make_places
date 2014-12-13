@@ -1,5 +1,6 @@
 from make_places.scenegraph import node
 import make_places.fundamental as fu
+import make_places.blueprints as bp
 import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
@@ -14,6 +15,10 @@ import random as rm
 import os
 
 import pdb
+
+
+
+
 
 _story_count_ = 0
 class story(node):
@@ -294,6 +299,66 @@ class story_batch(node):
         self._default_('grit_renderingdistance',250,**kwargs)
         self._default_('grit_lod_renderingdistance',1000,**kwargs)
         node.__init__(self, *args, **kwargs)
+
+_newbuilding_count_ = 0
+class newbuilding(node):
+
+    def get_name(self):
+        global _newbuilding_count_
+        nam = 'building ' + str(_newbuilding_count_)
+        _newbuilding_count_ += 1
+        return nam
+
+    def __init__(self, *args, **kwargs):
+        if kwargs.has_key('length') and kwargs['length'] < 40:
+            kwargs['length'] = 40
+        if kwargs.has_key('width') and kwargs['width'] < 40:
+            kwargs['width'] = 40
+        self._default_('length',40,**kwargs)
+        self._default_('width',40,**kwargs)
+        self._default_('tform',
+            self.def_tform(*args,**kwargs),**kwargs)
+        kwargs['uv_scales'] = cv.vector(10,10,10)
+        self._default_('uv_tform',
+            self.def_uv_tform(*args,**kwargs),**kwargs)
+        self.building_plan = bp.building_plan(**kwargs)
+        children = self.building_plan.build()
+
+        for ch in children:
+            ch.uv_tform.parent = self.uv_tform
+
+        self.add_child(*children)
+        node.__init__(self, *args, **kwargs)
+        self.assign_material('concrete')
+
+    def get_bbox(self, *args, **kwargs):
+        cornas = self.find_corners()
+        bb = mpbb.bbox(corners = cornas)
+        return [bb]
+
+    def terrain_points(self):
+        tpts = self.find_corners()
+        cv.translate_coords(tpts,cv.vector(0,0,-0.5))
+        center = cv.center_of_mass(tpts)
+        center.translate(cv.zero().translate_z(-0.5))
+        tpts = mpu.dice_edges(tpts, dices = 1)
+        tpts.append(center)
+        return tpts
+
+    def find_corners(self):
+        length = self.length + 2.0
+        width = self.width + 2.0
+        ttf = self.tform
+        #ttf = self.tform.true()
+        pos = ttf.position
+        zang = ttf.rotation.z
+        corners = mpu.make_corners(pos,length,width,zang)
+        return corners
+
+
+
+
+
 
 _building_count_ = 0
 class building(node):

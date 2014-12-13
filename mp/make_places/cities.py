@@ -1,16 +1,18 @@
 import make_places.fundamental as fu
-import mp_utils as mpu
-import mp_bboxes as mpbb
-import mp_vector as cv
 import make_places.primitives as pr
 import make_places.scenegraph as sg
 import make_places.waters as mpw
 from make_places.scenegraph import node
 from make_places.roads import road_system
 from make_places.roads import highway
-from make_places.buildings import building
+#from make_places.buildings import building
+from make_places.buildings import newbuilding as building
 from make_places.terrain import terrain
 import make_places.pkler as pk
+
+import mp_vector as cv
+import mp_utils as mpu
+import mp_bboxes as mpbb
 
 from math import sqrt
 import numpy as np
@@ -20,70 +22,61 @@ import os
 class block(node):
 
     bl_themes = {
-        'suburbs' : (30,3,30,30), 
-        'residential' : (20,10,70,70), 
-        #'park' : (3,1,10,10), 
-        'commercial' : (20,20,100,100), 
-        'industrial' : (30,6,60,60), 
+        'suburbs' : {
+            'max_buildings' : 30,
+            'max_floors' : 3, 
+            'min_length' : 30, 
+            'min_width' : 30, 
+            'max_length' : 60, 
+            'max_width' : 100, 
+                }, 
+        'residential' : {
+            'max_buildings' : 20,
+            'max_floors' : 10, 
+            'min_length' : 30, 
+            'min_width' : 30, 
+            'max_length' : 100, 
+            'max_width' : 100, 
+                }, 
+        'commercial' : {
+            'max_buildings' : 10,
+            'max_floors' : 30, 
+            'min_length' : 40, 
+            'min_width' : 40, 
+            'max_length' : 100, 
+            'max_width' : 100, 
+                }, 
+        'industrial' : {
+            'max_buildings' : 30,
+            'max_floors' : 6, 
+            'min_length' : 40, 
+            'min_width' : 40, 
+            'max_length' : 80, 
+            'max_width' : 80, 
+                }, 
             }
     themes = [ke for ke in bl_themes.keys()]
 
     def __init__(self, *args, **kwargs):
         self._default_('name',None,**kwargs)
-        self._default_('tform',
-            self.def_tform(*args,**kwargs),**kwargs)
-        bth = rm.choice(self.themes)
+        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('reuse',False,**kwargs)
+
+        bth = rm.choice(self.themes)
+        self.theme_data = self.bl_themes[bth]
+
         self._default_('theme',bth,**kwargs)
-        blbc,blfc,blbl,blbw = self.bl_themes[self.theme]
-        self._default_('max_floor_count',blfc,**kwargs)
-        self._default_('max_building_length',blbl,**kwargs)
-        self._default_('max_building_width',blbw,**kwargs)
-        self._default_('building_count',blbc,**kwargs)
-        children = self.reusing(*args, **kwargs)
-        if not children: children =\
-            self.children_from_kwargs(*args, **kwargs)
+
+        children = self.make_children(*args, **kwargs)
         self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
-    def children_from_kwargs(self, *args, **kwargs):
-        if 'road' in kwargs.keys():
-            rd = kwargs['road']
-            if not issubclass(rd.__class__,highway):
-                children = self.make_buildings_from_road(*args, **kwargs)
-            else: children = []
-        else:
-            pos = kwargs['position']
-            length = kwargs['length']
-            width = kwargs['width']
-            self.corners = self.find_corners(pos, length, width)
-            children = self.make_buildings(*args, **kwargs)
+    def make_children(self, *args, **kwargs):
+        rd = kwargs['road']
+        if not issubclass(rd.__class__,highway):
+            children = self.make_buildings_from_road(*args, **kwargs)
+        else: children = []
         return children
-
-    def children_from_reuse_file(self, info_file_name):
-        info_file_name = os.path.join(os.getcwd(),info_file_name)
-        self.reuse_data = pk.load_pkl(info_file_name)
-        buildings = []
-        bcnt = self.reuse_data['bcnt']
-        for blarg in self.reuse_data['blargs']:
-            buildings.append(building(**blarg))
-        self.buildings = buildings
-        return buildings
-
-    def output_reuse_file(self, info_file_name):
-        info_file_name = os.path.join(os.getcwd(),info_file_name)
-        pk.save_pkl(self.reuse_data, info_file_name)
-
-    def reusing(self, *args, **kwargs):
-        if not self.reuse or not self.name: return
-        info_file_name = '.'.join([self.name,'reusable','data','pkl'])
-        if not pk.file_exists(info_file_name):
-            chds = self.children_from_kwargs(*args, **kwargs)
-            self.output_reuse_file(info_file_name)
-            return chds
-        else:
-            chds = self.children_from_reuse_file(info_file_name)
-            return chds
 
     def terrain_points(self):
         pts = []
@@ -92,42 +85,35 @@ class block(node):
         return pts
 
     def get_bbox(self):
+        pbd.set_trace()
         return self.bboxes
-
-    def find_corners(self, pos, length, width):
-        c1, c2, c3, c4 = pos.copy(),pos.copy(),pos.copy(),pos.copy()
-        c2.x += length
-        c3.x += length
-        c3.y += width
-        c4.y += width
-        return [c1, c2, c3, c4]
 
     def make_buildings_from_road(self, *args, **kwargs):
         bboxes = kwargs['bboxes']
         rd = kwargs['road']
         rdside = kwargs['side']
+
+        # this info should be prestored on the roads
         corns = rd.segmented_vertices
-        #print('segverts',corns)
         corncnt = len(corns)
-        #zhat = [0,0,1]
         zhat = cv.zhat
         thats = [cv.v1_v2(corns[dx],corns[dx-1]).normalize()  
                 for dx in range(1,corncnt)]
         rdnorms = [cv.cross(that,zhat) for that in thats]
-        #thats = [mpu.normalize(mpu.v1_v2(corns[dx],corns[dx-1])) 
-        #        for dx in range(1,corncnt)]
-        #rdnorms = [mpu.cross(that,zhat) for that in thats]
 
-        bcnt = self.building_count
+        bcnt = self.theme_data['max_buildings']
         buildings = []
-        reuse_data = {'bcnt':bcnt, 'blargs':[]}
+
         for bdx in range(bcnt):
             bname = 'building_' + str(bdx)
+
             flcnt = self.get_building_floor_count()
-            bpos,blen,bwid,bhei,ang =\
+
+            bpos,blen,bwid,ang =\
                 self.get_building_position_from_road(
                     corns,rdnorms,flcnt,side = rdside, 
                     road = rd,bboxes = bboxes)
+
             if not bpos is False:
                 blarg = {
                     'theme':self.theme, 
@@ -136,19 +122,14 @@ class block(node):
                     'position':bpos, 
                     'length':blen, 
                     'width':bwid, 
-                    'floor_height':0.5, 
-                    'ceiling_height':0.5, 
-                    'wall_width':0.4, 
-                    'wall_height':4.0, 
                     'floors':flcnt, 
                     'rotation':cv.vector(0,0,ang), 
                         }
-                reuse_data['blargs'].append(blarg)
+
                 buildings.append(building(**blarg))
                 bboxes.extend(buildings[-1].get_bbox())
+
         self.buildings = buildings
-        self.reuse_data = reuse_data
-        self.bboxes = bboxes
         return buildings
 
     def get_building_position_from_road(self, 
@@ -156,102 +137,61 @@ class block(node):
         bboxes = kwargs['bboxes']
         road = kwargs['road']
         rdwidth = road.road_width
-        rdrtside = kwargs['side'] == 'right'
 
         segcnt = len(rdnorms)
         segdx = rm.randrange(segcnt)
         leadcorner = corners[segdx]
         seglen = cv.distance(corners[segdx+1],leadcorner)
-        if int(seglen) == 0: seglen += 1.0
-        #    print corners[segdx+1],leadcorner,seglen
-        segnorm = rdnorms[segdx]
+
         segtang = cv.v1_v2(leadcorner,corners[segdx+1]).normalize()
-        #segtang = mpu.normalize(mpu.v1_v2(leadcorner,corners[segdx+1]))
-
-        minblen = 20
-        minbwid = 20
-        maxblen = int(min([self.max_building_length, 2*seglen]))
-        maxbwid = self.max_building_width
-        squat = 0.5
-        rmfact = self.max_floor_count/(squat*flcnt) + 1
-
-        if rdrtside:
-            sidepitch = -np.pi
-            #sidebase = -1.0*rdwidth
-            sidebase = -1.0*rdwidth/2.0
-            easementsign = -1.0
-        else:
-            sidepitch = 0
-            #sidebase = 1.0*rdwidth
-            sidebase = 1.0*rdwidth/2.0
-            easementsign = 1.0
         rdpitch = cv.angle_from_xaxis(segtang)
-        #rdpitch = fu.angle_from_xaxis(segtang) - sidepitch
-        #rdpitch = np.pi/6
+        segnorm = rdnorms[segdx].copy()
+        if kwargs['side'] == 'right':
+            segnorm.flip()
+            rdpitch += fu.PI
+
+        minblen = self.theme_data['min_length']
+        minbwid = self.theme_data['min_width']
+        maxblen = self.theme_data['max_length']
+        maxbwid = self.theme_data['max_width']
 
         def get_random():
-            blen_bottom = max([int(maxblen/rmfact),minblen])
-            blen_top = maxblen
-            if blen_bottom >= blen_top: blen_bottom = blen_top - 1
-            blen = rm.randrange(blen_bottom,blen_top)
-            #blen = rm.randrange(max([int(maxblen/rmfact),minblen]),maxblen)
-            rmfactored = int(maxbwid/rmfact)
-            widbottom = max([rmfactored,minbwid])
-            bwid = min([rm.randrange(widbottom,maxbwid), blen*2])
-            sidesoff = 0.0
-            easement = int((bwid+0.5)/2.0)*easementsign +\
-                rm.randrange(2,15 +int(blen/2.0))*easementsign + sidebase
-            base = leadcorner.copy().translate(segtang.copy().scale_u(sidesoff)).\
-                                    translate(segnorm.copy().scale_u(easement))
-            #base = mpu.translate_vector(mpu.translate_vector(leadcorner[:],
-            #    mpu.scale_vector(segnorm[:],[easement,easement,easement])),
-            #    mpu.scale_vector(segtang[:],[sidesoff,sidesoff,sidesoff]))
-            bhei = 10.0
-            stry = rm.randrange(0, int(seglen))
-            
-            #xtry,ytry,ztry = mpu.translate_vector(base[:],
-            #    mpu.scale_vector(segtang[:],[stry,stry,stry]))
-            postry = base.copy().translate(segtang.copy().scale_u(stry))
-            corners = self.make_corners(postry,blen,bwid,bhei,rdpitch)
-            #boxpos = [xtry,ytry,ztry]
+            blen = rm.randrange(minblen,maxblen)
+            bwid = rm.randrange(minbwid,maxbwid)
+
+            d_to_road = rm.randrange(bwid)
+            d_to_road = mpu.clamp(d_to_road,int((bwid+0.5)/2.0),bwid)
+            stry = rm.randrange(int(seglen))
+
+            base = leadcorner.copy()
+            base.translate(segnorm.copy().scale_u(d_to_road))
+            base.translate(segtang.copy().scale_u(stry))
+
+            postry = base
+            corners = mpu.make_corners(postry,blen,bwid,rdpitch)
             boxtry = [mpbb.bbox(corners = corners)]
-            #boxtry = [mpbb.bbox(position = [xtry,ytry,ztry], corners = corners)]
-            return boxtry,postry,blen,bwid,bhei
+            return boxtry,postry,blen,bwid
 
         try_cnt = 0
         max_tries = 50
         tries_exceeded = False
-        boxtry,boxpos,blen,bwid,bhei = get_random()
+        boxtry,boxpos,blen,bwid = get_random()
         while mpbb.intersects(bboxes, boxtry) and not tries_exceeded:
             try_cnt += 1
             tries_exceeded = try_cnt == max_tries
-            boxtry,boxpos,blen,bwid,bhei = get_random()
-        if tries_exceeded:return False,None,None,None,None
-        #x, y, z = boxpos
-        ang_z = rdpitch
-        return boxpos, blen, bwid, bhei, ang_z
-        #return [x, y, z], blen, bwid, bhei, ang_z
-        
-    #def make_corners(self,x,y,z,l,w,h,theta):
-    def make_corners(self,pos,l,w,h,theta):
-        hl = l/2.0
-        hw = w/2.0
-        #corners = [[-hl,-hw,0],[hl,-hw,0],[hl,hw,0],[-hl,hw,0]]
-        corners = [
-            cv.vector(-hl,-hw,0), 
-            cv.vector( hl,-hw,0), 
-            cv.vector( hl, hw,0), 
-            cv.vector(-hl, hw,0)]
-        #corners = [[0,0,0],[l,0,0],[l,w,0],[0,w,0]]
-        cv.rotate_z_coords(corners,theta)
-        cv.translate_coords(corners,pos)
-        return corners
+            boxtry,boxpos,blen,bwid = get_random()
+
+        if tries_exceeded:
+            #print 'tries exceeded!'
+            return False,None,None,None
+        else:
+            #print 'accepted!',boxpos,blen,bwid
+            return boxpos, blen, bwid, rdpitch
 
     def get_building_floor_count(self, *args, **kwargs):
-        mflc = self.max_floor_count
-        rmfact = 4
-        flcnt = rm.randrange(int(mflc/rmfact),mflc)
-        if flcnt == 0: return 1
+        mflc = self.theme_data['max_floors']
+        flcnt = rm.randrange(int(mflc/4.0),mflc)
+        flcnt = int(mpu.clamp(flcnt,1,mflc))
         return flcnt
 
 class city(node):
@@ -264,31 +204,30 @@ class city(node):
 
     def make_blocks_from_roads(self, *args, **kwargs):
         road_system_ = args[0]
-        elements = []
         roads = road_system_.roads
         bboxes = road_system_.get_bbox()
+
         blcnt = 0
         blocks = []
         for rd in roads:
-            elements.append(block(name = 'block_' + str(blcnt + 1), 
+            blocks.append(block(name = 'block_' + str(blcnt + 1), 
                 road = rd, side = 'right',bboxes = bboxes,parent = self))
-            blocks.append(elements[-1])
-            #blbc,blfc,blbl,blbw = bl_themes[rm.choice(themes)]
-            lasttheme = elements[-1].theme
+            lasttheme = blocks[-1].theme
             blcnt += 1
-            elements.append(block(name = 'block_' + str(blcnt + 1), 
+
+            blocks.append(block(name = 'block_' + str(blcnt + 1), 
                 theme = lasttheme, parent = self, 
                 road = rd, side = 'left',bboxes = bboxes))
-            blocks.append(elements[-1])
             blcnt += 1
+
         self.blocks = blocks
         self.bboxes = bboxes
-        return elements
+        return blocks
 
     def make_terrain(self, *args, **kwargs):
         kwargs['parent'] = self
-        kwargs['splits'] = 9
-        kwargs['smooths'] = 20
+        kwargs['splits'] = 7
+        kwargs['smooths'] = 100
         kwargs['bboxes'] = self.bboxes
         ter = terrain(**kwargs)
         return [ter]

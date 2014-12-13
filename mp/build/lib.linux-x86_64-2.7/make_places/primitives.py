@@ -56,7 +56,10 @@ class arbitrary_primitive(base):
         self._default_('force_normal_calc',False,**kwargs)                   
         self._default_('smooth_normals',False,**kwargs)                   
 
-        self.position = kwargs['position']
+        #self.origin = kwargs['position']
+        self._default_('origin',None,**kwargs)
+        #self.position = kwargs['position']
+        
         self.coords = kwargs['verts']
         self.ncoords = kwargs['nverts']
         self.uv_coords = kwargs['uvs']
@@ -72,6 +75,36 @@ class arbitrary_primitive(base):
 
         self._default_('tag','_arb_',**kwargs)
         self.modified = False
+
+    def consume(self, other):
+        ofmats = other.face_materials
+        ofacnt = len(ofmats)
+        for dx in range(len(other.materials)):
+            omat = other.materials[dx]
+            if not omat in self.materials:
+                self.materials.append(omat)
+                mdx = len(self.materials) - 1
+                for fdx in range(ofacnt):
+                    if ofmats[fdx] == dx:
+                        ofmats[fdx] = mdx
+            else:
+                mdx = self.materials.index(omat)
+                if not mdx == dx:
+                    for fdx in range(ofacnt):
+                        if ofmats[fdx] == dx:
+                            ofmats[fdx] = mdx
+
+        other_offset = len(self.coords)
+        mpu.offset_faces(other.faces, other_offset)
+        self.coords.extend(other.coords)
+        self.ncoords.extend(other.ncoords)
+        self.uv_coords.extend(other.uv_coords)
+        self.faces.extend(other.faces)
+
+        self.phys_face_materials.extend(other.phys_face_materials)
+        self.face_materials.extend(other.face_materials)
+        self.modified = True
+        return self
 
     # CAN THIS BE DONE IN PLACE?
     def __add__(self, other):
@@ -104,7 +137,7 @@ class arbitrary_primitive(base):
         face_materials = self.face_materials + other.face_materials
         xmlfile = self.xml_filename
         pwargs = {
-            'position' : org, 
+            #'origin' : org, 
             'verts' : verts, 
             'nverts' : nverts, 
             'uvs' : uvs, 
@@ -128,18 +161,17 @@ class arbitrary_primitive(base):
         has = 'true' if self.ncoords else 'false'
         return has
 
-    # needs conversion
     def calculate_normals(self,anyway = False,smooth = False):
         if self.has_normals() == 'false' and not anyway: return
         # must iterate over faces, for each vertex, apply new normal
         for fa in self.faces:
-            v1 = self.coords[fa[0]]
+            try:v1 = self.coords[fa[0]]
+            except: pdb.set_trace()
             v2 = self.coords[fa[1]]
             v3 = self.coords[fa[2]]
             v1v2 = cv.v1_v2(v1,v2)
             v1v3 = cv.v1_v2(v1,v3)
             normal = v1v2.cross(v1v3).normalize()
-            #normal = mpu.normalize(mpu.cross(v1v2,v1v3))
             for vdx in fa: self.ncoords[vdx] = normal
         if smooth:
             cbins = []
@@ -197,8 +229,13 @@ class arbitrary_primitive(base):
         self.reset_position(centroid)
 
     def reset_position(self, pos):
-        self.position = pos
+        self.origin = pos
         self.translate(cv.flip(pos))
+
+    def reposition_origin(self):
+        if self.origin is None:self.origin_to_centroid()
+        else:self.reset_position(self.origin)
+        return self.origin
 
     def write_as_xml(self):
         if self.modified:
@@ -240,18 +277,22 @@ class arbitrary_primitive(base):
     def translate_x(self, dx):
         cv.translate_coords_x(self.coords, dx)
         self.modified = True
+        return self
 
     def translate_y(self, dy):
         cv.translate_coords_y(self.coords, dy)
         self.modified = True
+        return self
 
     def translate_z(self, dz):
         cv.translate_coords_z(self.coords, dz)
         self.modified = True
+        return self
 
     def translate(self, vect):
         cv.translate_coords(self.coords, vect)
         self.modified = True
+        return self
 
     def material_to_faces(self, mat, faces):
         if not mat in self.materials: self.materials.append(mat)
@@ -308,6 +349,8 @@ class arbitrary_primitive(base):
         sy = uv_ttf.scales.y
         #sx,sy,sz = uv_ttf.scales
         for uvc in self.uv_coords:
+            #uvc.x *= sx
+            #uvc.y *= sy
             uvc.x /= sx
             uvc.y /= sy
 
@@ -315,6 +358,7 @@ class arbitrary_primitive(base):
         cv.scale_coords(self.coords, vect)
         if self._scale_uvs_: self.scale_uvs(vect)
         self.modified = True
+        return self
 
     def rotate_z(self, ang_z):
         #self.coords = mpu.rotate_z_coords(self.coords, ang_z)
@@ -322,6 +366,7 @@ class arbitrary_primitive(base):
         cv.rotate_z_coords(self.coords, ang_z)
         cv.rotate_z_coords(self.ncoords, ang_z)
         self.modified = True
+        return self
 
 xml_file_names = []
 def make_xml_name_unique(xfile):
@@ -465,117 +510,43 @@ class unit_cube(arbitrary_primitive):
         self._default_('tag','_cube_',**kwargs)
         arbitrary_primitive.__init__(self, *args, **pcubedata)
         self.find_faces()
-        #self.coords_by_face = self.find_faces()
         self._scale_uvs_ = True
 
     def find_faces(self):
-        fronts = {
-            'c':[], 
-            'u':[], 
-            'n':[], 
-                }
-        backs = {
-            'c':[], 
-            'u':[], 
-            'n':[], 
-                }
-        lefts = {
-            'c':[], 
-            'u':[], 
-            'n':[], 
-                }
-        rights = {
-            'c':[], 
-            'u':[], 
-            'n':[], 
-                }
-        tops = {
-            'c':[], 
-            'u':[], 
-            'n':[], 
-                }
-        bottoms = {
-            'c':[], 
-            'u':[], 
-            'n':[], 
-                }
+        fronts = []
+        backs = []
+        lefts = []
+        rights = []
+        tops = []
+        bottoms = []
         for vdx in range(len(self.coords)):
-            uc = self.uv_coords[vdx]
-            nc = self.ncoords[vdx]
             cc = self.coords[vdx]
-            if cc.y < 0.0:
-                fronts['u'].append(uc)
-                fronts['n'].append(nc)
-                fronts['c'].append(cc)
-            if cc.y > 0.0:
-                backs['u'].append(uc)
-                backs['n'].append(nc)
-                backs['c'].append(cc)
-            if cc.x < 0.0:
-                lefts['u'].append(uc)
-                lefts['n'].append(nc)
-                lefts['c'].append(cc)
-            if cc.x > 0.0:
-                rights['u'].append(uc)
-                rights['n'].append(nc)
-                rights['c'].append(cc)
-            if cc.z > 0.0:
-                tops['u'].append(uc)
-                tops['n'].append(nc)
-                tops['c'].append(cc)
-            if cc.z <= 0.0:
-                bottoms['u'].append(uc)
-                bottoms['n'].append(nc)
-                bottoms['c'].append(cc)
-        #fronts = [v for v in self.coords if v.y < 0.0]
-        #backs = [v for v in self.coords if v.y > 0.0]
-        #lefts = [v for v in self.coords if v.x < 0.0]
-        #rights = [v for v in self.coords if v.x > 0.0]
-        #tops = [v for v in self.coords if v.z > 0.0]
-        #bottoms = [v for v in self.coords if v.z <= 0.0]
-        ufacedict = {
-            'front':fronts['u'], 
-            'back':backs['u'], 
-            'left':lefts['u'],                                        
-            'right':rights['u'], 
-            'top':tops['u'], 
-            'bottom':bottoms['u'], 
-                }
-        nfacedict = {
-            'front':fronts['n'], 
-            'back':backs['n'], 
-            'left':lefts['n'],                                        
-            'right':rights['n'], 
-            'top':tops['n'], 
-            'bottom':bottoms['n'], 
-                }
-        cfacedict = {
-            'front':fronts['c'], 
-            'back':backs['c'], 
-            'left':lefts['c'],                                        
-            'right':rights['c'], 
-            'top':tops['c'], 
-            'bottom':bottoms['c'], 
-                }
+            if cc.y < 0.0: fronts.append(cc)
+            if cc.y > 0.0: backs.append(cc)
+            if cc.x < 0.0: lefts.append(cc)
+            if cc.x > 0.0: rights.append(cc)
+            if cc.z > 0.0: tops.append(cc)
+            if cc.z <= 0.0: bottoms.append(cc)
 
-        # move this to fu or mpu?
-        def subset(super, sub):
-            for su in sub:
-                if not su in super:
-                    return False
-            return True
+        cfacedict = {
+            'front':fronts, 
+            'back':backs, 
+            'left':lefts,                                        
+            'right':rights, 
+            'top':tops, 
+            'bottom':bottoms, 
+                }
 
         def find_face_indices(side):
             found = []
+            fcnt = len(self.faces)
             for fdx in range(fcnt):
                 face = self.faces[fdx]
                 relevcoords = [self.coords[f] for f in face]
-                if subset(cfacedict[side],relevcoords):
+                if mpu.subset(cfacedict[side],relevcoords):
                     found.append(fdx)
             return found
 
-        fcnt = len(self.faces)
-        fs = self.faces
         top_faces = find_face_indices('top')
         bottom_faces = find_face_indices('bottom')
         left_faces = find_face_indices('left')
@@ -590,10 +561,9 @@ class unit_cube(arbitrary_primitive):
             'front':front_faces, 
             'back':back_faces, 
                 }
+        
         self.face_dict = truefacedict
         self.coords_by_face = cfacedict
-        self.ucoords_by_face = ufacedict
-        self.ncoords_by_face = nfacedict
 
     def align_face(self, parent_uvs):
         pdb.set_trace()
@@ -675,10 +645,10 @@ class unit_octagon(arbitrary_primitive):
         self.calculate_normals()
         self.modified = True
 
-UCUBE = unit_cube()
+#UCUBE = unit_cube()
 def ucube(*args, **kwargs):
-    pcube = dcopy(UCUBE)
-    #pcube = unit_cube(*args, **kwargs)
+    #pcube = dcopy(UCUBE)
+    pcube = unit_cube(*args, **kwargs)
     return pcube
 
 def uoctagon(*args, **kwargs):
@@ -691,7 +661,8 @@ def sum_primitives(prims):
     final_prim = prims[0]
     if len(prims) > 1:
         for prim in prims[1:]:
-            final_prim += prim
+            final_prim.consume(prim)
+            #final_prim += prim
     return final_prim
 
 

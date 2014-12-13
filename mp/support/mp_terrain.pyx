@@ -60,9 +60,12 @@ cdef float relax(terrain_point tpt):
 
 cdef class terrain_point:
 
-    def __cinit__(self,x,y,z):
-        self.position = cv.vector(x,y,z)
-        self.weights = cv.vector(1.0,1.0,1.0)
+    #def __cinit__(self,x,y,z):
+    def __cinit__(self,position):
+        #self.position = cv.vector(x,y,z)
+        self.position = position
+        self.weights = cv.one()
+        x,y = self.position.x,self.position.y
         self._str = str((x,y))
         self.neighbors = []
 
@@ -109,7 +112,7 @@ cdef class terrain_triangle:
         cdef float rand = rm.random()*2.0 - 1.0
         cdef float zoff
         vcnt = 10000 if vcnt > 10000 else vcnt
-        zoff = rand*(dist**(1.0/2.0))/(float(vcnt)**(1.0/2.0))
+        zoff = rand*dist/(float(vcnt)**(1.0/2.0))
         return zoff
 
     cdef terrain_point bisect(self,
@@ -124,12 +127,14 @@ cdef class terrain_triangle:
         cdef float dist
 
         newpos = cv.midpoint_c(tv1.position,tv2.position)
-        newtv = terrain_point(newpos.x,newpos.y,newpos.z)
-        newtv.position = newpos
+        #newtv = terrain_point(newpos.x,newpos.y,newpos.z)
+        newtv = terrain_point(newpos)
+        #newtv = terrain_point(newpos.copy())????
+        #newtv.position = newpos
         newtv.neighbors = [tv1,tv2]
 
         if not newtv._str in locs_str:
-            if control_count == 0:zoff = self.pick_zoff(1000**2,vcnt)
+            if control_count == 0:zoff = self.pick_zoff(100,vcnt)
             else:
                 ndex = cv.find_closest_xy_c(newpos,controls,control_count,20.0)
                 nearest = <cv.vector>controls[ndex]
@@ -138,8 +143,8 @@ cdef class terrain_triangle:
         
                 if dist < tolerance: zoff = zdiff
                 elif dist < big_tolerance: zoff = self.pick_zoff(dist,vcnt)
-                else: zoff = self.pick_zoff(1000**2,vcnt)
-            newtv.position.z += zoff#newpos.z += zoff
+                else: zoff = self.pick_zoff(100,vcnt)
+            newtv.position.z += zoff
 
             tv1_nstr = [n._str for n in tv1.neighbors]
             tv2_nstr = [n._str for n in tv2.neighbors]
@@ -269,8 +274,6 @@ cdef class terrain_triangle:
             v1v2 = cv.v1_v2(newverts[0],newverts[1])
             v1v3 = cv.v1_v2(newverts[0],newverts[2])
             newnorml = [cv.cross(v1v2,v1v3).normalize() for f in fdat]
-            #newuvs = [[0,0],[1,0],[0,1]]
-            #newuvs = [[0,0],[1,0],[0,1]]
             newuvs = [cv.vector2d(0,0),cv.vector2d(1,0),cv.vector2d(0,1)]
             newuvs = [cv.vector2d(0,0),cv.vector2d(1,0),cv.vector2d(0,1)]
             verts.extend(newverts)
@@ -281,7 +284,7 @@ cdef class terrain_triangle:
         xmlfile = '.'.join(['terrain',
             str(get_terrain_number()),'mesh','xml'])
         pwargs = {
-            'position' : cv.zero(), 
+            #'origin' : cv.zero(), 
             'verts' : verts, 
             'nverts' : nverts, 
             'uvs' : uvs, 
@@ -314,14 +317,19 @@ cdef class terrain_triangle:
 cpdef list filter(pts,tri):
     cdef list good = []
     cdef cv.vector vpt
-    cdef list vtri = [cv.vector(*t) for t in tri]
+    #cdef list vtri = [cv.vector(*t) for t in tri]
+
+    #com = cv.com(tri)
+    #vns = [cv.v1_v2(com,v).normalize() for v in tri]
+    #tri = [v.translate(vn) for v,vn in zip(tri,vns)]
+
     for pt in pts:
         if pt in good: continue
         else:
             if type(pt) == type([]):
                 vpt = cv.vector(*pt)
             else: vpt = pt
-            if cv.inside(vpt,vtri):
+            if cv.inside(vpt,tri):
                 good.append(vpt)
     return good
 
@@ -343,9 +351,12 @@ def make_terrain(initial_tps,splits = 2,smooths = 25,
     #t1.position = cv.vector(*initial_tps[0])
     #t2.position = cv.vector(*initial_tps[1])
     #t3.position = cv.vector(*initial_tps[2])
-    t1 = terrain_point(*initial_tps[0])
-    t2 = terrain_point(*initial_tps[1])
-    t3 = terrain_point(*initial_tps[2])
+    #t1 = terrain_point(*initial_tps[0])
+    #t2 = terrain_point(*initial_tps[1])
+    #t3 = terrain_point(*initial_tps[2])
+    t1 = terrain_point(initial_tps[0])
+    t2 = terrain_point(initial_tps[1])
+    t3 = terrain_point(initial_tps[2])
     print 'making terrain with'
     print t1.position
     print t2.position

@@ -183,7 +183,10 @@ class node(fu.base):
         return newpms
 
     def consume(self):
-        # returns a single primitives, the sum of self and childrens prims
+
+        #if self.converts_to_lod:
+        #    self.convert_to_lod()
+
         chps = []
         chlps = []
         for ch in self.tform.children:
@@ -200,6 +203,19 @@ class node(fu.base):
         if self.lod_primitives:
             final_lod_prim = pr.sum_primitives(self.lod_primitives)
             self.lod_primitives = [final_lod_prim]
+
+            if self.primitives:
+                self.primitives[0].has_lod = True
+            self.lod_primitives[0].is_lod = True
+
+    def convert_to_lod(self):
+        # convert every primitive to lod
+        for ch in self.tform.children:
+            ch.owner.convert_to_lod()
+        for p in self.primitives:
+            p.is_lod = True
+            self.lod_primitives.append(p)
+            self.primitives.remove(p)
 
     def terrain_points(self):
         return []
@@ -224,9 +240,15 @@ class node(fu.base):
         self._default_('grit_renderingdistance',250,**kwargs)
         self._default_('grit_lod_renderingdistance',2500,**kwargs)
         self._default_('consumes_children',False,**kwargs)
+        self._default_('converts_to_lod',False,**kwargs)
         self._default_('primitives',[],**kwargs)
         self._default_('lod_primitives',[],**kwargs)
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+
+        if not hasattr(self,'tform'):
+            if kwargs.has_key('tform'): self.tform = kwargs['tform']
+            else: self.tform = self.def_tform(*args,**kwargs)
+        #self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
 
     def make_primitives_in_scene(self, scene_type, **kwargs):
@@ -235,6 +257,7 @@ class node(fu.base):
 
         pcnt = len(self.primitives)
         lodcnt = len(self.lod_primitives)
+
         if pcnt < lodcnt:
             self.primitives.extend([None]*(lodcnt-pcnt))
             apcnt = lodcnt
@@ -259,8 +282,13 @@ class node(fu.base):
         self.make_primitives_in_scene(blgeo)
 
     def make_g(self, *args, **kwargs):
+
+        #if self.converts_to_lod:
+        #    self.convert_to_lod()
+
         if self.consumes_children: self.consume()
         else: [ch.owner.make_g(*args, **kwargs) for ch in self.tform.children]
+
         self.make_primitives_in_scene(gritgeo)
 
 

@@ -1,15 +1,12 @@
 import make_places.scenegraph as sg
 import make_places.fundamental as fu
+import make_places.primitives as pr
 import make_places.walls as wa
 import make_places.floors as fl
 import make_places.stairs as st
-#import make_places.primitives as pr
 import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
-
-#from make_places.stairs import ramp
-#from make_places.stairs import shaft
 
 from math import cos
 from math import sin
@@ -37,14 +34,14 @@ class blueprint(fu.base):
     def __init__(self, *args, **kwargs):
         pass
 
-class door_plan(blueprint):
+class door_plan____(blueprint):
     def __init__(self, position, rotation, **kwargs):
         self.position = position
         self.rotation = rotation
         self._default_('width',1,**kwargs)
         self._default_('height',3,**kwargs)
 
-class window_plan(blueprint):
+class window_plan____(blueprint):
     def __init__(self, position, **kwargs):
         self.position = position
         self._default_('width',1,**kwargs)
@@ -67,7 +64,7 @@ class shaft_plan(blueprint):
     def build(self):
         pieces = []
         shargs = {
-            'position':self.position, 
+            'position':self.position.copy(), 
             'floor_heights':self.floor_heights, 
             'ceiling_heights':self.ceiling_heights, 
             'wall_heights':self.wall_heights, 
@@ -88,14 +85,35 @@ class wall_plan(blueprint):
         self.v1 = v1
         self.v2 = v2
         self.v1v2 = cv.v1_v2(v1,v2)
+        self.center = cv.midpoint(v1,v2)
         self.lead_tip_rot = 0.0
         self.rear_tip_rot = 0.0
         self.length = self.v1v2.magnitude()
         self.normal = cv.cross(self.v1v2,cv.zhat).normalize()
         self.tangent = self.v1v2.copy().normalize()
 
+    def distance_to_border(self, border):
+
+        def distance_to_edge(pt,e1,e2,norm):
+            eproj = mpbb.project([e1,e2],norm)
+            pproj = mpbb.project([pt],norm)
+            return abs(eproj.x - pproj.x)
+
+        edgenorms = mpbb.get_norms(border)
+        pt = self.center 
+        dists = []
+        for edx in range(len(border)):
+            e1 = border[edx-1]
+            e2 = border[edx]
+            norm = edgenorms[edx-1]
+            dists.append(distance_to_edge(pt,e1,e2,norm))
+            #dists.append(mpbb.distance_to_edge(pt,e1,e2))
+        dists.append(dists.pop(0))
+        distance = min(dists)
+        return distance
+
     def face_away(self):
-        intpt = self.sector.position
+        intpt = self.sector.position.copy()
         midpt = cv.midpoint(self.v1,self.v2)
         tstpt = midpt.copy().translate(self.normal)
         if cv.distance(intpt,midpt) > cv.distance(intpt,tstpt):
@@ -111,12 +129,6 @@ class wall_plan(blueprint):
             self.tangent = self.v1v2.copy().normalize()
 
     def fill_windows(self, windows):
-
-        def _____clamp(val,f,c):
-            if val < f: return f
-            elif val > c: return c
-            else: return val
-
         filled = []
         for wo in windows:
             w1off = self.tangent.copy().scale_u(wo[0])
@@ -145,12 +157,6 @@ class wall_plan(blueprint):
         return filled
 
     def fill_doors(self, doors):
-
-        def ______clamp(val,f,c):
-            if val < f: return f
-            elif val > c: return c
-            else: return val
-
         filled = []
         for do in doors:
             d1off = self.tangent.copy().scale_u(do[0])
@@ -197,35 +203,27 @@ class wall_plan(blueprint):
 
             else:
                 doors = []
-                if self.length > 3.0*windowwidth:
-                    w1pos = 0.25*self.length - windowwidth/2.0
-                    w2pos = 0.75*self.length - windowwidth/2.0
-                    windows = [
-                        [w1pos,windowwidth], 
-                        [w2pos,windowwidth]]
-                elif self.length > 2.0*windowwidth:
-                    w1pos = 0.5*self.length - windowwidth/2.0
-                    windows = [[w1pos,windowwidth]]
-                else: windows = []
+
+                wlen = float(self.length)
+                gcnt = int(wlen/(windowwidth*3))
+                if gcnt % 2 != 0: gcnt -= 1
+                windows = []
+                if gcnt > 0: gspa = wlen/gcnt
+                for gn in range(gcnt):
+                    gp = (gn + 0.5)*gspa - windowwidth/2.0
+                    windows.append((gp,windowwidth))
                 doors.extend(windows)
 
             if self.unswitchable:
                 doorwidth = 3.0
                 dpos = 0.5*self.length - doorwidth/2.0
-                doors.insert(1,[dpos,doorwidth])
+                doors.insert(gcnt/2,[dpos,doorwidth])
 
         wargs['gaps'] = doors
-
-        #flh = 0.5
-        #clh = 0.5
         v1 = self.v1.copy().translate_z(-flh)
         v2 = self.v2.copy().translate_z(-flh)
 
         pieces = [wa.wall(v1,v2,**wargs)]
-        #pieces[0].primitives[0].rotate_z_face(
-        #    self.rear_tip_rot,face = 'left')
-        #pieces[0].primitives[-1].rotate_z_face(
-        #    self.lead_tip_rot,face = 'right')
         pieces.extend(self.fill_doors(doors))
         pieces.extend(self.fill_windows(windows))
         return pieces
@@ -241,6 +239,7 @@ class floor_sector(blueprint):
     def __init__(self, *args, **kwargs):
         self._default_('fgaps',[],**kwargs)
         self._default_('cgaps',[],**kwargs)
+        self._default_('shafted',False,**kwargs)
         self._default_('floor_height',0.5,**kwargs)
         self._default_('ceiling_height',0.5,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
@@ -274,6 +273,14 @@ class floor_sector(blueprint):
     def get_bboxes(self):
         return self.bboxes
 
+    def reducible(self,wpool):
+        bwalls = self.find_walls(wpool)
+        ibwalls = [w for w in bwalls if w.sort == 'interior']
+        if self.fgaps: return False
+        if len(ibwalls) == 1: return True
+        else: return False
+        #if len(bwalls) - len(ibwalls) > 3*len(ibwalls): return True
+
     def find_walls(self, wpool):
         mine = []
         for w in wpool:
@@ -293,13 +300,30 @@ class floor_sector(blueprint):
         pairs.append((c1.copy(),c2.copy()))
         return pairs
 
+    def build_lod(self,floor = True,ceiling = True):
+        pieces = []
+        fh = self.floor_height
+        ch = self.ceiling_height
+        wh = self.wall_height
+        loff = wh + ch
+        lheight = loff + fh
+        piece = pr.ucube(is_lod = True)
+        piecenode = sg.node(
+            position = self.position.copy().translate_z(-fh), 
+            scales = cv.vector(self.length,self.width,wh+ch+fh), 
+            lod_primitives = [piece])
+
+        pieces.append(piecenode)
+        #pieces.append(fl.floor(**largs))
+        return pieces
+
     def build(self,floor = True,ceiling = True):
         #print 'BUILD FLOOR SECTOR!'
 
         pieces = []
         fargs = {
             'gaps':self.fgaps, 
-            'position':self.position, 
+            'position':self.position.copy(), 
             'length':self.length,
             'width':self.width, 
             'floor_height':self.floor_height, 
@@ -320,11 +344,13 @@ class floor_sector(blueprint):
 class floor_plan(blueprint):
 
     def __init__(self, *args, **kwargs):
-        self._default_('length',50,**kwargs)
+        self._default_('length',100,**kwargs)
         self._default_('width',50,**kwargs)
         self._default_('floor_height',0.5,**kwargs)
+        self._default_('max_sections',25,**kwargs)
         self._default_('ceiling_height',0.5,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
+        self.corners = mpu.make_corners(cv.zero(),self.length,self.width,0)
         self.interior_walls = []
         self.exterior_walls = []
         self.sectors = []
@@ -336,10 +362,16 @@ class floor_plan(blueprint):
             self.wall_height + self.ceiling_height
         for ew in self.exterior_walls:
             ew.wall_height = self.wall_height
+            ew.floor_height = self.floor_height
+            ew.ceiling_height = self.ceiling_height
         for ew in self.interior_walls:
             ew.wall_height = self.wall_height
+            ew.floor_height = self.floor_height
+            ew.ceiling_height = self.ceiling_height
         for ew in self.sectors:
             ew.wall_height = self.wall_height
+            ew.floor_height = self.floor_height
+            ew.ceiling_height = self.ceiling_height
         return self.story_height
 
     def reduce_sectors(self, cuts = None):
@@ -349,6 +381,7 @@ class floor_plan(blueprint):
         extrasects = []
         for cu in range(cuts):
             secw = rm.choice(self.exterior_walls).sector
+            if not secw.reducible(self.exterior_walls): continue
             if secw in extrasects: continue
             extrasects.append(secw)
             swalls = []
@@ -362,7 +395,7 @@ class floor_plan(blueprint):
         for sc in extrasects: self.sectors.remove(sc)
         for ew in extrawalls: self.exterior_walls.remove(ew)
         # 
-        print 'reduce should cut down the floor sectors'
+        #print 'reduce should cut down the floor sectors'
     
     def resolve_walls(self,ewalls,iwalls,sect):
         # ewalls and iwalls are new but will be added soon
@@ -442,12 +475,10 @@ class floor_plan(blueprint):
                                         epair.reverse()
 
                                     niw = wall_plan(*ipair, 
-                                            sector = sect, 
-                                            sort = 'interior', 
+                                            sector = sect,sort = 'interior', 
                                             wall_height = self.wall_height)
                                     new = wall_plan(*epair, 
-                                            sector = sect, 
-                                            sort = 'exterior', 
+                                            sector = sect,sort = 'exterior', 
                                             wall_height = self.wall_height)
                                     niwalls.append(niw)
                                     newalls.append(new)
@@ -466,13 +497,9 @@ class floor_plan(blueprint):
                                     if ew.length > eew.length:
                                         epair.reverse()
 
-                                    niw = wall_plan(*ipair, 
-                                            sector = sect, 
-                                            sort = 'interior', 
+                                    niw = wall_plan(*ipair,sector = sect,sort = 'interior', 
                                             wall_height = self.wall_height)
-                                    new = wall_plan(*epair, 
-                                            sector = sect, 
-                                            sort = 'exterior', 
+                                    new = wall_plan(*epair,sector = sect,sort = 'exterior',
                                             wall_height = self.wall_height)
                                     niwalls.append(niw)
                                     newalls.append(new)
@@ -535,7 +562,7 @@ class floor_plan(blueprint):
                             for sc in self.sectors]
             if not sdists: sdmin = 100
             else: sdmin = min(sdists)
-            if sdmin > 20 and newl > 20 and neww > 20:
+            if sdmin > 20 and newl >= 20 and neww >= 20:
                 shpos = newpos.copy()
                 shl = 10
                 shw = 12
@@ -556,17 +583,23 @@ class floor_plan(blueprint):
             self.shaft_kwargs.append(shargs)
             return gaps
 
-    def grow(self,length = None,side = None):
+    def grow(self,length = None,side = None,force = False):
         if side is None:
             side = rm.choice(self.exterior_walls)
             if side.unswitchable:
-                print 'found the entrance while growing'
+                #print 'found the entrance while growing'
                 return False
 
         if length is None:
             glengmax = 20 # this is decided by projecting each v1v2
             gleng = rm.choice([8,12,16,20,24,28,32])
         else: gleng = length
+
+        bdist = side.distance_to_border(self.corners)
+        if bdist < 8 and not force:
+            #print 'too close to a border to grow'
+            return False
+        elif gleng > bdist: gleng = bdist
 
         side.face_away()
         c1 = side.v2.copy()
@@ -578,18 +611,16 @@ class floor_plan(blueprint):
                 floor_height = self.floor_height, 
                 ceiling_height = self.ceiling_height, 
                 wall_height = self.wall_height)
-        scpos = sect.position
-        scl = sect.length
-        scw = sect.width
-        gaps = self.should_shaft(scpos,scl,scw)
+        gaps = self.should_shaft(sect.position,sect.length,sect.width)
         sect.fgaps = gaps[:]
         sect.cgaps = gaps[:]
+        if gaps: sect.shafted = True
         for esect in self.sectors:
             ebb = esect.get_bboxes()
             nbb =  sect.get_bboxes()
             if mpbb.intersects(ebb,nbb):
                 if gaps: self.shaft_kwargs.pop(-1)
-                print 'new sect intersected!'
+                #print 'new sect intersected!'
                 return False
 
         cpairs = [(c2,c3),(c3,c4),(c4,c1)]
@@ -609,6 +640,16 @@ class floor_plan(blueprint):
 
         else: return False
     
+    def build_basement_lod(self,bottom = False):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            built.extend(sector.build_lod())
+
+        #for b in built: b.converts_to_lod = True
+        self.sectors.insert(1,porch)
+        return built
+
     def build_basement(self,bottom = False):
         built = []
         porch = self.sectors.pop(1)
@@ -618,21 +659,35 @@ class floor_plan(blueprint):
                 sector.fgaps = []
             built.extend(sector.build())
             if bottom: sector.fgaps = tgaps
+
         for wall in self.exterior_walls:
             built.extend(wall.build(solid = True))
         #for wall in self.interior_walls: built.extend(wall.build())
+
         self.sectors.insert(1,porch)
+        return built
+
+    def build_lobby_lod(self):
+        built = []
+        for sector in self.sectors:
+            built.extend(sector.build_lod())
         return built
 
     def build_lobby(self):
         built = []
-        for sector in self.sectors:
-            #sector.wall_height = self.wall_height
-            built.extend(sector.build())
+        for sector in self.sectors: built.extend(sector.build())
         for wall in self.exterior_walls: built.extend(wall.build())
         for wall in self.interior_walls: built.extend(wall.build())
         return built
     
+    def build_lod(self):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            built.extend(sector.build_lod())
+        self.sectors.insert(1,porch)
+        return built
+
     def build(self):
         built = []
         porch = self.sectors.pop(1)
@@ -648,15 +703,53 @@ class floor_plan(blueprint):
         self.sectors.insert(1,porch)
         return built
 
+    def build_rooftop_lod(self):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            if sector.shafted:
+                tgaps = sector.cgaps[:]
+                sector.cgaps = []
+                built.extend(sector.build_lod())
+                sector.cgaps = tgaps
+            else:
+                built.extend(sector.build(ceiling = False))
+        for wall in self.exterior_walls:
+            if wall.sector.shafted:
+                built.extend(wall.build())
+            else:
+                wh = wall.wall_height
+                wall.wall_height = 1.0
+                built.extend(wall.build(solid = True))
+                wall.wall_height = wh
+        for wall in self.interior_walls:
+            if wall.sector.shafted:
+                built.extend(wall.build())
+        self.sectors.insert(1,porch)
+        return built
+
     def build_rooftop(self):
         built = []
         porch = self.sectors.pop(1)
         for sector in self.sectors:
-            built.extend(sector.build(ceiling = False))
+            if sector.shafted:
+                tgaps = sector.cgaps[:]
+                sector.cgaps = []
+                built.extend(sector.build())
+                sector.cgaps = tgaps
+            else:
+                built.extend(sector.build(ceiling = False))
         for wall in self.exterior_walls:
-            wall.wall_height = 1.0
-            built.extend(wall.build(solid = True))
-        #for wall in self.interior_walls: built.extend(wall.build())
+            if wall.sector.shafted:
+                built.extend(wall.build())
+            else:
+                wh = wall.wall_height
+                wall.wall_height = 1.0
+                built.extend(wall.build(solid = True))
+                wall.wall_height = wh
+        for wall in self.interior_walls:
+            if wall.sector.shafted:
+                built.extend(wall.build())
         self.sectors.insert(1,porch)
         return built
 
@@ -665,11 +758,20 @@ class floor_plan(blueprint):
 
     def main_space(self):
         l,w = self.length,self.width
-        subl = rm.choice([0.5*l,0.75*l,l])
-        subw = rm.choice([0.5*w,0.75*w,w])
-        mx = -l + subl
-        my = -w + subw
-        pos = cv.vector(mx,my,0)
+        subl = rm.choice([0.25*l,0.5*l,0.75*l])
+        subw = rm.choice([0.25*w,0.5*w,0.75*w])
+        subl = mpu.clamp(subl,20,l)
+        subw = mpu.clamp(subw,20,l)
+        mx = -l/2.0 + subl/2.0
+        my = -w/2.0 + 8 + subw/2.0
+        mx = 0.0
+        my = - w/2.0 + subw/2.0 + 10.0
+
+        # could mx,my be correlated with the lod offset problem?
+        print 'lwslsw',l,w,subl,subw,mx,my
+
+        #pos = cv.vector(mx,my,0)
+        pos = cv.zero() # this investigates the above question
 
         self.shaft_kwargs = []
         sect = floor_sector(
@@ -682,6 +784,7 @@ class floor_plan(blueprint):
         gaps = self.should_shaft(sect.position,subl,subw)
         sect.fgaps = gaps[:]
         sect.cgaps = gaps[:]
+        if gaps: sect.shafted = True
         cpairs = sect.wall_verts()
         extwalls = [wall_plan(*cp, 
             sector = sect, 
@@ -695,8 +798,8 @@ class floor_plan(blueprint):
         self.sectors = [sect]
         
         self.entrance = extwalls[0]
-        porch_length = 8
-        self.grow(porch_length,self.entrance)
+        porch_length = 6
+        self.grow(porch_length,self.entrance,True)
         self.porch = self.sectors[-1]
         self.exterior_walls.pop(-1)
         self.exterior_walls.pop(-1)
@@ -747,28 +850,47 @@ class floor_plan(blueprint):
             ew.rear_tip_rot = angle1
             ew.lead_tip_rot = angle2
         
-        print 'finish join walls function!'
+        #print 'finish join walls function!'
 
     def divide_space(self):
-        #sections = rm.choice([5,6,7,8,9,10])
-        sections = 25
+        sections = self.max_sections
         self.main_space()
         for sect in range(sections):
             grew = self.grow()
-            if grew is False: print 'growth rejected'
+            if grew is False:
+                #print 'growth rejected'
+                pass
             elif grew is None:
-                print 'division aborted'
+                #print 'division aborted'
                 break
-        print '\n\tgrew', sect, 'of', sections
+        #print '\n\tgrew', sect, 'of', sections
         #self.join_walls()
 
+batch_count = 0
 class building_plan(blueprint):
 
     def __init__(self, *args, **kwargs):
+        self._default_('length',200,**kwargs)
+        self._default_('width',200,**kwargs)
         self._default_('floors',10,**kwargs)
         self._default_('basements',2,**kwargs)
+        self.corners = mpu.make_corners(cv.zero(), 
+                        self.length,self.width,0)
 
-        self.st0plan = floor_plan()
+        self.st0plan = floor_plan(
+            length = self.length, width = self.width)
+
+        self.floor_heights = [1]*self.basements
+        self.floor_heights.extend([0.8,0.8,0.8])
+        self.floor_heights.extend([0.5]*(self.floors - 3))
+
+        self.floor_heights = [0.5]*(self.floors + self.basements)
+
+        self.ceiling_heights = [1]*self.basements
+        self.ceiling_heights.extend([0.8,0.8,0.8])
+        self.ceiling_heights.extend([0.5]*(self.floors - 3))
+
+        self.ceiling_heights = [0.5]*(self.floors + self.basements)
 
         self.wall_heights = [10]*self.basements
         self.wall_heights.extend([8,6,6])
@@ -780,12 +902,27 @@ class building_plan(blueprint):
             sh['position'].translate_z(-11.0*self.basements)
             sh['floors'] = self.floors + self.basements
             sh['wall_heights'] = self.wall_heights[:]
-
-            #'wall_heights':self.wall_heights, 
-            #'floor_heights':self.floor_heights, 
-            #'ceiling_heights':self.ceiling_heights, 
+            sh['floor_heights'] = self.floor_heights[:]
+            sh['ceiling_heights'] = self.ceiling_heights[:]
 
         self.shaft_plans = [shaft_plan(**sh) for sh in shargs]
+
+    def build_fence(self):
+        fence = []
+        pwarg = {
+            'corners':self.corners, 
+            'gaped':False, 
+            'rid_top_bottom_walls':False, 
+            'consumes_children':True, 
+                }
+        pfwarg = {
+            'position':cv.zero(), 
+            'length':self.length, 
+            'width':self.width, 
+                }
+        fence.append(wa.perimeter(**pwarg))
+        #fence.append(fl.floor(**pfwarg))
+        return fence
 
     def build_shafts(self):
         shplans = self.shaft_plans
@@ -798,16 +935,24 @@ class building_plan(blueprint):
         bacount = self.basements
         whopts = self.wall_heights
         basements = []
-        newstpos = cv.vector(0,0,0)
+        
+        newstpos = cv.zero()
         for stdx in range(bacount):
             this_st_plan = self.st0plan
             this_st_plan.wall_height = whopts.pop(0)
             this_st_plan.set_story_height()
             newstpos = newstpos.copy()
             newstpos.z -= this_st_plan.story_height
+
             newpieces = this_st_plan.build_basement(
                         bottom = stdx == bacount - 1)
+
+            lodpieces = this_st_plan.build_basement_lod(
+                        bottom = stdx == bacount - 1)
+            newpieces.extend(lodpieces)
+
             newstory = sg.node(
+                name = 'abasement' + str(stdx), 
                 children = newpieces, 
                 consumes_children = True, 
                 position = newstpos)
@@ -823,21 +968,33 @@ class building_plan(blueprint):
         stories = []
         newstpos = cv.vector(0,0,0)
         whopts = self.wall_heights
+        fhopts = self.floor_heights
+        chopts = self.ceiling_heights
 
-        reduces = 1
+        reduces = 3
 
         for stdx in range(flcount):
             this_st_plan = self.st0plan
             this_st_plan.wall_height = whopts.pop(0)
+            this_st_plan.floor_height = fhopts.pop(0)
+            this_st_plan.ceiling_height = chopts.pop(0)
             this_st_plan.set_story_height()
 
             if roll_for_reduction(stdx) and reduces > 0:
                 reduces -= 1
                 this_st_plan.reduce_sectors()
 
-            if stdx == 0: newpieces = this_st_plan.build_lobby()
-            else: newpieces = this_st_plan.build()
+            if stdx == 0:
+                newpieces = this_st_plan.build_lobby()
+                lodpieces = this_st_plan.build_lobby_lod()
+            
+            else:
+                newpieces = this_st_plan.build()
+                lodpieces = this_st_plan.build_lod()
+            newpieces.extend(lodpieces)
+
             newstory = sg.node(
+                name = 'astory' + str(stdx), 
                 children = newpieces, 
                 consumes_children = True, 
                 position = newstpos)
@@ -852,18 +1009,62 @@ class building_plan(blueprint):
         newstpos = self.roof_position
         this_st_plan = self.st0plan
         newpieces = this_st_plan.build_rooftop()
+
+        lodpieces = this_st_plan.build_rooftop_lod()
+        newpieces.extend(lodpieces)
+
         newstory = sg.node(
+            name = 'aroof', 
             children = newpieces, 
             consumes_children = True,
             position = newstpos)
         rooftop.append(newstory)
         return rooftop
+    
+    def batch_name(self):
+        global batch_count
+        name = '_story_batch_' + str(batch_count)
+        batch_count += 1
+        return name
+
+    def batch_stories(self, stories):
+        stcnt = len(stories)
+
+        max_batch_number = 10
+        stheight = self.st0plan.story_height
+        batch_number = int(((self.length+self.width)/2.0)/stheight)
+        batch_number = int(mpu.clamp(batch_number,1,max_batch_number))
+        if batch_number == 1: return stories
+
+        batches = []
+        dex0 = 0
+        while dex0 < stcnt:
+            sts_left = stcnt - dex0
+            if sts_left >= batch_number: 
+                sts_this_round = batch_number
+            else: sts_this_round = sts_left % batch_number
+            this_batchs = stories[dex0:dex0+sts_this_round]
+            dex0 += sts_this_round
+
+            batch = sg.node(name = self.batch_name(), 
+                children = this_batchs,consumes_children = True)
+            batches.append(batch)
+
+        return batches
 
     def build(self):
-        built = self.build_foundation()
-        built.extend(self.build_stories())
-        built.extend(self.build_rooftop())
-        built.extend(self.build_shafts())
+        found = self.build_foundation()
+        stories = self.build_stories()
+        rooftop = self.build_rooftop()
+        shafts = self.build_shafts()
+        fence = self.build_fence()
+        built = []
+        built.extend(found)
+        built.extend(stories)
+        built.extend(rooftop)
+        built = self.batch_stories(built)
+        built.extend(shafts)
+        built.extend(fence)
         return built
 
 

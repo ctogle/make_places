@@ -229,10 +229,42 @@ def create_grit_mesh(prim, tangents = False,
     return is_new
 
 def create_gcol(prim):
+    lindamp = 1.0
+    angdamp = 1.0
+    linsleepthresh = 1.0
+    angsleepthresh = 1.0
+    faces = prim.get_vertexes_faces_phys()
+
     filename = os.path.join(world_dir, prim.gcol_filename)
-    #for c in obj.children:
-    #    if c.type == 'EMPTY':
-    #        print(
+    with open(filename,'w') as handle:
+        handle.write('TCOL1.0\n\n')
+        handle.write('attributes {\n')
+        handle.write('\tstatic;\n')
+        handle.write('\tlinear_damping ' + str(lindamp) + ';\n')
+        handle.write('\tangular_damping ' + str(angdamp) + ';\n')
+        handle.write('\tlinear_sleep_threshold ' + str(linsleepthresh) + ';\n')
+        handle.write('\tangular_sleep_threshold ' + str(angsleepthresh) + ';\n')
+        handle.write('}\n\n')
+        handle.write('compound {\n')
+        handle.write('}\n')
+
+        handle.write('trimesh {\n')
+        handle.write('\tvertexes {\n')
+        coords = prim.coords
+        for vdx in range(len(coords)):
+            p = coords[vdx]
+            x,y,z = p.x,p.y,p.z
+            handle.write('\t\t' + ' '.join([str(x),str(y),str(z)]) + ';\n')
+        handle.write('\t}\n')
+        handle.write('\tfaces {\n')
+        for m in faces.keys():
+            for f in faces[m]:
+                handle.write('\t\t'+\
+                    ' '.join([str(f[0]),str(f[1]),str(f[2])])+\
+                    ' \"'+m+'\";\n')
+        handle.write('\t}\n}\n')
+
+    '''#
     lindamp = 1.0
     angdamp = 1.0
     linsleepthresh = 1.0
@@ -250,17 +282,20 @@ def create_gcol(prim):
             ]
     # handle children if necessary
     glines.append('}\n')
-    (vertexes, faces) = prim.get_vertexes_faces_phys()
+    faces = prim.get_vertexes_faces_phys()
+    #(vertexes, faces) = prim.get_vertexes_faces_phys()
     glines += 'trimesh {\n'
     glines += '\tvertexes {\n'
-    for v in vertexes:
-        x = v.position.x
-        y = v.position.y
-        z = v.position.z
+    #for v in vertexes:
+    coords = prim.coords
+    for vdx in range(len(coords)):
+        p = coords[vdx]
+        x,y,z = p.x,p.y,p.z
+        #x = v.position.x
+        #y = v.position.y
+        #z = v.position.z
         #' '.join([str(v.pos[0]),str(v.pos[1]),str(v.pos[2])])+\
-        glines += '\t\t'+\
-            ' '.join([str(x),str(y),str(z)])+\
-            ';\n'
+        glines += '\t\t' + ' '.join([str(x),str(y),str(z)]) + ';\n'
     glines += '\t}\n'
     glines += '\tfaces {\n'
     for m in faces.keys():
@@ -270,10 +305,10 @@ def create_gcol(prim):
                 ' \"'+m+'\";\n'
     glines += '\t}\n}\n'
 
-    #glines += children_lines
     gfile = os.path.join(world_dir,filename)
     with open(gfile,'w') as handle:
         [handle.write(gli) for gli in glines]
+    '''#
 
 def reset_world_scripts():
     global classlines, used_classes, maplines, used_mats, matlines
@@ -317,7 +352,7 @@ def output_world_scripts():
     output_classes()
     output_map()
     output_mats()
-    create_grit_meshes()
+    #create_grit_meshes()
 
 def create_element(*args):
     for ag in args:

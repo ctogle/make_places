@@ -6,7 +6,8 @@ from make_places.fundamental import base
 import make_places.profiler as prf
 import make_places.user_info as ui
 
-import xml.etree.ElementTree
+import xml.etree.cElementTree
+#import xml.etree.ElementTree
 
 import os, pdb, shutil
 import numpy as np
@@ -194,7 +195,7 @@ class arbitrary_primitive(base):
         return mpp.vertices_from_data(self.coords,self.ncoords,self.uv_coords)
 
     def get_vertexes_faces_phys(self):
-        vs = self.get_vertexes()
+        #vs = self.get_vertexes()
         mcnt = len(self.phys_materials)
         fcnt = len(self.face_materials)
         fa = {}
@@ -204,10 +205,11 @@ class arbitrary_primitive(base):
             for fmdx in range(fcnt):
                 if self.phys_face_materials[fmdx] == mdx:
                     fa[ma].append(self.faces[fmdx])
-        return (vs, fa)
+        return fa
+        #return (vs, fa)
 
     def get_vertexes_faces(self):
-        vs = self.get_vertexes()
+        #vs = self.get_vertexes()
         mcnt = len(self.materials)
         fcnt = len(self.face_materials)
         fa = {}
@@ -218,7 +220,8 @@ class arbitrary_primitive(base):
                 if self.face_materials[fmdx] == mdx:
                     fa[ma].append(self.faces[fmdx])
             if not fa[ma]: del fa[ma]
-        return (vs, fa)
+        return fa
+        #return (vs, fa)
 
     def find_centroid(self):
         com = cv.center_of_mass(self.coords)   
@@ -381,7 +384,8 @@ def xml_from_primitive_data(prim):
         xfile = make_xml_name_unique(xfile)
     xml_file_names.append(xfile)
     xlines = []
-    (vertexes, faces) = prim.get_vertexes_faces()
+    #(vertexes, faces) = prim.get_vertexes_faces()
+    faces = prim.get_vertexes_faces()
     _32bitindices = prim.requires_32bit_indices()
     _normals = prim.has_normals()
     sig = 4
@@ -391,30 +395,40 @@ def xml_from_primitive_data(prim):
     xlines.append("    <sharedgeometry>\n")
     xlines.append("        <vertexbuffer positions=\"true\" normals=\""+_normals+"\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     #xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
-    for v in vertexes:
-        x = v.position.x
-        y = v.position.y
-        z = v.position.z
-        nx = v.normal.x
-        ny = v.normal.y
-        nz = v.normal.z
-        ux = v.uv.x
-        uy = v.uv.y
-        xlines.append("            <vertex>\n")
-        if doround:
-            xlines.append("                <position x=\""+str(np.round(v.pos[0],sig))+"\" y=\""+str(np.round(v.pos[1],sig))+"\" z=\""+str(np.round(v.pos[2],sig))+"\" />\n")
-            if _normals == 'true':
-                xlines.append("                <normal x=\""+str(np.round(v.normal[0],sig))+"\" y=\""+str(np.round(v.normal[1],sig))+"\" z=\""+str(np.round(v.normal[2],sig))+"\" />\n")
-            xlines.append("                <texcoord u=\""+str(np.round(v.uv[0],sig))+"\" v=\""+str(np.round(1-v.uv[1],sig))+"\" />\n")
-        else:
-            xlines.append("                <position x=\""+str(x)+"\" y=\""+str(y)+"\" z=\""+str(z)+"\" />\n")
-            if _normals == 'true':
-                xlines.append("                <normal x=\""+str(nx)+"\" y=\""+str(ny)+"\" z=\""+str(nz)+"\" />\n")
-            xlines.append("                <texcoord u=\""+str(ux)+"\" v=\""+str(1.0-uy)+"\" />\n")
+
+    #for v in vertexes:
+
+    coords  = prim.coords
+    ncoords = prim.ncoords
+    ucoords = prim.uv_coords
+    vcnt = len(coords)
+    for vdx in range(vcnt):
+        #x = v.position.x
+        #y = v.position.y
+        #z = v.position.z
+        #nx = v.normal.x
+        #ny = v.normal.y
+        #nz = v.normal.z
+        #ux = v.uv.x
+        #uy = v.uv.y
+
+        p = coords[vdx]
+        x,y,z = p.x,p.y,p.z
+        n = ncoords[vdx]
+        nx,ny,nz = n.x,n.y,n.z
+        u = ucoords[vdx]
+        ux,uy = u.x,u.y
+
+        #xlines.append("            <vertex>\n")
+        xlines.append(" "*12 + "<vertex>\n")
+        xlines.append("                <position x=\""+str(x)+"\" y=\""+str(y)+"\" z=\""+str(z)+"\" />\n")
+        #if _normals == 'true':
+        xlines.append("                <normal x=\""+str(nx)+"\" y=\""+str(ny)+"\" z=\""+str(nz)+"\" />\n")
+        xlines.append("                <texcoord u=\""+str(ux)+"\" v=\""+str(1.0-uy)+"\" />\n")
         xlines.append("            </vertex>\n")
+
     xlines.append("        </vertexbuffer>\n")
     xlines.append("    </sharedgeometry>\n")
-
     xlines.append("    <submeshes>\n")
     for m in faces.keys():
         xlines.append("        <submesh material=\""+m+"\" usesharedvertices=\"true\" use32bitindexes=\""+_32bitindices+"\" operationtype=\"triangle_list\">\n")
@@ -428,31 +442,18 @@ def xml_from_primitive_data(prim):
     return xlines, xfile
 
 def primitive_data_from_xml(xmlfile):
-    tree = xml.etree.ElementTree.parse(xmlfile)
+    tree = xml.etree.cElementTree.parse(xmlfile)
+    #tree = xml.etree.ElementTree.parse(xmlfile)
     root = tree.getroot()
+
     sharedgeometry = root.find('sharedgeometry')
     if sharedgeometry == None: print('NEED SHARED GEOMETRY!')
+
     verts = []
     nverts = []
     uvs = []
-    sig = 4
-    doround = False
     for vbuff in sharedgeometry.iterfind('vertexbuffer'):
         for vt in vbuff.iterfind('vertex'):
-            if doround:
-                x = np.round(float(vt.find('position').get('x')), sig)
-                y = np.round(float(vt.find('position').get('y')), sig)
-                z = np.round(float(vt.find('position').get('z')), sig)
-                verts.append(cv.vector(x,y,z))
-                #verts.append([x,y,z])
-                nx = np.round(float(vt.find('normal').get('x')), sig)
-                ny = np.round(float(vt.find('normal').get('y')), sig)
-                nz = np.round(float(vt.find('normal').get('z')), sig)
-                nverts.append(cv.vector(nx,ny,nz))
-                u = np.round(float(vt.find('texcoord').get('u')), sig)
-                v = np.round(float(vt.find('texcoord').get('v')), sig)
-                uvs.append(cv.vector2d(u,1-v))
-            else:
                 x = float(vt.find('position').get('x'))
                 y = float(vt.find('position').get('y'))
                 z = float(vt.find('position').get('z'))
@@ -464,8 +465,10 @@ def primitive_data_from_xml(xmlfile):
                 u = float(vt.find('texcoord').get('u'))
                 v = float(vt.find('texcoord').get('v'))
                 uvs.append(cv.vector2d(u,1-v))
+
     submeshes = root.find('submeshes')
     if submeshes == None: print('NEED SUBMESHES!')
+
     faces = []
     materials = []
     face_materials = []
@@ -479,12 +482,13 @@ def primitive_data_from_xml(xmlfile):
                 v3 = int(face.get('v3'))
                 faces.append([v1,v2,v3])
                 face_materials.append(len(materials)-1)
-    org = cv.vector(0,0,0)
+
+    #org = cv.vector(0,0,0)
     sep = xmlfile.rfind(os.path.sep)
     xmlfile = xmlfile[sep+1:]
     xml_file_names.append(xmlfile)
     pwargs = {
-        'position' : org, 
+        #'origin' : org, 
         'verts' : verts, 
         'nverts' : nverts, 
         'uvs' : uvs, 

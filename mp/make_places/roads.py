@@ -81,7 +81,8 @@ class intersection(node):
         self._default_('road_width',20,**kwargs)
         self._default_('road_height',2,**kwargs)
         self.primitives = self.make_segments(*args, **kwargs)
-        children = self.place_vehicles()
+        #children = self.place_vehicles()
+        children = []
         self.add_child(*children)
         node.__init__(self, *args, **kwargs)
 
@@ -363,13 +364,14 @@ class road(node):
         rh = self.road_height
         segments = []
         vcnt = len(verts)
-        tangs = [self.stnorm]
+        tangs = [self.stnorm.copy().xy().normalize()]
         angs = []
         for sgdx in range(1,vcnt):            
             p1,p2 = verts[sgdx-1],verts[sgdx]
-            tangs.append(cv.v1_v2(p1,p2).normalize())
+            tangs.append(cv.v1_v2(p1,p2).xy().normalize())
+            #tangs.append(cv.v1_v2(p1,p2).normalize())
             #tangs.append(mpu.normalize(mpu.v1_v2(p1,p2)))
-        tangs.append(self.ednorm)
+        tangs.append(self.ednorm.copy().xy().normalize())
         for tgdx in range(1,vcnt+1):
             t1,t2 = tangs[tgdx-1],tangs[tgdx]
             a12 = cv.angle_between_xy(t1,t2)
@@ -389,7 +391,8 @@ class road(node):
 
     def make_segment(self, p1, p2, widt, depth, a1, a2, leg = False):
         leng = cv.distance_xy(p1,p2)
-        p1_p2 = cv.v1_v2(p1,p2).normalize()
+        p1_p2 = cv.v1_v2(p1,p2).xy().normalize()
+        #p1_p2 = cv.v1_v2(p1,p2).normalize()
         #p1_p2 = mpu.normalize(mpu.v1_v2(p1,p2))
         zdiff = p2.z - p1.z
         ang_z = cv.angle_from_xaxis_xy(p1_p2)

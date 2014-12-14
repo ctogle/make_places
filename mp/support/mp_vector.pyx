@@ -39,7 +39,7 @@ cdef class matrix:
     def __init__(self, rows = None, columns = None):
         if rows:
             self.rows = rows
-            self.columns = self.columns_from_rows(rows)
+            #self.columns = self.columns_from_rows(rows)
         elif columns:
             print 'must use rows for cv.matrix!'
         else:
@@ -48,7 +48,7 @@ cdef class matrix:
             z3 = z1.copy()
             rows = [z1,z2,z3]
             self.rows = rows
-            self.columns = self.columns_from_rows(rows)
+            #self.columns = self.columns_from_rows(rows)
 
 cdef matrix rotation_matrix(float ang,char axis = 'z'):
     if axis == 'z':

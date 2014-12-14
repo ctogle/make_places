@@ -108,6 +108,13 @@ cdef class terrain_triangle:
         self.corners = [cv.vector(v.x,v.y,v.z) for v in vposs]
         [c.translate(tv) for c,tv in zip(self.corners,self.com_vects)]
     
+        #t1.triangle = terra
+        #t1.triangle_index = 0
+        #t2.triangle = terra
+        #t2.triangle_index = 1
+        #t3.triangle = terra
+        #t3.triangle_index = 2
+    
     cdef float pick_zoff(self, float dist,int vcnt):
         cdef float rand = rm.random()*2.0 - 1.0
         cdef float zoff
@@ -127,10 +134,7 @@ cdef class terrain_triangle:
         cdef float dist
 
         newpos = cv.midpoint_c(tv1.position,tv2.position)
-        #newtv = terrain_point(newpos.x,newpos.y,newpos.z)
         newtv = terrain_point(newpos)
-        #newtv = terrain_point(newpos.copy())????
-        #newtv.position = newpos
         newtv.neighbors = [tv1,tv2]
 
         if not newtv._str in locs_str:
@@ -345,15 +349,6 @@ def make_terrain(initial_tps,splits = 2,smooths = 25,
     cdef terrain_point t1
     cdef terrain_point t2
     cdef terrain_point t3
-    #t1 = terrain_point
-    #t2 = terrain_point
-    #t3 = terrain_point
-    #t1.position = cv.vector(*initial_tps[0])
-    #t2.position = cv.vector(*initial_tps[1])
-    #t3.position = cv.vector(*initial_tps[2])
-    #t1 = terrain_point(*initial_tps[0])
-    #t2 = terrain_point(*initial_tps[1])
-    #t3 = terrain_point(*initial_tps[2])
     t1 = terrain_point(initial_tps[0])
     t2 = terrain_point(initial_tps[1])
     t3 = terrain_point(initial_tps[2])

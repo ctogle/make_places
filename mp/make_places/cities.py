@@ -23,7 +23,7 @@ class block(node):
 
     bl_themes = {
         'suburbs' : {
-            'max_buildings' : 30,
+            'max_buildings' : 40,
             'max_floors' : 3, 
             'min_length' : 30, 
             'min_width' : 30, 
@@ -31,7 +31,7 @@ class block(node):
             'max_width' : 100, 
                 }, 
         'residential' : {
-            'max_buildings' : 20,
+            'max_buildings' : 30,
             'max_floors' : 10, 
             'min_length' : 30, 
             'min_width' : 30, 
@@ -39,7 +39,7 @@ class block(node):
             'max_width' : 100, 
                 }, 
         'commercial' : {
-            'max_buildings' : 10,
+            'max_buildings' : 20,
             'max_floors' : 30, 
             'min_length' : 40, 
             'min_width' : 40, 
@@ -47,7 +47,7 @@ class block(node):
             'max_width' : 100, 
                 }, 
         'industrial' : {
-            'max_buildings' : 30,
+            'max_buildings' : 40,
             'max_floors' : 6, 
             'min_length' : 40, 
             'min_width' : 40, 
@@ -243,10 +243,8 @@ class city(node):
                     cv.vector(1000,0,0),
                     cv.vector(-1000,0,0),
                     cv.vector(0,1000,0)], 
-                #'seeds':[[0,-1000,0],[1000,0,0],[-1000,0,0],[0,1000,0]], 
-                #'seeds':[[0,0,0],[1000,0,0],[0,1000,0]], 
                 'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':100, 
+                'intersection_count':20, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 

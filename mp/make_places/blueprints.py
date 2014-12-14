@@ -740,6 +740,8 @@ class floor_plan(blueprint):
             else:
                 built.extend(sector.build(ceiling = False))
         for wall in self.exterior_walls:
+            wswitch = wall.unswitchable
+            wall.unswitchable = False
             if wall.sector.shafted:
                 built.extend(wall.build())
             else:
@@ -747,6 +749,7 @@ class floor_plan(blueprint):
                 wall.wall_height = 1.0
                 built.extend(wall.build(solid = True))
                 wall.wall_height = wh
+            wall.unswitchable = wswitch
         for wall in self.interior_walls:
             if wall.sector.shafted:
                 built.extend(wall.build())
@@ -768,10 +771,10 @@ class floor_plan(blueprint):
         my = - w/2.0 + subw/2.0 + 10.0
 
         # could mx,my be correlated with the lod offset problem?
-        print 'lwslsw',l,w,subl,subw,mx,my
+        #print 'lwslsw',l,w,subl,subw,mx,my
 
-        #pos = cv.vector(mx,my,0)
-        pos = cv.zero() # this investigates the above question
+        pos = cv.vector(mx,my,0)
+        #pos = cv.zero() # this investigates the above question
 
         self.shaft_kwargs = []
         sect = floor_sector(
@@ -1057,14 +1060,14 @@ class building_plan(blueprint):
         stories = self.build_stories()
         rooftop = self.build_rooftop()
         shafts = self.build_shafts()
-        fence = self.build_fence()
+        #fence = self.build_fence()
         built = []
         built.extend(found)
         built.extend(stories)
         built.extend(rooftop)
         built = self.batch_stories(built)
         built.extend(shafts)
-        built.extend(fence)
+        #built.extend(fence)
         return built
 
 

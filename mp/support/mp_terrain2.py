@@ -1,8 +1,9 @@
 
-
 import mp_vector cv
 import mp_utils mpu
 
+import numpy as np
+import pdb
 
 # this is a reimplementation of terrain generation
 #
@@ -54,8 +55,59 @@ def some_input():
             }
     return theinput
 
+def find_extremes_y(pts):
+    lo = pts[0]
+    hi = pts[0]
+    for pt in pts[1:]:
+        if pt.y < lo.y: lo = pt
+        if pt.y > hi.y: hi = pt
+    return lo,hi
+
+def find_extremes_x(pts):
+    lo = pts[0]
+    hi = pts[0]
+    for pt in pts[1:]:
+        if pt.x < lo.x: lo = pt
+        if pt.x > hi.x: hi = pt
+    return lo,hi
+
+def sweep_search(pts,center):
+    # this will behave oddly when `which` would
+    #  be a colinear set
+    cv.translate_coords(pts,center.flip())
+    which = center
+    pang = 2*np.pi
+    pcnt = len(pts)
+    for adx in range(pcnt):
+        pt = pts[adx]
+        if pt is center: continue
+        tpang = cv.angle_from_xaxis_xy(pt)
+        if tpang < pang:
+            pang = tpang
+            which = pt
+    cv.translate_coords(pts,center.flip())
+    return which
+
+def pts_to_convex_xy(pts):
+    # return the corners of the polygon, a subset of pts
+    # it could be that pts is all one point or is colinear
+    new = find_extremes_x(pts)[1]
+    shape = []
+    while not new in shape:
+        shape.append(new)
+        new = sweep_search(pts,new)
+    return shape
+
+def region_pts_to_boundary(rpts, radius = 100):
+    # draw a convex polygon enclosing rpts; inflate by a radius
+    convex = pts_to_convex(rpts)
 
 
+
+def test():
+    someinput = some_input()
+    convex = pts_to_convex(someinput['region_pts'])
+    pdb.set_trace()
 
 
 

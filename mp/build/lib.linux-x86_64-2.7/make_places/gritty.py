@@ -250,17 +250,20 @@ def create_gcol(prim):
             ]
     # handle children if necessary
     glines.append('}\n')
-    (vertexes, faces) = prim.get_vertexes_faces_phys()
+    faces = prim.get_vertexes_faces_phys()
+    #(vertexes, faces) = prim.get_vertexes_faces_phys()
     glines += 'trimesh {\n'
     glines += '\tvertexes {\n'
-    for v in vertexes:
-        x = v.position.x
-        y = v.position.y
-        z = v.position.z
+    #for v in vertexes:
+    coords = prim.coords
+    for vdx in range(len(coords)):
+        p = coords[vdx]
+        x,y,z = p.x,p.y,p.z
+        #x = v.position.x
+        #y = v.position.y
+        #z = v.position.z
         #' '.join([str(v.pos[0]),str(v.pos[1]),str(v.pos[2])])+\
-        glines += '\t\t'+\
-            ' '.join([str(x),str(y),str(z)])+\
-            ';\n'
+        glines += '\t\t' + ' '.join([str(x),str(y),str(z)]) + ';\n'
     glines += '\t}\n'
     glines += '\tfaces {\n'
     for m in faces.keys():
@@ -270,7 +273,6 @@ def create_gcol(prim):
                 ' \"'+m+'\";\n'
     glines += '\t}\n}\n'
 
-    #glines += children_lines
     gfile = os.path.join(world_dir,filename)
     with open(gfile,'w') as handle:
         [handle.write(gli) for gli in glines]
@@ -317,7 +319,7 @@ def output_world_scripts():
     output_classes()
     output_map()
     output_mats()
-    create_grit_meshes()
+    #create_grit_meshes()
 
 def create_element(*args):
     for ag in args:

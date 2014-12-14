@@ -308,7 +308,7 @@ def block():
         bl2.terrain_points()
     ter = terr.terrain(smooths = 100, 
         pts_of_interest = pts_of_int, 
-        splits = 5, bboxes = bboxes)
+        splits = 7, bboxes = bboxes)
     
     ocean = mpw.waters(position = cv.vector(500,500,0),
         depth = 50,sealevel = -30.0,length = 2000,width = 2000)

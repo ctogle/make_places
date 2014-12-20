@@ -310,10 +310,12 @@ class newbuilding(node):
         return nam
 
     def __init__(self, *args, **kwargs):
+        #global _new_building_count_
         if kwargs.has_key('length') and kwargs['length'] < 40:
             kwargs['length'] = 40
         if kwargs.has_key('width') and kwargs['width'] < 40:
             kwargs['width'] = 40
+        self._default_('name',self.get_name(),**kwargs)
         self._default_('length',40,**kwargs)
         self._default_('width',40,**kwargs)
         self._default_('tform',
@@ -331,6 +333,8 @@ class newbuilding(node):
         node.__init__(self, *args, **kwargs)
         self.assign_material('concrete')
 
+        print 'built building', _newbuilding_count_
+
     def get_bbox(self, *args, **kwargs):
         cornas = self.find_corners()
         bb = mpbb.bbox(corners = cornas)
@@ -343,6 +347,10 @@ class newbuilding(node):
         center.translate(cv.zero().translate_z(-0.5))
         tpts = mpu.dice_edges(tpts, dices = 1)
         tpts.append(center)
+        return tpts
+
+    def terrain_holes(self):
+        tpts = [self.find_corners()]
         return tpts
 
     def find_corners(self):

@@ -175,7 +175,7 @@ class wall_plan(blueprint):
             filled.append(head)
         return filled
 
-    def build(self, solid = False, flh = 0.0, clh = 0.0):
+    def build(self, solid = False, skirt = False, flh = 0.0, clh = 0.0):
         #print 'BUILD WALL!'
 
         wargs = {
@@ -226,6 +226,16 @@ class wall_plan(blueprint):
         pieces = [wa.wall(v1,v2,**wargs)]
         pieces.extend(self.fill_doors(doors))
         pieces.extend(self.fill_windows(windows))
+        if skirt:
+            swargs = {
+                'rid_top_bottom':False,
+                'wall_width':self.wall_width, 
+                'wall_height' : flh + clh, 
+                'gaped': False, 
+                    }
+            sv1 = v1.copy().translate_z(-flh-clh)
+            sv2 = v2.copy().translate_z(-flh-clh)
+            pieces.append(wa.wall(sv1,sv2,**swargs))
         return pieces
 
 class floor_sector(blueprint):
@@ -692,12 +702,11 @@ class floor_plan(blueprint):
         built = []
         porch = self.sectors.pop(1)
         for sector in self.sectors:
-            #sector.wall_height = self.wall_height
             built.extend(sector.build())
         for wall in self.exterior_walls:
             wswitch = wall.unswitchable
             wall.unswitchable = False
-            built.extend(wall.build())
+            built.extend(wall.build(skirt = True))
             wall.unswitchable = wswitch
         for wall in self.interior_walls: built.extend(wall.build())
         self.sectors.insert(1,porch)

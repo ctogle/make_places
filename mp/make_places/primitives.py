@@ -55,6 +55,7 @@ class arbitrary_primitive(base):
         self._default_('has_lod',False,**kwargs)
         
         self._default_('force_normal_calc',False,**kwargs)                   
+        self._default_('prevent_normal_calc',False,**kwargs)
         self._default_('smooth_normals',False,**kwargs)                   
 
         #self.origin = kwargs['position']
@@ -162,12 +163,11 @@ class arbitrary_primitive(base):
         has = 'true' if self.ncoords else 'false'
         return has
 
-    def calculate_normals(self,anyway = False,smooth = False):
-        if self.has_normals() == 'false' and not anyway: return
+    def calculate_normals(self,prevent = False,anyway = False,smooth = False):
+        if self.has_normals() == 'false' and not anyway or prevent: return
         # must iterate over faces, for each vertex, apply new normal
         for fa in self.faces:
-            try:v1 = self.coords[fa[0]]
-            except: pdb.set_trace()
+            v1 = self.coords[fa[0]]
             v2 = self.coords[fa[1]]
             v3 = self.coords[fa[2]]
             v1v2 = cv.v1_v2(v1,v2)
@@ -243,7 +243,9 @@ class arbitrary_primitive(base):
     def write_as_xml(self):
         if self.modified:
             self.calculate_normals(
-                self.force_normal_calc,self.smooth_normals)
+                self.prevent_normal_calc, 
+                self.force_normal_calc,
+                self.smooth_normals)
             xlines, xfile = xml_from_primitive_data(self)
             self.xml_representation = '\n'.join(xlines)
         else:
@@ -416,7 +418,8 @@ def xml_from_primitive_data(prim):
         x,y,z = p.x,p.y,p.z
         n = ncoords[vdx]
         nx,ny,nz = n.x,n.y,n.z
-        u = ucoords[vdx]
+        try:u = ucoords[vdx]
+        except: pdb.set_trace()
         ux,uy = u.x,u.y
 
         #xlines.append("            <vertex>\n")

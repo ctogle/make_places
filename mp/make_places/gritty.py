@@ -32,8 +32,7 @@ def create_prim(prim, name = None, center = False,
     if prim.is_lod:
         prim.origin = last_origin
         last_origin = prim.reposition_origin()
-    else:
-        last_origin = prim.reposition_origin()
+    else:last_origin = prim.reposition_origin()
 
     w_position = prim.origin
     w_rotation = world_rotation

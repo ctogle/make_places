@@ -3,13 +3,12 @@ import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
 import make_places.primitives as pr
-#from make_places.fundamental import element
-from make_places.scenegraph import node
+#from make_places.scenegraph import node
+import make_places.scenegraph as sg
 from make_places.floors import floor
 from make_places.primitives import arbitrary_primitive
 from make_places.primitives import ucube
 from make_places.primitives import uoctagon
-#from make_places.primitives import unit_cube
 import make_places.pkler as pk
 
 import os, pdb
@@ -20,6 +19,7 @@ from math import cos
 from math import sin
 from math import tan
 from copy import deepcopy as dcopy
+import matplotlib.pyplot as plt
 
 cardinal_directions = [
     'north', 'northeast', 
@@ -50,7 +50,7 @@ class taxi_primitive(vehicle_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'Body.mesh.xml')
     offset = cv.vector(0,0,0.5)
 
-class car_batch(node):
+class car_batch(sg.node):
 
     possible_vehicles = [truck_primitive,taxi_primitive]
 
@@ -60,7 +60,7 @@ class car_batch(node):
         self._default_('grit_renderingdistance',100,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
         self.primitives = self.make_batch(self.cargs)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def make_batch(self, cargs):
         cars = []
@@ -72,7 +72,7 @@ class car_batch(node):
         return cars
 
 clip_length = 25
-class intersection(node):
+class intersection(sg.node):
     def __init__(self, *args, **kwargs):
         #self._default_('consumes_children',True,**kwargs)
         self._default_('grit_renderingdistance',1000,**kwargs)
@@ -84,7 +84,7 @@ class intersection(node):
         #children = self.place_vehicles()
         children = []
         self.add_child(*children)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def find_corners(self):
         v1 = cv.vector( clip_length, clip_length*tan(fu.to_rad(22.5)),0)
@@ -95,8 +95,8 @@ class intersection(node):
         v6 = cv.vector(-clip_length*tan(fu.to_rad(22.5)), clip_length,0)
         v7 = cv.vector( clip_length*tan(fu.to_rad(22.5)),-clip_length,0)
         v8 = cv.vector(-clip_length*tan(fu.to_rad(22.5)),-clip_length,0)
-        corners = [v1, v2, v3, v4, v5, v6, v7, v8]
-        return corners
+        self.corners = [[v1, v2, v3, v4, v5, v6, v7, v8]]
+        return self.corners[0]
 
     def terrain_points(self):
         # i need the location of the octagon verts!
@@ -203,25 +203,63 @@ class road_segment_primitive(arbitrary_primitive):
 class highway_segment_primitive(road_segment_primitive):
     roadxml = os.path.join(pr.primitive_data_path, 'highroad.mesh.xml')
 
-class road(node):
+road_batch_count = 0
+class road(sg.node):
     road_prim_type = road_segment_primitive
+    road_type = 'road'
 
     def __init__(self, *args, **kwargs):
         kwargs['uv_scales'] = cv.one()
+        self._default_('tform',
+            self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
         self._default_('grit_renderingdistance',1000,**kwargs)
         self._default_('grit_lod_renderingdistance',2000,**kwargs)
-        self._default_('consumes_children',True,**kwargs)
+        #self._default_('consumes_children',True,**kwargs)
         self._default_('road_width', 10, **kwargs)
         self._default_('road_height', 1, **kwargs)
+        self._default_('control_points', [], **kwargs)
         self.clip_length = clip_length
         self.set_segmented_vertices(*args, **kwargs)
         self.set_corners(self.segmented_vertices)
-        segs = self.make_segments(*args, **kwargs)
-        litter = self.litter(segs)
-        self.primitives = segs + litter
-        node.__init__(self, *args, **kwargs)
+        self.segs = self.make_segments(*args, **kwargs)
+        litter = self.litter(self.segs)
+        #segbatches = self.segs
+        segbatches = self.batch_segments(self.segs)
+        self.add_child(*segbatches)
+        self.primitives = litter
+        sg.node.__init__(self, *args, **kwargs)
+
+    def batch_name(self):
+        global road_batch_count
+        name = '_road_segment_batch_' + str(road_batch_count)
+        road_batch_count += 1
+        return name
+
+    def batch_segments(self, segs):
+        stcnt = len(segs)
+        if stcnt == 1: return segs
+
+        batch_number = int(mpu.clamp(20,1,len(segs)))
+        #batch_number = 10
+        batches = []
+        dex0 = 0
+        while dex0 < stcnt:
+            sts_left = stcnt - dex0
+            if sts_left >= batch_number: 
+                sts_this_round = batch_number
+            else: sts_this_round = sts_left % batch_number
+            this_batchs = segs[dex0:dex0+sts_this_round]
+            dex0 += sts_this_round
+
+            batch = sg.node(name = self.batch_name(), 
+                grit_renderingdistance = 500, 
+                primitives = this_batchs,
+                consumes_children = True)
+            batches.append(batch)
+
+        return batches
 
     def pick_seg_count(self, vs):
         ds = cv.distance(vs[0],vs[-1])
@@ -231,6 +269,9 @@ class road(node):
     def litter(self, segs):
         lit = []
         return lit
+
+    def ramp_to(self, otherrd):
+        pdb.set_trace()
 
     def terrain_points(self):
         tpts = []
@@ -252,7 +293,47 @@ class road(node):
             corners.append(corns)
         self.corners = corners
 
+    def get_xy_bbox(self):
+        bboxes = []
+        for cdx in range(len(self.corners)):
+            corns = self.corners[cdx]
+            bboxes.append(mpbb.xy_bbox(corns))
+            bboxes[-1].segment_id = cdx
+        xybb = mpbb.xy_bbox(children = bboxes)
+
+        def plot():
+            c1,c2,c3,c4 = xybb.corners
+
+            fig = plt.figure()
+            ax = fig.gca(aspect = 'equal')
+            ax.grid(True)
+
+            ax.axis([c1.x,c2.x,c1.y,c4.y])
+            '''#
+            for bb in bboxes:
+                #ax.axis([c1.x,c2.x,c1.y,c4.y])
+                xybb.plot_corners()
+                bb.plot()
+                plt.show()
+            '''#
+            #ax.axis([c1.x,c2.x,c1.y,c4.y])
+            xybb.plot()
+            plt.show()
+
+        return xybb
+
+    def get_bbox(self):
+        bboxes = []
+        for cdx in range(len(self.corners)):
+            corns = self.corners[cdx]
+            bboxes.append(mpbb.bbox(corners = corns))
+        return bboxes
+
     def make_corners(self, p1, p2):
+
+        #if abs(p1.x - p2.x) < 0.1 and abs(p1.y - p2.y) < 0.1:
+        #    pdb.set_trace()
+
         widt = self.road_width
         
         p1_p2 = cv.v1_v2(p1,p2)
@@ -260,22 +341,11 @@ class road(node):
         p1_p2.normalize()
         
         ang_z = cv.angle_from_xaxis_xy(p1_p2)
-        corns = [
-            cv.vector(0,-widt/2.0,0),
-            cv.vector(leng,-widt/2.0,0),
-            cv.vector(leng,widt/2.0,0),
-            cv.vector(0,widt/2.0,0)]
-        cv.rotate_z_coords(corns,ang_z)
-        cv.translate_coords(corns,p1)
-        cv.translate_coords_z(corns[1:3],p2.z-p1.z)
+        corns = mpu.make_corners(
+            cv.zero(),leng,widt,ang_z)
+        cv.translate_coords(corns,p1.copy().translate_x(leng/2.0))
+        #cv.translate_coords_z(corns[1:3],p2.z-p1.z)
         return corns
-
-    def get_bbox(self):
-        bboxes = []
-        for corns in self.corners:
-            bboxes.append(mpbb.bbox(corners = corns))
-            #bboxes.append(fu.bbox(corners = corns))
-        return bboxes
 
     def get_cardinal_normals(self, dirs):
         def getcardnorm(dx):
@@ -310,27 +380,62 @@ class road(node):
         verts = self.clip_tips(verts,norms[0],norms[1])
         verts = self.add_tips(verts,norms[0],norms[1])
 
-        scnt = self.pick_seg_count(verts)
-        self.segment_count = scnt
+        #scnt = self.pick_seg_count(verts)
+        #self.segment_count = scnt
         def bend(vs):
-            tips = vs[:2] + vs[-2:]
-            #cox,coy,coz = [list(i) for i in zip(*tips)]
+            #tips = vs[:2] + vs[-2:]
+            tips = vs
             cox = [t.x for t in tips]
             coy = [t.y for t in tips]
             coz = [t.z for t in tips]
-            #cox,coy,coz = [list(i) for i in zip(*tips)]
             tim = [0.0,1.0,2.0,3.0]
             alpha = 1.0/2.0
             mpu.parameterize_time(tips,tim,alpha)
+            scnt = self.pick_seg_count(tips[1:-1])
             cox = mpu.catmull_rom(cox,tim,scnt)
             coy = mpu.catmull_rom(coy,tim,scnt)
             coz = mpu.catmull_rom(coz,tim,scnt)
             new = [cv.vector(*i) for i in zip(cox,coy,coz)]
             return new
+            #return new[1:-1]
 
-        if segdice: verts = bend(verts)
-        self.segmented_vertices = verts
+        if segdice:
+            #if self.control_points:
+            #    cp1 = self.control_points[0]
+            #    cp2 = self.control_points[1]
+            #    verts.insert(2,cp2)
+            #    verts.insert(2,cp1)
+
+            final_verts = []
+            for dx in range(len(verts) - 3):
+                ttips = verts[dx:dx+4]
+
+                #if final_verts:
+                #    ttips[0].x = final_verts[-2].x
+                #    ttips[0].y = final_verts[-2].y
+                #    ttips[1].x = final_verts[-1].x
+                #    ttips[1].y = final_verts[-1].y
+
+                final_verts.extend(bend(ttips)[1:-1])
+                #self.plot(final_verts,show = False)
+                #self.plot(ttips,color = 'blue')
+
+            #self.plot(final_verts,show = True)
+            #self.plot(verts,color = 'blue')
+            #verts = bend(verts)
+
+        #final_verts = self.add_tips(final_verts,norms[0],norms[1])
+        self.segment_count = len(final_verts)
+        self.segmented_vertices = final_verts
+        #self.segmented_vertices = verts
         return verts
+
+    def plot(self, verts, color = 'green', show = True):
+        plt.plot(
+            [v.x for v in verts],
+            [v.y for v in verts],
+            color = color,marker = 'o')
+        if show: plt.show()
 
     def add_tips(self,verts,n1,n2):
         clip = 25
@@ -411,10 +516,166 @@ class road(node):
         strip.translate(p1)
         return [strip]
 
-class road_system(node):
+class road_system_new(sg.node):
+    def pick_sea_level(self, vals):
+        maxval = max(vals)
+        minval = min(vals)
+        rng = maxval - minval
+        return minval + rng/10.0
+
+    def get_bbox(self):
+        bboxes = []
+        roads = self.tform.children
+        for rdtf in roads:
+            rdboxes = rdtf.owner.get_bbox()
+            bboxes.extend(rdboxes)
+        return bboxes
+
+    def terrain_points(self):
+        pts = []
+        [pts.extend(ch.owner.terrain_points()) 
+            for ch in self.tform.children]
+        print 'tptcnt', len(pts)
+        return pts
+      
+    def terrain_holes(self):
+        pts = []
+        for ch in self.tform.children:
+            pts.append(ch.owner.corners)
+        return pts
+
     def __init__(self, *args, **kwargs):
         self._default_('name','road_system',**kwargs)
-        self._default_('reuse',False,**kwargs)
+
+        self._default_('seeds',[0,45,180,270],**kwargs)
+        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
+
+        children = self.network(*args,**kwargs)
+        self.add_child(*children)
+
+        sg.node.__init__(self,*args,**kwargs)
+
+    dang = 22.5
+    deg_rngs = [((dx*45.0)-dang,(dx*45.0)+dang) for dx in range(8)]
+    deg_bins = {
+        'west':deg_rngs[0], 
+        'southwest':deg_rngs[1], 
+        'south':deg_rngs[2], 
+        'southeast':deg_rngs[3], 
+        'east':deg_rngs[4], 
+        'northeast':deg_rngs[5], 
+        'north':deg_rngs[6], 
+        'northwest':deg_rngs[7], 
+            }
+    def network(self,*args,**kwargs):
+
+        def ang_wobble(ang):
+            rand = rm.choice([-1,1])
+            aoff = rand * rm.choice([15,30,45,60,75])
+            return ang + aoff
+
+        def cardinal(deg):
+            if deg >= 360: deg -= 360
+            elif deg < 0: deg += 360
+            for ke in self.deg_bins.keys():
+                if mpu.in_range(deg,self.deg_bins[ke]):
+                    return ke
+
+        def nodeoffset():
+            return rm.choice([x-20 for x in range(40)])
+
+        # first generate the interstates
+        # each seed creates an interstate
+        # each interstate is reachable from the others via a beltway
+        interlinkdist = 1000
+        intercitynodes = []
+        interstates = []
+        for se in self.seeds:
+            newnode = cv.zero()
+            antiang = ang_wobble(180.0)
+            newnode.translate_x(interlinkdist).rotate_z(fu.to_rad(se))
+            antinode = newnode.copy().rotate_z(fu.to_rad(antiang))
+            newnode.translate_z(nodeoffset())
+            antinode.translate_z(nodeoffset())
+            ndir = cardinal(se)
+            andir = cardinal(se + antiang)
+            intercitynodes.append((newnode,antinode))
+
+            cp = cv.midpoint(newnode,antinode)
+            #cp1.translate(cp.copy().flip().scale_u(0.5))
+            #cp2.translate(cp.copy().flip().scale_u(0.5))
+            cp1 = cv.center_of_mass([newnode,antinode,newnode])
+            cp2 = cv.center_of_mass([newnode,antinode,antinode])
+            cp1.translate(cp.copy().flip().scale_u(0.5))
+            cp2.translate(cp.copy().flip().scale_u(0.5))
+            cpts = [cp1,cp2]
+
+            rarg = {
+                'control_points':cpts, 
+                'start':newnode, 
+                'end':antinode, 
+                'directions':[ndir,andir],
+                'road_height':2, 
+                'road_width':20, 
+                    }
+            hway = rm.random() < 0.5
+            if hway: interstates.append(highway(**rarg))
+            else: interstates.append(road(**rarg))
+
+        return self.resolve_roads(interstates)
+
+    def resolve_roads(self, interstates):
+
+        fig = plt.gcf()
+        ax = fig.gca()
+        ax.grid(True)
+
+        icnt = len(interstates)
+        for idx1 in range(icnt - 1):
+            i1 = interstates[idx1]
+            ibb1 = i1.get_xy_bbox()
+            for idx2 in range(idx1 + 1,icnt):
+                i2 = interstates[idx2]
+                ibb2 = i2.get_xy_bbox()
+                isect = ibb1.intersect_xy(ibb2)
+                #if ibb1.intersect_xy(ibb2):
+                if not isect is None:
+                    segids = [me.segment_id for me in isect['members']]
+                    
+                    print 'intersection!', len(isect['members'])
+                    print 'segids', [me.segment_id for me in isect['members']]
+                  
+                    #ibb1.plot()
+                    #ibb2.plot()
+                    for me in isect['members']:
+                        sid = me.segment_id
+                        if me.parent is ibb1: me.plot(colors = ['blue'])
+                        if me.parent is ibb2: me.plot(colors = ['green'])
+
+                    if isect['members']:
+                        c1,c2,c3,c4 = mpbb.inscribe([ibb1,ibb2])
+                        ax.axis([c1.x,c2.x,c1.y,c4.y])
+                        plt.show()
+
+        return interstates
+
+
+
+
+
+
+
+
+
+class road_system(sg.node):
+    def terrain_holes(self):
+        pts = []
+        for ch in self.tform.children:
+            pts.extend(ch.owner.corners)
+        return pts
+      
+    def __init__(self, *args, **kwargs):
+        self._default_('name','road_system',**kwargs)
         self._default_('linkmin', 200, **kwargs)
         self._default_('linkmax', 400, **kwargs)
         self._default_('linkangles', 
@@ -426,11 +687,10 @@ class road_system(node):
         rwidth = 2*clip_length*tan(fu.to_rad(22.5))
         self._default_('road_width', rwidth, **kwargs)
         #kwargs['road_width'] = rwidth
-        children = self.reusing(*args, **kwargs)
-        if not children:children = self.children_from_kwargs(*args,**kwargs)
+        children = self.children_from_kwargs(*args,**kwargs)
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self.add_child(*children)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def children_from_kwargs(self, *args, **kwargs):
         rwidth = self.road_width
@@ -440,39 +700,7 @@ class road_system(node):
         else: children = self.make_primitives_web(*args, **kwargs)
         return children
 
-    # will be class specific
-    def children_from_reuse_file(self, info_file_name):
-        info_file_name = os.path.join(os.getcwd(),info_file_name)
-        self.reuse_data = pk.load_pkl(info_file_name)
-        #self.reuse_data = {'rargs':[],'iargs':[],'topology':None}
-        elements = []
-        self.roads = []
-        for ig in self.reuse_data['iargs']:
-            elements.append(intersection(**ig))
-        for rarg in self.reuse_data['rargs']:
-            newrd = road(**rarg)
-            self.roads.append(newrd)
-            elements.append(newrd)
-        self.topology = self.reuse_data['topology']
-        return elements
-
-    def output_reuse_file(self, info_file_name):
-        info_file_name = os.path.join(os.getcwd(),info_file_name)
-        pk.save_pkl(self.reuse_data, info_file_name)
-
-    def reusing(self, *args, **kwargs):
-        if not self.reuse or not self.name: return
-        info_file_name = '.'.join([self.name,'reusable','data','pkl'])
-        if not pk.file_exists(info_file_name):
-            chds = self.children_from_kwargs(*args, **kwargs)
-            self.output_reuse_file(info_file_name)
-            return chds
-        else:
-            chds = self.children_from_reuse_file(info_file_name)
-            return chds
-
     def terrain_points(self):
-        #pts = [ch.tform.true().position for ch in self.children]
         pts = []
         [pts.extend(ch.owner.terrain_points()) 
             for ch in self.tform.children]
@@ -480,30 +708,22 @@ class road_system(node):
 
     def make_primitives_web(self, *args, **kwargs):
         def good_dir(tip, ang):
-            link = rm.choice(range(linkmin,linkmax,50))
-            #link = rm.randrange(linkmin,linkmax)
+            max_slope = 0.1
             tippos = tip['position'].copy()
-            #angrad = (np.pi/180.0)*ang
-            angrad = fu.to_rad(ang)
-            z_off_min = -25
-            z_off_max =  25
+            link = rm.choice(range(linkmin,linkmax,25))
+            max_zoff = int(link*max_slope)
+            z_off_min = -max_zoff
+            z_off_max =  max_zoff
             z_offset = rm.randrange(z_off_min, z_off_max)
+            angrad = fu.to_rad(ang)
             offset = cv.vector(link*cos(angrad),link*sin(angrad),z_offset)
             tippos.translate(offset)
-            #newtip = mpu.translate_vector(tippos, offset)
-            if not mpu.in_region(region_bounds, tippos):
-                return False,None
+            if not cv.inside(tippos, region_bounds):return False,None
+            #if not mpu.in_region(region_bounds, tippos):return False,None
             for ipos in [i['position'] for i in interargs]:
                 d = cv.distance(tippos, ipos)
                 if d < linkmin: return False,None
             return True,tippos
-            #newtip = mpu.translate_vector(tippos, offset)
-            #if not mpu.in_region(region_bounds, newtip):
-            #    return False,None
-            #for ipos in [i['position'] for i in interargs]:
-            #    d = mpu.distance(newtip, ipos)
-            #    if d < linkmin: return False,None
-            #return True,newtip
 
         def get_angle(tip):
             nodes = [i['position'] for i in interargs]
@@ -600,6 +820,9 @@ class road_system(node):
                     self.roads.append(newrd)
                     elements.append(newrd)
                 else:
+
+                    continue
+
                     newrd = highway(**rarg)
                     newbb = newrd.get_bbox()
                     if not mpbb.intersects(hwbbs,newbb):
@@ -611,44 +834,6 @@ class road_system(node):
         self.reuse_data['topology'] = topology
         return elements
 
-    def make_primitives_from_blocks_______(self, *args, **kwargs):
-        prims = []
-        # given a list of blocks, determine a set of roads which bounds them
-        # assume them do not overlap, and that a road should bound each
-        # determine locations of intersections as all corners of every block
-        # determine the width, length, and position of each road connecting
-        # intersections
-        # also assume that intersections will never intersect by construction
-        #  that is the blocks are sized/positioned to prevent strange
-        #  intersections
-        # create the kwargs which includes them all
-        def get_inter_length():
-            return 40
-        def get_inter_width():
-            return 40
-        blocks = args[0]
-        used_bcorners = []
-        corner_signs = [(-1,-1), (0, -1), (0, 0), (-1, 0)]
-        interargs = []
-        for bl in blocks:
-            corn = bl.corners
-            c1, c2, c3, c4 = corn
-            for c_, signs in zip(corn, corner_signs):
-                ilength = get_inter_length()
-                iwidth = get_inter_width()
-                ipos = mpu.translate_vector(c_[:], 
-                    [signs[0]*ilength,signs[1]*iwidth,0]), 
-                if not ipos in used_bcorners:
-                    used_bcorners.append(ipos)
-                    interargs.append({
-                        'name' : 'intersection_' + str(len(used_bcorners)), 
-                        'position' : mpu.translate_vector(
-                            c_[:],[signs[0]*ilength,signs[1]*iwidth,0]), 
-                        'length' : ilength, 
-                        'width' : iwidth, 
-                        'floor_height' : 1.0})
-        return self.make_system_from_intersections(interargs)
-
     def get_bbox(self):
         bboxes = []
         roads = self.tform.children
@@ -659,6 +844,7 @@ class road_system(node):
 
 class highway(road):
     road_prim_type = highway_segment_primitive
+    road_type = 'highway'
 
     def terrain_points(self):
         tpts = [l.translate_z(5) for l in self.leg_positions]
@@ -684,12 +870,13 @@ class highway(road):
         rdsegs = road.make_segments(self, *args, **kwargs)
         return rdsegs
 
-    def make_leg(self, v):
+    def make_leg(self, v, alpha):
         leg = pr.ucube()
         leg_leng = 20
         leg.scale(cv.vector(5,5,leg_leng))
         leg_pos = v.copy().translate_z(-leg_leng-2.0)
         #leg_pos = [v[0],v[1],v[2]-leg_leng-2.0]
+        leg.rotate_z(alpha)
         leg.translate(leg_pos)
         self.leg_positions.append(leg_pos)
         return leg
@@ -700,7 +887,8 @@ class highway(road):
         [r.translate_z(1.75) for r in rs]# unacceptable...
         # use a bbox check to decide to place a leg or not
         if not leg: return rs
-        leg = self.make_leg(p1)
+        alpha = cv.angle_from_xaxis_xy(cv.v1_v2(p1,p2))
+        leg = self.make_leg(p1,alpha)
         rs.append(leg)
         return rs
 
@@ -721,7 +909,7 @@ def north_check(topology,topo,seek_fov,linkmax):
     potentials = []
     ndists = []
     tthresh = 50
-    max_slope = 0.25
+    max_slope = 0.1
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
@@ -755,7 +943,7 @@ def south_check(topology,topo,seek_fov,linkmax):
     potentials = []
     ndists = []
     tthresh = 50
-    max_slope = 0.25
+    max_slope = 0.1
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
@@ -787,7 +975,7 @@ def east_check(topology,topo,seek_fov,linkmax):
     potentials = []
     ndists = []
     tthresh = 50
-    max_slope = 0.25
+    max_slope = 0.1
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:
@@ -821,7 +1009,7 @@ def west_check(topology,topo,seek_fov,linkmax):
     normdx = 0
     trandx = 1
     tthresh = 50
-    max_slope = 0.25
+    max_slope = 0.1
     for pntopo in topology:
         outlets = [ake for ake in antidirs if pntopo[ake] is None]
         if outlets:

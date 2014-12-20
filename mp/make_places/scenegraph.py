@@ -234,9 +234,9 @@ class node(fu.base):
         return nam
 
     def __init__(self, *args, **kwargs):
-        if kwargs.has_key('name'): defname = self.get_name()
-        else: defname = None
-        self._default_('name',defname,**kwargs)
+        if not hasattr(self,'name'):
+            self.name = self.get_name()
+        #self._default_('name',defname,**kwargs)
         self._default_('grit_renderingdistance',250,**kwargs)
         self._default_('grit_lod_renderingdistance',2500,**kwargs)
         self._default_('consumes_children',False,**kwargs)

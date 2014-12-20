@@ -32,8 +32,7 @@ def create_prim(prim, name = None, center = False,
     if prim.is_lod:
         prim.origin = last_origin
         last_origin = prim.reposition_origin()
-    else:
-        last_origin = prim.reposition_origin()
+    else:last_origin = prim.reposition_origin()
 
     w_position = prim.origin
     w_rotation = world_rotation
@@ -229,10 +228,42 @@ def create_grit_mesh(prim, tangents = False,
     return is_new
 
 def create_gcol(prim):
+    lindamp = 1.0
+    angdamp = 1.0
+    linsleepthresh = 1.0
+    angsleepthresh = 1.0
+    faces = prim.get_vertexes_faces_phys()
+
     filename = os.path.join(world_dir, prim.gcol_filename)
-    #for c in obj.children:
-    #    if c.type == 'EMPTY':
-    #        print(
+    with open(filename,'w') as handle:
+        handle.write('TCOL1.0\n\n')
+        handle.write('attributes {\n')
+        handle.write('\tstatic;\n')
+        handle.write('\tlinear_damping ' + str(lindamp) + ';\n')
+        handle.write('\tangular_damping ' + str(angdamp) + ';\n')
+        handle.write('\tlinear_sleep_threshold ' + str(linsleepthresh) + ';\n')
+        handle.write('\tangular_sleep_threshold ' + str(angsleepthresh) + ';\n')
+        handle.write('}\n\n')
+        handle.write('compound {\n')
+        handle.write('}\n')
+
+        handle.write('trimesh {\n')
+        handle.write('\tvertexes {\n')
+        coords = prim.coords
+        for vdx in range(len(coords)):
+            p = coords[vdx]
+            x,y,z = p.x,p.y,p.z
+            handle.write('\t\t' + ' '.join([str(x),str(y),str(z)]) + ';\n')
+        handle.write('\t}\n')
+        handle.write('\tfaces {\n')
+        for m in faces.keys():
+            for f in faces[m]:
+                handle.write('\t\t'+\
+                    ' '.join([str(f[0]),str(f[1]),str(f[2])])+\
+                    ' \"'+m+'\";\n')
+        handle.write('\t}\n}\n')
+
+    '''#
     lindamp = 1.0
     angdamp = 1.0
     linsleepthresh = 1.0
@@ -276,6 +307,7 @@ def create_gcol(prim):
     gfile = os.path.join(world_dir,filename)
     with open(gfile,'w') as handle:
         [handle.write(gli) for gli in glines]
+    '''#
 
 def reset_world_scripts():
     global classlines, used_classes, maplines, used_mats, matlines

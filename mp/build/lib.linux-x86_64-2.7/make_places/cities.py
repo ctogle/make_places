@@ -8,6 +8,7 @@ from make_places.roads import highway
 #from make_places.buildings import building
 from make_places.buildings import newbuilding as building
 from make_places.terrain import terrain
+from make_places.newterrain import make_terrain as terrain
 import make_places.pkler as pk
 
 import mp_vector as cv
@@ -17,6 +18,7 @@ import mp_bboxes as mpbb
 from math import sqrt
 import numpy as np
 import random as rm
+import pdb
 import os
 
 class block(node):
@@ -63,9 +65,8 @@ class block(node):
         self._default_('reuse',False,**kwargs)
 
         bth = rm.choice(self.themes)
-        self.theme_data = self.bl_themes[bth]
-
         self._default_('theme',bth,**kwargs)
+        self.theme_data = self.bl_themes[self.theme]
 
         children = self.make_children(*args, **kwargs)
         self.add_child(*children)
@@ -82,6 +83,12 @@ class block(node):
         pts = []
         if hasattr(self,'buildings'):
             [pts.extend(bg.terrain_points()) for bg in self.buildings]
+        return pts
+
+    def terrain_holes(self):
+        pts = []
+        if hasattr(self,'buildings'):
+            [pts.extend(bg.terrain_holes()) for bg in self.buildings]
         return pts
 
     def get_bbox(self):
@@ -225,11 +232,17 @@ class city(node):
         return blocks
 
     def make_terrain(self, *args, **kwargs):
-        kwargs['parent'] = self
-        kwargs['splits'] = 7
-        kwargs['smooths'] = 100
-        kwargs['bboxes'] = self.bboxes
-        ter = terrain(**kwargs)
+        target_polygon_edge_length = 20
+        target_primitive_edge_length = 200
+        tkwargs = {
+            'parent':self, 
+            'fixed_pts':kwargs['pts_of_interest'], 
+            'hole_pts':kwargs['hole_pts'], 
+            'region_pts':kwargs['region_bounds'], 
+            'polygon_edge_length':target_polygon_edge_length, 
+            'primitive_edge_length':target_primitive_edge_length, 
+                }
+        ter = terrain(**tkwargs)
         return [ter]
 
     def make_road_system(self, *args, **kwargs):
@@ -243,8 +256,9 @@ class city(node):
                     cv.vector(1000,0,0),
                     cv.vector(-1000,0,0),
                     cv.vector(0,1000,0)], 
-                'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':20, 
+                'region_bounds':mpu.make_corners(cv.zero(),2000,2000,0), 
+                #'region_bounds':[(-1000,1000),(-1000,1000)], 
+                'intersection_count':10, 
                 'linkmin':200, 
                 'linkmax':400, 
                 'parent':self, 
@@ -256,11 +270,14 @@ class city(node):
     def make_city_parts(self, *args, **kwargs):
         road_sys = self.make_road_system(*args, **kwargs)
         blocks = self.make_blocks_from_roads(road_sys[0])
+        #blocks = []
         pts_of_int = road_sys[0].terrain_points()
+        hole_pts = road_sys[0].terrain_holes()
         for bl in blocks: pts_of_int.extend(bl.terrain_points())
+        for bl in blocks: hole_pts.extend(bl.terrain_holes())
         sea_level = road_sys[0]._suggested_sea_level_
         terra = self.make_terrain(sealevel = sea_level, 
-            pts_of_interest = pts_of_int, 
+            pts_of_interest = pts_of_int, hole_pts = hole_pts, 
             region_bounds = road_sys[0].region_bounds)
         ocean = [mpw.waters(position = cv.zero(),depth = 20,
                 sealevel = sea_level,length = 4000,width = 4000)]

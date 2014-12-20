@@ -12,6 +12,7 @@ import make_places.roads as roads
 import make_places.floors as floors
 import make_places.walls as walls
 import make_places.terrain as terr
+import make_places.newterrain as nmpt
 import make_places.profiler as prf
 
 import make_places.blend_in as blgeo
@@ -347,6 +348,34 @@ def terrain():
 
 def profile_terrain():
     prf.profile_function(terrain)
+
+def newroadsys():
+    gritgeo.reset_world_scripts()
+    rsys = roads.road_system_new()
+    fixed_pts = rsys.terrain_points()
+    targs = {
+        'fixed_pts':fixed_pts,
+        'hole_pts':[mpu.make_corners(cv.zero(),100,100,0)], 
+        'region_pts':mpu.make_corners(cv.zero(),2000,2000,0), 
+        'polygon_edge_length':20, 
+        'primitive_edge_length':400, 
+            }
+    terr = nmpt.make_terrain(**targs)
+    gritgeo.create_element(rsys)
+    gritgeo.create_element(terr)
+    gritgeo.output_world_scripts()
+
+def profile_newroadsys():
+    prf.profile_function(newroadsys)
+
+def newterrain():
+    gritgeo.reset_world_scripts()
+    terr = nmpt.test()
+    gritgeo.create_element(terr)
+    gritgeo.output_world_scripts()
+    
+def profile_newterrain():
+    prf.profile_function(newterrain)
 
 def blgplan():
     gritgeo.reset_world_scripts()

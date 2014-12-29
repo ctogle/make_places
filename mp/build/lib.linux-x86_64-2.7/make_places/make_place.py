@@ -9,6 +9,7 @@ import make_places.waters as mpw
 import make_places.cities as cities
 import make_places.buildings as blg
 import make_places.roads as roads
+import make_places.newroads as newroads
 import make_places.floors as floors
 import make_places.walls as walls
 import make_places.terrain as terr
@@ -81,18 +82,7 @@ def intersection_g():
     gritgeo.create_element(elem)
     gritgeo.output_world_scripts()
 
-def roady_b():
-    r1 = {
-        'start':[0,0,0], 
-        'end':[0,100,10], 
-        'directions':['north','south'],
-        'road_height':2, 
-        'road_width':20, 
-            }
-    rargs = [r1]
-    blgeo.create_element([roads.road(**rg) for rg in rargs])
-
-def roady_g():
+def roady():
     gritgeo.reset_world_scripts()
     r1 = {
         'start':[0,0,0], 
@@ -105,7 +95,7 @@ def roady_g():
     gritgeo.create_element([roads.road(**rg) for rg in rargs])
     gritgeo.output_world_scripts()
 
-def highway_g():
+def highway():
     gritgeo.reset_world_scripts()
     r1 = {
         'start':[0,0,0], 
@@ -118,14 +108,14 @@ def highway_g():
     gritgeo.create_element([roads.highway(**rg) for rg in rargs])
     gritgeo.output_world_scripts()
 
-def road_network_g():
+def road_network():
     gritgeo.reset_world_scripts()
     rnarg = {}
     elem = roads.road_system(**rnarg)
     gritgeo.create_element(elem)
     gritgeo.output_world_scripts()
 
-def road_network_terrain_g():
+def road_network_terrain():
     gritgeo.reset_world_scripts()
     iargs = [{
         'position':[0,0,0], 
@@ -155,7 +145,7 @@ def road_network_terrain_g():
     #gritgeo.create_element(terra)
     gritgeo.output_world_scripts()
 
-def profile_road_network_terrain_g():
+def profile_road_network_terrain():
     prf.profile_function(road_network_terrain_g)
 
 def afloor():
@@ -351,8 +341,11 @@ def profile_terrain():
 
 def newroadsys():
     gritgeo.reset_world_scripts()
-    rsys = roads.road_system_new()
+
+    rsys = newroads.road_system_new()
+    rsys.build()
     fixed_pts = rsys.terrain_points()
+
     targs = {
         'fixed_pts':fixed_pts,
         'hole_pts':[mpu.make_corners(cv.zero(),100,100,0)], 
@@ -361,6 +354,7 @@ def newroadsys():
         'primitive_edge_length':400, 
             }
     terr = nmpt.make_terrain(**targs)
+
     gritgeo.create_element(rsys)
     gritgeo.create_element(terr)
     gritgeo.output_world_scripts()

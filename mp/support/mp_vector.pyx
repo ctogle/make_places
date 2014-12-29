@@ -102,9 +102,34 @@ cpdef vector2d midpoint2d(vector2d v1, vector2d v2):
     cdef vector2d pt = midpoint2d_c(v1, v2)
     return pt
 
+cdef void translate_coords2d_c(list coords, vector2d t):
+    cdef int ccnt = len(coords)
+    cdef int cdx
+    cdef vector2d coo
+    for cdx in range(ccnt):
+        coo = <vector2d>coords[cdx]
+        coo.translate(t)
+
+cpdef translate_coords2d(list coords, vector2d t):
+    translate_coords2d_c(coords,t)
+
+cdef void scale_coords2d_c(list coords, vector2d s):
+    cdef int ccnt = len(coords)
+    cdef int cdx
+    cdef vector2d coo
+    for cdx in range(ccnt):
+        coo = <vector2d>coords[cdx]
+        coo.scale(s)
+
+cpdef scale_coords2d(list coords, vector2d s):
+    scale_coords2d_c(coords,s)
+
 # 3d classes/functions
 
 cdef class vector:
+
+    def plot_xy(self):
+        return [(self.x,self.y)]
 
     def __cinit__(self,float x,float y,float z):
         self.x = x
@@ -115,23 +140,11 @@ cdef class vector:
         strr = 'vector:' + str((self.x,self.y,self.z))
         return strr
 
-    #def __eq__(self, other):
     def __richcmp__(self, other, comparator):
-    #def __cmp__(self, other):
         if self.x == other.x:
             if self.y == other.y:
                 if self.z == other.z: return True
         return False
-        #xeq = self.x == other.x
-        #yeq = self.y == other.y
-        #zeq = self.z == other.z
-        #return xeq and yeq and zeq
-
-    #def __ne__(self, other):
-    #    xeq = self.x != other.x
-    #    yeq = self.y != other.y
-    #    zeq = self.z != other.z
-    #    return xeq or yeq or zeq
 
     cpdef vector2d xy2d(self):
         cdef vector2d new = vector2d(self.x,self.y)

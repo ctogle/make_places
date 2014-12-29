@@ -17,10 +17,7 @@ import random as rm
 import pdb
 
 def extrude_edge(c1,c2,length,direction):
-    #c1c2 = cv.v1_v2(c1,c2)
     c1c2n = direction.normalize().scale_u(length)
-    #c1c2n = cv.cross(cv.zhat,c1c2).normalize()
-    #c1c2n.scale_u(length)
     c3 = c2.copy().translate(c1c2n)
     c4 = c1.copy().translate(c1c2n)
     return c3,c4
@@ -34,20 +31,6 @@ class blueprint(fu.base):
     def __init__(self, *args, **kwargs):
         pass
 
-class door_plan____(blueprint):
-    def __init__(self, position, rotation, **kwargs):
-        self.position = position
-        self.rotation = rotation
-        self._default_('width',1,**kwargs)
-        self._default_('height',3,**kwargs)
-
-class window_plan____(blueprint):
-    def __init__(self, position, **kwargs):
-        self.position = position
-        self._default_('width',1,**kwargs)
-        self._default_('height',2,**kwargs)
-        self._default_('zoffset',1,**kwargs)
-
 class shaft_plan(blueprint):
     def __init__(self, position, **kwargs):
         self.position = position
@@ -55,9 +38,6 @@ class shaft_plan(blueprint):
         self._default_('floor_heights',[0.5]*self.floors,**kwargs)
         self._default_('ceiling_heights',[0.5]*self.floors,**kwargs)
         self._default_('wall_heights',[4.0]*self.floors,**kwargs)
-        #self._default_('floor_height',0.5,**kwargs)
-        #self._default_('ceiling_height',0.5,**kwargs)
-        #self._default_('wall_height',4.0,**kwargs)
         self._default_('length',8,**kwargs)
         self._default_('width',8,**kwargs)
 

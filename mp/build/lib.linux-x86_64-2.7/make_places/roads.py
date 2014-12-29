@@ -95,8 +95,8 @@ class intersection(sg.node):
         v6 = cv.vector(-clip_length*tan(fu.to_rad(22.5)), clip_length,0)
         v7 = cv.vector( clip_length*tan(fu.to_rad(22.5)),-clip_length,0)
         v8 = cv.vector(-clip_length*tan(fu.to_rad(22.5)),-clip_length,0)
-        self.corners = [v1, v2, v3, v4, v5, v6, v7, v8]
-        return self.corners
+        self.corners = [[v1, v2, v3, v4, v5, v6, v7, v8]]
+        return self.corners[0]
 
     def terrain_points(self):
         # i need the location of the octagon verts!
@@ -224,13 +224,17 @@ class road(sg.node):
         self.set_segmented_vertices(*args, **kwargs)
         self.set_corners(self.segmented_vertices)
         self.segs = self.make_segments(*args, **kwargs)
+
         litter = self.litter(self.segs)
+
         #segbatches = self.segs
         segbatches = self.batch_segments(self.segs)
+
         self.add_child(*segbatches)
         self.primitives = litter
-        sg.node.__init__(self, *args, **kwargs)
 
+        sg.node.__init__(self, *args, **kwargs)
+    
     def batch_name(self):
         global road_batch_count
         name = '_road_segment_batch_' + str(road_batch_count)
@@ -517,6 +521,19 @@ class road(sg.node):
         return [strip]
 
 class road_system_new(sg.node):
+    dang = 22.5
+    deg_rngs = [((dx*45.0)-dang,(dx*45.0)+dang) for dx in range(8)]
+    deg_bins = {
+        'west':deg_rngs[0], 
+        'southwest':deg_rngs[1], 
+        'south':deg_rngs[2], 
+        'southeast':deg_rngs[3], 
+        'east':deg_rngs[4], 
+        'northeast':deg_rngs[5], 
+        'north':deg_rngs[6], 
+        'northwest':deg_rngs[7], 
+            }
+
     def pick_sea_level(self, vals):
         maxval = max(vals)
         minval = min(vals)
@@ -555,18 +572,6 @@ class road_system_new(sg.node):
 
         sg.node.__init__(self,*args,**kwargs)
 
-    dang = 22.5
-    deg_rngs = [((dx*45.0)-dang,(dx*45.0)+dang) for dx in range(8)]
-    deg_bins = {
-        'west':deg_rngs[0], 
-        'southwest':deg_rngs[1], 
-        'south':deg_rngs[2], 
-        'southeast':deg_rngs[3], 
-        'east':deg_rngs[4], 
-        'northeast':deg_rngs[5], 
-        'north':deg_rngs[6], 
-        'northwest':deg_rngs[7], 
-            }
     def network(self,*args,**kwargs):
 
         def ang_wobble(ang):

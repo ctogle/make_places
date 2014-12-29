@@ -64,6 +64,10 @@ def some_input():
             }
     return theinput
 
+
+
+
+
 def find_extremes_y(pts):
     lo = pts[0]
     hi = pts[0]
@@ -188,21 +192,8 @@ def intersects_xy(polys,bounds):
     return keep
 
 def relax(tpt):
-    #weights = tpt.weights
-    
-    #tns = tpt.neighbors
-    #ndists = [cv.distance(tpt.position,tn.position) for tn in tns]
-    #print 'ndists', ndists
-    #if max(ndists) > 20: return
-
     centroidz = np.mean([v.position.z for v in tpt.neighbors])
-    #centroid = cv.center_of_mass([v.position for v in tpt.neighbors])
-    #move = cv.v1_v2(tpt.position,centroid)
     move = (centroidz - tpt.position.z) * tpt.weights.z
-    #print 'smooth move!', move
-
-    #move.scale(weights)
-    #tpt.position.translate_z(move)
     tpt.position.translate_z(move)
 
 class terrain_point:
@@ -431,7 +422,7 @@ class terrain_piece:
                 zoff = zdiff
                 tpt.weights.z = 0
             elif dist < partial_tolerance:
-                zoff = zdiff * (1 - (dist/(partial_tolerance))) * offset(1)
+                zoff = zdiff * (1 - (dist/(partial_tolerance)))# * offset(1)
             else: zoff = free_find()
         return zoff
 
@@ -700,9 +691,7 @@ def make_terrain(**someinput):
 
     holes = []
     for hdx in range(len(someinput['hole_pts'])):
-        #pdb.set_trace()
         hpts = someinput['hole_pts'][hdx]
-        print 'hpts', hpts
         holes.append(mpbb.bbox(corners = hpts))
 
     for pdx in range(tpiececount):
@@ -721,7 +710,7 @@ def make_terrain(**someinput):
 
     #plot_tpts(global_bounding_points)
     
-    smooths = 100
+    smooths = 10
     for sdx in range(smooths):
         print 'smoothing global points', sdx
         #for pt in global_bounding_points:

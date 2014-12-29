@@ -197,24 +197,49 @@ cdef class xy_bbox:
     def copy(self):
         return bbox(corners = self.corners)
 
-    def intersect_xy(self, other):
+    def intersect_xy(self, other, info = None):
+        if info is None:
+            info = {
+                'self members':[], 
+                'other members':[], 
+                'center':None, 
+                    }
         if intersect_xy(self.copy(),other.copy()):
             if self.children and other.children:
-                members = []
+                children_isect = False
+                subcenters = []
                 for ch in self.children:
                     for och in other.children:
-                        ipair = ch.intersect_xy(och)
-                        if not ipair is None:
-                            for im in ipair:
-                                if not im in members:
-                                    members.append(im)
-                if members: return {'members':members}
+                        chiinfo = ch.intersect_xy(och,info = info)
+                        if not chiinfo is None:
+                            children_isect = True
+                            subcenters.append(chiinfo['center'])
+                            for sm in chiinfo['self members']:
+                                if not sm in info['self members']:
+                                    info['self members'].append(sm)
+                            for osm in chiinfo['other members']:
+                                if not osm in info['other members']:
+                                    info['other members'].append(osm)
+                            #if not ipair[0] in info['self members']:
+                            #    info['self members'].append(ipair[0])
+                            #if not ipair[1] in info['self members']:
+                            #    info['other members'].append(ipair[1])
+                            #for im in ipair:
+                            #    if not im in members:
+                            #        members.append(im)
+                if children_isect:
+                    info['center'] = cv.com(subcenters)
+                    return info
                 else: return None
             else:
-                members = [self,other]
-                if self.parent is self:
-                    return {'members':members}
-                else: return members
+                info['self members'].append(self)
+                info['other members'].append(other)
+                info['center'] = cv.midpoint(self.center,other.center)
+                return info
+                #members = [self,other]
+                #if self.parent is self:
+                #    return {'members':members}
+                #else: return members
         else: return None
 
     def plot_corners(self, color = 'black'):

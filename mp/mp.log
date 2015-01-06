@@ -1,6 +1,0 @@
-('function', 'load xml library', 'ran in', 0.037999999999999999, 'seconds')
-bpy is not available!
-['west', 'southeast']
-['southwest', 'northeast']
-['east', 'southwest']
-['north', 'southwest']

@@ -4,6 +4,7 @@
 
 cimport mp_vector as cv
 import mp_vector as cv
+import mp_bboxes as mpbb
 
 from libc.math cimport sqrt
 from libc.math cimport cos
@@ -21,6 +22,68 @@ import random as rm
 #from numpy import pi
 
 stuff = 'hi'
+
+def find_extremes_y(pts):
+    lo = pts[0]
+    hi = pts[0]
+    for pt in pts[1:]:
+        if pt.y < lo.y: lo = pt
+        if pt.y > hi.y: hi = pt
+    return lo,hi
+
+def find_extremes_x(pts):
+    lo = pts[0]
+    hi = pts[0]
+    for pt in pts[1:]:
+        if pt.x < lo.x: lo = pt
+        if pt.x > hi.x: hi = pt
+    return lo,hi
+
+def sweep_search(pts,center,tangent = None):
+    # this will behave oddly when `which` would
+    #  be a colinear set
+    offset = center.copy().flip()
+    cv.translate_coords(pts,offset)
+    if not tangent is None:
+        tangent_rot = cv.angle_from_xaxis_xy(tangent)
+        cv.rotate_z_coords(pts,-tangent_rot)
+    which = center
+    pang = 2*np.pi
+    pcnt = len(pts)
+    for adx in range(pcnt):
+        pt = pts[adx]
+        if pt is center: continue
+        tpang = cv.angle_from_xaxis_xy(pt)
+        if tpang < pang:
+            pang = tpang
+            which = pt
+    if not tangent is None:
+        cv.rotate_z_coords(pts,tangent_rot)
+    cv.translate_coords(pts,offset.flip())
+    return which
+
+def pts_to_convex_xy(pts,start = None):
+    # return the corners of the polygon, a subset of pts
+    # it could be that pts is all one point or is colinear
+    if start is None:new = find_extremes_x(pts)[1]
+    else:new = start.copy()
+    tang = None
+    shape = []
+    while not new in shape:
+        shape.append(new)
+        if len(shape) > 1:
+            tang = cv.v1_v2(shape[-2],shape[-1])
+        new = sweep_search(pts,new,tang)
+    return shape
+
+def inflate(convex, radius):
+    enorms = mpbb.get_norms(convex)
+    for cdx in range(len(convex)):
+        lead = enorms[cdx]
+        rear = enorms[cdx-1]
+        norm = cv.midpoint(lead,rear).normalize()
+        convex[cdx].translate(norm.scale_u(radius))
+    return convex
 
 def make_corners(pos,l,w,theta):
     hl = l/2.0

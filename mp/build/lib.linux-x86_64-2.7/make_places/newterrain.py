@@ -4,6 +4,7 @@ import mp_utils as mpu
 import mp_bboxes as mpbb
 import make_places.primitives as pr
 import make_places.scenegraph as sg
+import make_places.blueprints as mbp
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -129,6 +130,8 @@ def inflate(convex, radius):
         convex[cdx].translate(norm.scale_u(radius))
     return convex
 
+
+
 def region_pts_to_boundary(rpts, radius = 100):
     convex = pts_to_convex_xy(rpts)
     inflate(convex,radius)
@@ -192,9 +195,10 @@ def intersects_xy(polys,bounds):
     return keep
 
 def relax(tpt):
-    centroidz = np.mean([v.position.z for v in tpt.neighbors])
-    move = (centroidz - tpt.position.z) * tpt.weights.z
-    tpt.position.translate_z(move)
+    if tpt.neighbors:
+        centroidz = np.mean([v.position.z for v in tpt.neighbors])
+        move = (centroidz - tpt.position.z) * tpt.weights.z
+        tpt.position.translate_z(move)
 
 class terrain_point:
     def __init__(self,position):
@@ -204,6 +208,7 @@ class terrain_point:
         self.owners = []
         self.owner_count = 0
         self.boundary = False
+        self.hole_boundary = False
         self.is_corner = False
     
     def set_neighbor_count(self):
@@ -224,7 +229,7 @@ class terrain_point:
             n1 = self.neighbors[ndx-1].position
             n2 = self.neighbors[ndx].position
 
-            if near_xy(n1,n2):pdb.set_trace()
+            #if near_xy(n1,n2):pdb.set_trace()
 
             vn1 = cv.v1_v2(spos,n1)
             vn2 = cv.v1_v2(spos,n2)
@@ -271,10 +276,10 @@ class terrain_point:
 def near_xy(p1,p2):
     dx = (p2.x - p1.x)
     dx2 = dx*dx
-    if dx2 > 1: return False
+    if dx2 > 0.5: return False
     dy = (p2.y - p1.y)
     dy2 = dy*dy
-    if dy2 > 1: return False
+    if dy2 > 0.5: return False
     return True
 
 def new_neighbors(tp1,tp2):
@@ -294,8 +299,34 @@ class terrain_triangle:
     def __init__(self,parent,tpts):
         self.parent = parent
         self.local_points = tpts
-        self.bbox = mpbb.bbox(corners = [t.position for t in tpts])
         self.children = []
+        self.set_bbox()
+
+    def set_bbox(self):
+        tpts = self.local_points
+        tposs = []
+        for t in tpts:
+                tpos = t.position
+                if not tpos in tposs:
+                    tposs.append(tpos)
+        #tposs = [t.position for t in tpts]
+        if len(tpts) > 3:
+            tposs = mpu.pts_to_convex_xy(tposs)
+        if len(tposs) < 3: self.bbox = None
+        else: self.bbox = mpbb.bbox(corners = tposs)
+
+    '''#
+    def set_bbox(self):
+        tpts = self.local_points
+        if len(tpts) > 3:
+            tposs = [t.position for t in tpts]
+            tposs = mpu.pts_to_convex_xy(tposs)
+        else: tposs = [t.position for t in tpts]
+        if len(tposs) < 3: self.bbox = None
+        else:
+            for p in tposs: print p
+            self.bbox = mpbb.bbox(corners = tposs)
+    '''#
 
     def split(self, isolated = False):
         if self.children:
@@ -323,26 +354,108 @@ class terrain_triangle:
                 terrain_triangle(self.parent,[ t2,nt2,nt1]), 
                 terrain_triangle(self.parent,[ t3,nt3,nt2])]
     
+    def cut_self(self,in1,in2,in3,bboxes):
+
+        '''#
+        lposs = [tp.position for tp in self.local_points]
+        mbp.plot(lposs,marker = '*',color = 'green')
+        for mc in must_check:
+            mbp.plot(mc.corners,marker = 's',color = 'red')
+        plt.show()
+        '''#
+
+        ins = [in1,in2,in3]
+        incnt = ins.count(True)
+        if incnt == 3:
+            for tpt in self.local_points:
+                if self in tpt.owners:
+                    tpt.owners.remove(self)
+                for n in tpt.neighbors:
+                    if tpt in n.neighbors:
+                        n.neighbors.remove(tpt)
+                        n.hole_boundary = True
+            self.local_points = []
+        elif incnt == 2:
+            for tpt in self.local_points:
+                if self in tpt.owners:
+                    tpt.owners.remove(self)
+                for n in tpt.neighbors:
+                    if tpt in n.neighbors:
+                        n.neighbors.remove(tpt)
+                        n.hole_boundary = True
+            self.local_points = []
+
+            '''#
+            outwhich = ins.index(False)
+            shared = self.local_points[outwhich]
+
+            # find intersection from shared and the other 2 local points
+            fanmembers = self.local_points[:]
+            fanmembers.pop(outwhich)
+            for fm in fanmembers:
+                if not fm is shared:
+                    etang = cv.v1_v2(fm.position,shared.position)
+                    fm.position.translate(etang.scale_u(0.9))
+            fanmembers.insert(0,shared)
+
+            for fm in fanmembers:
+                for ow in fm.owners:
+                    ow.set_bbox()
+
+            self.local_points = []
+            tcnt = len(fanmembers) - 2
+            for trdx in range(tcnt):
+                c2dx = trdx+1
+                c3dx = trdx+2
+                if c3dx == tcnt + 1: c3dx = 1
+                c1 = fanmembers[0]
+                c2 = fanmembers[c2dx]
+                c3 = fanmembers[c3dx]
+                c1.weights = cv.zero()
+                c2.weights = cv.zero()
+                c3.weights = cv.zero()
+                self.local_points.extend([c1,c2,c3])
+            self.set_bbox()
+            # for any vertex whose position changes, recalc the bbox for
+            # that vertex's owner triangle
+            '''#
+        elif incnt == 1:
+            for tpt in self.local_points:
+                if self in tpt.owners:
+                    tpt.owners.remove(self)
+                for n in tpt.neighbors:
+                    if tpt in n.neighbors:
+                        n.neighbors.remove(tpt)
+                        n.hole_boundary = True
+            self.local_points = []
+
     def cut_holes(self, holes):
         bb = self.bbox
-        must_check = None
+        must_check = []
         for ho in holes:
             if mpbb.intersect_xy(bb,ho):
-                must_check = ho
-                break
+                must_check.append(ho)
         
-        if not must_check is None:
+        if must_check:
             if self.children:
                 for ch in self.children:
                     ch.cut_holes(holes)
             else:
                 lp1,lp2,lp3 = self.local_points
-                p1in = cv.inside(lp1.position,must_check.corners)
-                p2in = cv.inside(lp2.position,must_check.corners)
-                p3in = cv.inside(lp3.position,must_check.corners)
-                incnt = [p1in,p2in,p3in].count(True)
-                if incnt == 3:self.local_points = []
-                else: pass
+
+                # must_check is now a list of bboxes
+                inside1 = False
+                inside2 = False
+                inside3 = False
+                for mc in must_check:
+                    p1in = cv.inside(lp1.position,mc.corners)
+                    if p1in: inside1 = True
+                    p2in = cv.inside(lp2.position,mc.corners)
+                    if p2in: inside2 = True
+                    p3in = cv.inside(lp3.position,mc.corners)
+                    if p3in: inside3 = True
+                self.cut_self(inside1,inside2,inside3,must_check)
+
 
     def face_data(self, depth = None, max_depth = None):
         data = []
@@ -359,12 +472,19 @@ class terrain_triangle:
 
 terrain_number = 0
 class terrain_piece:
+    def filter_fixed(self,fixed):
+        relevant = []
+        for fx in fixed:
+            if cv.inside(fx,self.corners):
+                relevant.append(fx)
+        return relevant
+
     def __init__(self,verts,fixed_pts,
             primitive_edge_length,poly_edge_length,
             global_points,global_bounding_points):
-        self.fixed_pts = fixed_pts
-        self.fixed_count = len(fixed_pts)
         self.set_corners(verts)
+        self.fixed_pts = self.filter_fixed(fixed_pts)
+        self.fixed_count = len(self.fixed_pts)
         self.children = []
         self.splits = 0
         self.parent = None
@@ -374,6 +494,19 @@ class terrain_piece:
         self.local_points = []
         self.poly_size = poly_edge_length
         self.primitive_size = primitive_edge_length
+
+    def set_bbox(self):
+        tpts = self.local_points
+        tposs = []
+        for t in tpts:
+                tpos = t.position
+                if not tpos in tposs:
+                    tposs.append(tpos)
+        #tposs = [t.position for t in tpts]
+        if len(tpts) > 3:
+            tposs = mpu.pts_to_convex_xy(tposs)
+        if len(tposs) < 3: self.bbox = None
+        else: self.bbox = mpbb.bbox(corners = tposs)
 
     def get_terrain_number(self):
         global terrain_number
@@ -559,15 +692,24 @@ class terrain_piece:
         bump = 0
         for fdx,fdat in enumerate(data):
             if not fdat: bump += 1
-            if len(fdat) == 3:
+            #if len(fdat) == 3:
+            if len(fdat) > 0:
                 newverts = [f.position.copy() for f in fdat]
                 newnorml = [f.calculate_smooth_normal() for f in fdat]
                 newuvs = [cv.vector2d(0,0),cv.vector2d(1,0),cv.vector2d(0,1)]
                 verts.extend(newverts)
                 nverts.extend(newnorml)
-                uvs.extend(newuvs)
-                faces.append([3*(fdx-bump)+x for x in range(3)])
-                face_materials.append(0)
+
+                newfcnt = len(fdat)/3
+                if not newfcnt == 1: pdb.set_trace()
+                for d in range(newfcnt):
+                    uvs.extend([u.copy() for u in newuvs])
+                    if d > 0: bump += 1
+                    faces.append([3*(fdx-bump)+x for x in range(3)])
+                    face_materials.append(0)
+
+                #faces.append([3*(fdx-bump)+x for x in range(3)])
+                #face_materials.append(0)
         
         xmlfile = '.'.join(['terrain',
             self.get_terrain_number(),'mesh','xml'])
@@ -620,6 +762,7 @@ def plot_tpts(tpts):
     for tp in tpts:
         if tp.is_corner: col = 'red'
         elif tp.boundary: col = 'green'
+        elif tp.hole_boundary: col = 'red'
         else: col = 'blue'
         if tp.neighbor_count == 4: mark = 'o'
         elif tp.neighbor_count == 6: mark = 'x'
@@ -689,15 +832,24 @@ def make_terrain(**someinput):
             print 'terrain piece',pdx + 1,'of',tpiececount,'split',p.splits,'times'
     '''#
 
+    reneightime = time.time()
+    print 'reneighboring...'
+    for pt in global_points:
+        pt.set_neighbor_count()
+        for pwn in pt.owners:
+            ownerpts = pwn.local_points
+            pt.reneighbors(ownerpts,poly_length+1)
+    print 'reneighbored!', time.time() - reneightime
+
     holes = []
     for hdx in range(len(someinput['hole_pts'])):
         hpts = someinput['hole_pts'][hdx]
         holes.append(mpbb.bbox(corners = hpts))
 
-    for pdx in range(tpiececount):
-        p = pieces[pdx]
-        #p.cut_holes(holes)
-        print 'terrain piece',pdx + 1,'of',tpiececount,'cut holes'
+    #for pdx in range(tpiececount):
+    #    p = pieces[pdx]
+    #    p.cut_holes(holes)
+    #    print 'terrain piece',pdx + 1,'of',tpiececount,'cut holes'
 
     reneightime = time.time()
     print 'reneighboring...'
@@ -708,9 +860,11 @@ def make_terrain(**someinput):
             pt.reneighbors(ownerpts,poly_length+1)
     print 'reneighbored!', time.time() - reneightime
 
+    #plot_tpts(global_points)
     #plot_tpts(global_bounding_points)
     
-    smooths = 10
+    #smooths = 0
+    smooths = 100
     for sdx in range(smooths):
         print 'smoothing global points', sdx
         #for pt in global_bounding_points:

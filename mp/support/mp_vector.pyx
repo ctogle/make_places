@@ -2,6 +2,8 @@
 # cython: profile=True
 #cimport cython
 
+import matplotlib.pyplot as plt
+
 from libc.math cimport sqrt
 from libc.math cimport cos
 from libc.math cimport sin
@@ -9,6 +11,8 @@ from libc.math cimport tan
 from libc.math cimport hypot
 import numpy as np
  
+#cimport mp_utils as mpu
+import mp_utils as mpu
 
 
 
@@ -443,6 +447,10 @@ cpdef bint near(vector v1, vector v2):
     cdef bint isnear = distance_c(v1,v2) < 0.01
     return isnear
 
+cpdef bint near_xy(vector v1, vector v2):
+    cdef bint isnear = distance_xy_c(v1,v2) < 0.01
+    return isnear
+
 cdef int find_closest_xy_c(vector one,list bunch,int bcnt,float close_enough):
     cdef float nearest = 100000000.0
     cdef float ds = nearest
@@ -545,7 +553,7 @@ cpdef bint inside(vector pt, list corners):
     poly = [(c.x,c.y) for c in corners]
     x,y = pt.x,pt.y
     n = len(poly)
-    inside = False
+    ins = False
 
     p1x,p1y = poly[0]
     for i in range(n+1):
@@ -556,10 +564,25 @@ cpdef bint inside(vector pt, list corners):
                     if p1y != p2y:
                         xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
                     if p1x == p2x or x <= xints:
-                        inside = not inside
+                        ins = not ins
         p1x,p1y = p2x,p2y
+    return ins
 
-    return inside
+def spline(c1,c2,c3,c4,scnt):
+    cox = [c1.x,c2.x,c3.x,c4.x]
+    coy = [c1.y,c2.y,c3.y,c4.y]
+    coz = [c1.z,c2.z,c3.z,c4.z]
+    tim = [0.0,1.0,2.0,3.0]
+    alpha = 1.0/2.0
+    mpu.parameterize_time([c1,c2,c3,c4],tim,alpha)
+    cox = mpu.catmull_rom(cox,tim,scnt)[1:-1]
+    coy = mpu.catmull_rom(coy,tim,scnt)[1:-1] 
+    coz = mpu.catmull_rom(coz,tim,scnt)[1:-1] 
+    filled = [vector(*i) for i in zip(cox,coy,coz)]
+    return filled
+
+
+
 
 
 

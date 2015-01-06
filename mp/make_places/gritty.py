@@ -34,6 +34,10 @@ def create_prim(prim, name = None, center = False,
         last_origin = prim.reposition_origin()
     else:last_origin = prim.reposition_origin()
 
+    if last_origin is None:
+        print 'must skip empty primitive creation!'
+        return
+
     w_position = prim.origin
     w_rotation = world_rotation
     # rotate coords backwards by world_rotation?
@@ -91,9 +95,9 @@ materials = {
         }
 def read_material_name(matline):
     if matline.startswith('material'):
-        st = matline.find('"') + 1
-        matline = matline.replace('"','@',1)
-        en = matline.find('"')
+        st = matline.find('`') + 1
+        matline = matline.replace('`','@',1)
+        en = matline.find('`')
         matname = matline[st:en]
         return matname
 
@@ -130,7 +134,7 @@ def output_mats():
 
 def write_material(matname, textfile):
     #lines = ['\nmaterial "' + matname + '" {diffuseMap = "' + textdir + '/' + textfile + '"}\n']
-    lines = ['\nmaterial \'' + matname + '\' {diffuseMap = \'' + textfile + '\'}\n']
+    lines = ['\nmaterial `' + matname + '` {diffuseMap = `' + textfile + '`}\n']
     return lines
 
 classlines = []
@@ -156,7 +160,7 @@ def output_classes():
 def write_class(clname, gmesh, cmesh, rd, lod):
     lod = 'true' if lod else 'false'
     lines = [
-        '\nclass "' + clname + '" (ColClass) {\n', 
+        '\nclass `' + clname + '` (ColClass) {\n', 
         #'    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
         #'    colMesh = \'/solemn/world/' + cmesh + '\';\n'
         '    gfxMesh = `' + gmesh + '`;\n'
@@ -173,7 +177,7 @@ def write_class(clname, gmesh, cmesh, rd, lod):
 def write_lod_class(clname, gmesh, cmesh, rd, lod):
     lodclname = 'lod_' + clname
     lines = [
-        '\nclass "'+ lodclname + '" (BaseClass) {\n',
+        '\nclass `'+ lodclname + '` (BaseClass) {\n',
         #'    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
         '    gfxMesh = `' + gmesh + '`;\n'
         '    castShadows = false;\n', 
@@ -196,7 +200,7 @@ def output_map():
 def write_map_lines(obj, location, rotation, name):
     zang = rotation[2]
     quat = (cos(zang/2.0),0,0,sin(zang/2.0))
-    lines = ['\nobject "' + obj + '" ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
+    lines = ['\nobject `' + obj + '` ' + location.__repr__() + ' { rot=quat' + quat.__repr__() + ', name="' + name + '" }\n']
     return lines
 
 def create_grit_meshes():
@@ -318,9 +322,9 @@ def reset_world_scripts():
         #'\ninclude "materials_constant.lua"\n', 
         #'include "materials.lua"\n', 
         #'include "classes.lua"\n\n']
-        '\ninclude \'materials_constant.lua\'\n', 
-        'include \'materials.lua\'\n', 
-        'include \'classes.lua\'\n\n']
+        '\ninclude `materials_constant.lua`\n', 
+        'include `materials.lua`\n', 
+        'include `classes.lua`\n\n']
     maplines = world_start
 
     mapfile = os.path.join(world_dir, 'map.lua')

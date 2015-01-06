@@ -14,7 +14,37 @@ from math import tan
 from math import sqrt
 import numpy as np
 import random as rm
+import matplotlib.pyplot as plt
+
 import pdb
+
+def plot(verts,number = True,color = 'black',marker = None):
+    fig = plt.gcf()
+    ax = fig.gca()
+    ax.grid(True)
+
+    mark = 0
+    for vdx in range(len(verts)):
+        v = verts[vdx]
+        mark = 1 if mark % 2 == 0 else 0
+        altmark = '+' if mark else 'x'
+        vmark = altmark if marker is None else marker
+        vplt = v.plot_xy()
+        x = [vplt[0][0]]
+        y = [vplt[0][1]]
+        label = str(vdx+1)
+        plt.plot(x,y,markersize = 10,marker = vmark,color = color)
+        if number:
+            plt.annotate(label,xy = (x[0],y[0]),xytext = (-20, 20),
+                textcoords = 'offset points', ha = 'right', va = 'bottom',
+                #bbox = dict(boxstyle = 'round,pad=0.5',fc = 'yellow', alpha = 0.5),
+                arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+        
+def rotate_pair(pair,ang):
+    mp = cv.midpoint(*pair)
+    cv.translate_coords(pair,mp.flip())
+    cv.rotate_z_coords(pair,ang)
+    cv.translate_coords(pair,mp.flip())
 
 def extrude_edge(c1,c2,length,direction):
     c1c2n = direction.normalize().scale_u(length)
@@ -30,6 +60,98 @@ def extrude_edge_normal(c1,c2,length):
 class blueprint(fu.base):
     def __init__(self, *args, **kwargs):
         pass
+
+    def tripie(self,vs,nvs,nus,nfs,fms,pfms,convex):
+        convex.insert(0,cv.center_of_mass(convex))
+        tcnt = len(convex) - 1
+        for trdx in range(tcnt):
+            c2dx = trdx+1
+            c3dx = trdx+2
+            if c3dx == tcnt + 1: c3dx = 1
+            c1 = convex[0].copy()
+            c2 = convex[c2dx].copy()
+            c3 = convex[c3dx].copy()
+            self.add_tri(vs,nvs,nus,nfs,fms,pfms,c1,c2,c3)
+        #plot(convex)
+        #plt.show()
+
+    def quadrafy(convex):
+        pdb.set_trace()
+
+    def bridge(self,vs,nvs,nus,nfs,fms,pfms,loop1,loop2):
+        if not len(loop1) == len(loop2): raise ValueError
+        lcnt = len(loop1)
+        for ldx in range(1,lcnt):
+            v1 = loop1[ldx-1].copy()
+            v2 = loop2[ldx-1].copy()
+            v3 = loop2[ldx].copy()
+            v4 = loop1[ldx].copy()
+            self.add_quad(vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4)
+
+    def add_tri(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3):
+        foffset = len(vs)
+        n = cv.v1_v2(v1,v2).cross(cv.v1_v2(v2,v3)).normalize()
+        vs.extend([v1,v2,v3])       
+        nvs.extend([n,n,n])
+        nus.extend([cv.vector2d(0,1),
+            cv.vector2d(0,0),cv.vector2d(1,0)])
+        uvlength = cv.distance(v2,v3)
+        #cv.scale_coords2d(nus,cv.vector2d(uvlength,self.lane_width))
+        #cv.translate_coords2d(nus,self.uvguide)
+        nfs.extend(mpu.offset_faces([[0,1,2]],foffset))
+        fms.extend([0])
+        pfms.extend([0])
+
+    def add_quad(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4):
+        foffset = len(vs)
+        n = cv.v1_v2(v1,v2).cross(cv.v1_v2(v2,v3)).normalize()
+        vs.extend([v1,v2,v3,v4])       
+        nvs.extend([n,n,n,n])
+        nus.extend([cv.vector2d(0,1),cv.vector2d(0,0),
+                  cv.vector2d(1,0),cv.vector2d(1,1)])
+        uvlength = cv.distance(v2,v3)
+        #cv.scale_coords2d(nus,cv.vector2d(uvlength,self.lane_width))
+        #cv.translate_coords2d(nus,self.uvguide)
+        nfs.extend(mpu.offset_faces([[0,1,3],[1,2,3]],foffset))
+        fms.extend([0,0])
+        pfms.extend([0,0])
+
+    def quaddata(self,data_methods = []):
+        vs = []
+        nvs = []
+        nus = []
+        nfs = []
+        fms = []
+        pfms = []
+        for dm in data_methods:
+            dm(vs,nvs,nus,nfs,fms,pfms)
+        return vs,nvs,nus,nfs,fms,pfms
+
+    def build(self,xmlfile,ilod,hlod):
+        vdat = self.quaddata()
+        newverts,newnorml,newuvs,newfaces,fmats,pfmats = vdat
+        pwargs = {
+            'verts' : newverts, 
+            'nverts' : newnorml, 
+            'uvs' : newuvs, 
+            'faces' : newfaces, 
+            'materials' : self.materials[:], 
+            'face_materials' : fmats, 
+            'phys_materials' : self.phys_materials[:], 
+            'phys_face_materials' : pfmats, 
+            'xmlfilename' : xmlfile, 
+            'force_normal_calc' : True, 
+            'prevent_normal_calc' : False, 
+            'smooth_normals' : False, 
+            'is_lod' : ilod, 
+            'has_lod' : hlod,
+                }
+        mesh = pr.arbitrary_primitive(**pwargs)
+        return mesh
+
+    def build_lod(self):
+        scubes = [pr.ucube()]
+        return scubes
 
 class shaft_plan(blueprint):
     def __init__(self, position, **kwargs):

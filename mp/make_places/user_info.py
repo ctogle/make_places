@@ -3,7 +3,8 @@ import os
 
 game = 'solemn'
 
-grit_dir = os.path.join('/home','athyra','dev','grit')
+grit_dir = os.path.join('/home','athyra','dev','gritengine')
+#grit_dir = os.path.join('/home','athyra','dev','grit')
 game_dir = os.path.join(grit_dir,'grit_core','media',game)
 world_dir = os.path.join(game_dir,'newworld')
 texture_dir = os.path.join(game_dir,'textures')

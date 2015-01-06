@@ -337,8 +337,9 @@ class newbuilding(node):
 
     def get_bbox(self, *args, **kwargs):
         cornas = self.find_corners()
-        bb = mpbb.bbox(corners = cornas)
-        return [bb]
+        #bb = mpbb.bbox(corners = cornas)
+        bb = mpbb.xy_bbox(corners = cornas,owner = self)
+        return bb
 
     def terrain_points(self):
         tpts = self.find_corners()
@@ -527,8 +528,9 @@ class building(node):
 
     def get_bbox(self, *args, **kwargs):
         cornas = self.find_corners()
-        bb = mpbb.bbox(corners = cornas)
-        return [bb]
+        #bb = mpbb.bbox(corners = cornas)
+        bb = mpbb.xy_bbox(corners = cornas,owner = self)
+        return bb
 
     def find_corners(self):
         length = self.length

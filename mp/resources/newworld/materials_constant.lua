@@ -1,41 +1,41 @@
 local soc = 20
 soc = 0
 
-material "grass2" {
+material `grass2` {
     --vertexDiffuse=true,
     vertexDiffuse=false,
-    --diffuseMap="/solemn/textures/grass.dds", 
-    --normalMap="/solemn/textures/grass_N.dds", 
-    --glossMap="/solemn/textures/grass_S.tga", 
-    diffuseMap='../textures/grass.dds', 
-    --normalMap='../textures/grass_N.dds', 
-    --glossMap='../textures/grass_S.tga', 
+    --diffuseMap=`/solemn/textures/grass.dds`, 
+    --normalMap=`/solemn/textures/grass_N.dds`, 
+    --glossMap=`/solemn/textures/grass_S.tga`, 
+    diffuseMap=`../textures/grass.dds`, 
+    --normalMap=`../textures/grass_N.dds`, 
+    --glossMap=`../textures/grass_S.tga`, 
     textureScale={2,2},
     shadowObliqueCutOff = soc,
 }
 
-material "Tree_aelmTrunk" {
+material `Tree_aelmTrunk` {
     --vertexDiffuse = true,
     vertexDiffuse = false,
-    diffuseMap = '../textures/tree_aelm.dds',
-    normalMap = '../textures/tree_aelm_N.dds',
+    diffuseMap = `../textures/tree_aelm.dds`,
+    normalMap = `../textures/tree_aelm_N.dds`,
     gloss = 0,
     specular = 0,
 }
 
-material "Tree_aelmLev" {
+material `Tree_aelmLev` {
     vertexDiffuse = false,
-    diffuseMap = '../textures/tree_aelm.dds',
+    diffuseMap = `../textures/tree_aelm.dds`,
     clamp = true,
     alphaReject = 0.5,
-    normalMap = '../textures/tree_aelm_N.dds',
+    normalMap = `../textures/tree_aelm_N.dds`,
     gloss = 0,
     specular = 0,
 }
 
-material "GrassTuft1" {
+material `GrassTuft1` {
     backfaces=true,
-    diffuseMap = '../textures/GrassTuft1_D.dds',
+    diffuseMap = `../textures/GrassTuft1_D.dds`,
     clamp = true,
     alphaReject = 0.9,
     grassLighting = true,
@@ -43,10 +43,10 @@ material "GrassTuft1" {
     specular = 0,
 }
 
-material "grasstuft2" {
+material `grasstuft2` {
     backfaces=true,
-    diffuseMap = '../textures/GrassTuft2_D.dds',
-    normalMap = '../textures/GrassTuft2_N.dds',
+    diffuseMap = `../textures/GrassTuft2_D.dds`,
+    normalMap = `../textures/GrassTuft2_N.dds`,
     clamp = true,
     alphaReject = 0.33,
     grassLighting = true,
@@ -54,11 +54,11 @@ material "grasstuft2" {
     specular = 0,
 }
 
-material "ocean" {
+material `ocean` {
 	diffuseColour = V_ZERO,
-	--diffuseMap="textures/ocean_D.dds",
-	normalMap='../textures/ocean_N.tga',
-	glossMap='../textures/ocean_S.tga',
+	--diffuseMap=`textures/ocean_D.dds`,
+	normalMap=`../textures/ocean_N.tga`,
+	glossMap=`../textures/ocean_S.tga`,
     depthWrite=true,
 	alpha = 0.9,
 	textureAnimation={-0.1,0},

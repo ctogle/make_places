@@ -2,11 +2,13 @@ import make_places.fundamental as fu
 import make_places.primitives as pr
 import make_places.scenegraph as sg
 import make_places.waters as mpw
+import make_places.newnewroads as nrds
 from make_places.scenegraph import node
 from make_places.roads import road_system
 from make_places.roads import highway
 #from make_places.buildings import building
 from make_places.buildings import newbuilding as building
+import make_places.buildings as blg
 from make_places.terrain import terrain
 from make_places.newterrain import make_terrain as terrain
 import make_places.pkler as pk
@@ -15,6 +17,7 @@ import mp_vector as cv
 import mp_utils as mpu
 import mp_bboxes as mpbb
 
+import matplotlib.pyplot as plt
 from math import sqrt
 import numpy as np
 import random as rm
@@ -29,32 +32,32 @@ class block(node):
             'max_floors' : 3, 
             'min_length' : 30, 
             'min_width' : 30, 
-            'max_length' : 60, 
-            'max_width' : 100, 
+            'max_length' : 50, 
+            'max_width' : 70, 
                 }, 
         'residential' : {
             'max_buildings' : 30,
             'max_floors' : 10, 
             'min_length' : 30, 
             'min_width' : 30, 
-            'max_length' : 100, 
-            'max_width' : 100, 
+            'max_length' : 80, 
+            'max_width' : 80, 
                 }, 
         'commercial' : {
             'max_buildings' : 20,
             'max_floors' : 30, 
             'min_length' : 40, 
             'min_width' : 40, 
-            'max_length' : 100, 
-            'max_width' : 100, 
+            'max_length' : 80, 
+            'max_width' : 80, 
                 }, 
         'industrial' : {
             'max_buildings' : 40,
             'max_floors' : 6, 
             'min_length' : 40, 
             'min_width' : 40, 
-            'max_length' : 80, 
-            'max_width' : 80, 
+            'max_length' : 60, 
+            'max_width' : 60, 
                 }, 
             }
     themes = [ke for ke in bl_themes.keys()]
@@ -68,16 +71,9 @@ class block(node):
         self._default_('theme',bth,**kwargs)
         self.theme_data = self.bl_themes[self.theme]
 
-        children = self.make_children(*args, **kwargs)
+        children = self.make_buildings_from_road(*args, **kwargs)
         self.add_child(*children)
         node.__init__(self, *args, **kwargs)
-
-    def make_children(self, *args, **kwargs):
-        rd = kwargs['road']
-        if not issubclass(rd.__class__,highway):
-            children = self.make_buildings_from_road(*args, **kwargs)
-        else: children = []
-        return children
 
     def terrain_points(self):
         pts = []
@@ -100,31 +96,28 @@ class block(node):
         rd = kwargs['road']
         rdside = kwargs['side']
 
-        # this info should be prestored on the roads
-        corns = rd.segmented_vertices
-        corncnt = len(corns)
+        corns = rd.vertices
         zhat = cv.zhat
-        thats = [cv.v1_v2(corns[dx],corns[dx-1]).normalize()  
-                for dx in range(1,corncnt)]
-        rdnorms = [cv.cross(that,zhat) for that in thats]
+        thats = rd.tangents
+        rdnorms = [that.cross(zhat).normalize() for that in thats]
 
         bcnt = self.theme_data['max_buildings']
         buildings = []
 
+        if rd.style == 'interstate': bcnt = 0
+        if blg._newbuilding_count_ >= 300: bcnt = 0
+        #print 'BCNT',bcnt,blg._newbuilding_count_
+
         for bdx in range(bcnt):
-            bname = 'building_' + str(bdx)
-
             flcnt = self.get_building_floor_count()
-
             bpos,blen,bwid,ang =\
                 self.get_building_position_from_road(
                     corns,rdnorms,flcnt,side = rdside, 
                     road = rd,bboxes = bboxes)
-
             if not bpos is False:
                 blarg = {
                     'theme':self.theme, 
-                    'name':bname, 
+                    #'name':bname, 
                     'parent':self, 
                     'position':bpos, 
                     'length':blen, 
@@ -134,8 +127,7 @@ class block(node):
                         }
 
                 buildings.append(building(**blarg))
-                bboxes.extend(buildings[-1].get_bbox())
-
+                bboxes.append(buildings[-1].get_bbox())
         self.buildings = buildings
         return buildings
 
@@ -145,16 +137,18 @@ class block(node):
         road = kwargs['road']
         rdwidth = road.road_width
 
-        segcnt = len(rdnorms)
+        segcnt = len(rdnorms) - 1
         segdx = rm.randrange(segcnt)
         leadcorner = corners[segdx]
-        seglen = cv.distance(corners[segdx+1],leadcorner)
+        rearcorner = corners[segdx+1]
+        seglen = cv.distance(rearcorner,leadcorner)
 
         segtang = cv.v1_v2(leadcorner,corners[segdx+1]).normalize()
         rdpitch = cv.angle_from_xaxis(segtang)
         segnorm = rdnorms[segdx].copy()
-        if kwargs['side'] == 'right':
+        if kwargs['side'] == 'left':
             segnorm.flip()
+        if kwargs['side'] == 'right':
             rdpitch += fu.PI
 
         minblen = self.theme_data['min_length']
@@ -166,8 +160,9 @@ class block(node):
             blen = rm.randrange(minblen,maxblen)
             bwid = rm.randrange(minbwid,maxbwid)
 
-            d_to_road = rm.randrange(bwid)
-            d_to_road = mpu.clamp(d_to_road,int((bwid+0.5)/2.0),bwid)
+            d_to_road = rdwidth/2.0 + bwid/2.0 + rm.randrange(int(bwid/4.0))
+            #d_to_road = rdwidth + rm.randrange(bwid)
+            #d_to_road = mpu.clamp(d_to_road,int((bwid+0.5)/2.0),bwid)
             stry = rm.randrange(int(seglen))
 
             base = leadcorner.copy()
@@ -176,24 +171,50 @@ class block(node):
 
             postry = base
             corners = mpu.make_corners(postry,blen,bwid,rdpitch)
-            boxtry = [mpbb.bbox(corners = corners)]
+            boxtry = mpbb.xy_bbox(corners = corners)
+            #boxtry = [mpbb.bbox(corners = corners)]
             return boxtry,postry,blen,bwid
 
         try_cnt = 0
-        max_tries = 50
+        max_tries = 250
         tries_exceeded = False
         boxtry,boxpos,blen,bwid = get_random()
-        while mpbb.intersects(bboxes, boxtry) and not tries_exceeded:
+
+        acceptable = True
+        for bb in bboxes:
+            isect = boxtry.intersect_xy(bb)
+            if isect:
+                # hack?
+                #if len(isect['other members']) > 1:
+                if [io.bottomlevel for io in isect['other members']].count(True) > 0:
+                    acceptable = False
+
+        #if not acceptable:
+        #    for bb in bboxes: bb.plot()
+        #    boxtry.plot(colors = ['green','blue','purple'])
+        #    plt.show()
+
+        while not acceptable and not tries_exceeded:
             try_cnt += 1
             tries_exceeded = try_cnt == max_tries
             boxtry,boxpos,blen,bwid = get_random()
 
-        if tries_exceeded:
-            #print 'tries exceeded!'
-            return False,None,None,None
-        else:
-            #print 'accepted!',boxpos,blen,bwid
-            return boxpos, blen, bwid, rdpitch
+            acceptable = True
+            for bb in bboxes:
+                isect = boxtry.intersect_xy(bb)
+                if isect:
+                    #if len(isect['other members']) > 1:
+                    if [io.bottomlevel for io in isect['other members']].count(True) > 0:
+                        acceptable = False
+
+            #if not acceptable:
+            #    for bb in bboxes: bb.plot()
+            #    boxtry.plot(colors = ['green','blue','purple'])
+            #    plt.show()
+
+        print 'tried',try_cnt,'times to place a building'
+        if tries_exceeded:return False,None,None,None
+        else:return boxpos, blen, bwid, rdpitch
 
     def get_building_floor_count(self, *args, **kwargs):
         mflc = self.theme_data['max_floors']
@@ -210,13 +231,22 @@ class city(node):
         node.__init__(self, *args, **kwargs)
 
     def make_blocks_from_roads(self, *args, **kwargs):
-        road_system_ = args[0]
-        roads = road_system_.roads
-        bboxes = road_system_.get_bbox()
+        #road_system_ = args[0]
+        #roads = road_system_.roads
+        #bboxes = road_system_.get_bbox()
+        #bboxes = args[0]
+        #roads = args[1]
+        bboxes = self.road_bboxes
+        rplans = self.road_system_plans
+
 
         blcnt = 0
         blocks = []
-        for rd in roads:
+        for rd in rplans:
+            if not issubclass(rd.__class__,nrds.road_plan):
+                print 'skipping',rd
+                continue
+
             blocks.append(block(name = 'block_' + str(blcnt + 1), 
                 road = rd, side = 'right',bboxes = bboxes,parent = self))
             lasttheme = blocks[-1].theme
@@ -246,6 +276,7 @@ class city(node):
         return [ter]
 
     def make_road_system(self, *args, **kwargs):
+        '''#
         if 'road_system' in kwargs.keys():
             road_sys = kwargs['road_system']
         else:
@@ -263,22 +294,42 @@ class city(node):
                 'linkmax':400, 
                 'parent':self, 
                     }
-            road_sys = road_system(**rsargs)
-        self.road_system = road_sys
-        return [road_sys]
+        '''#
+        #road_sys,bboxes,fixedpts,holepts = nrds.make_road_system(20)
+        iplans,rplans = nrds.make_road_system_plans(50)
+        rpts = nrds.generate_region_points(iplans,rplans)
+
+        rsysplans = iplans[:]
+        rsysplans.extend(rplans)
+        self.road_system_plans = rsysplans
+
+        rsys = []
+        fpts = []
+        hpts = []
+        bboxes = []
+        for rp in rsysplans:
+            bboxes.append(rp.xybb)
+            rsys.extend(rp.build())
+            fpts.extend(rp.terrain_points())
+            hpts.extend(rp.terrain_holes())
+
+        self.road_system = rsys
+        self.road_bboxes = bboxes
+        return rsys,fpts,hpts,rpts
 
     def make_city_parts(self, *args, **kwargs):
-        road_sys = self.make_road_system(*args, **kwargs)
-        blocks = self.make_blocks_from_roads(road_sys[0])
+        road_sys,tpts,hpts,rpts = self.make_road_system(*args, **kwargs)
+        #rpts = mpu.make_corners(cv.zero(),2000,2000,0)
+        blocks = self.make_blocks_from_roads()
         #blocks = []
-        pts_of_int = road_sys[0].terrain_points()
-        hole_pts = road_sys[0].terrain_holes()
+        pts_of_int = tpts
+        hole_pts = hpts
         for bl in blocks: pts_of_int.extend(bl.terrain_points())
         for bl in blocks: hole_pts.extend(bl.terrain_holes())
-        sea_level = road_sys[0]._suggested_sea_level_
+        sea_level = -0.3 # road_sys[0]._suggested_sea_level_
         terra = self.make_terrain(sealevel = sea_level, 
             pts_of_interest = pts_of_int, hole_pts = hole_pts, 
-            region_bounds = road_sys[0].region_bounds)
+            region_bounds = rpts)
         ocean = [mpw.waters(position = cv.zero(),depth = 20,
                 sealevel = sea_level,length = 4000,width = 4000)]
         parts = road_sys + blocks + terra + ocean

@@ -56,6 +56,38 @@ cdef bint separating_axis(bb1,bb2):
             return 1
     return 0
 
+cdef list intersection_c(bb1,bb2):
+    # should return the set of intersection points
+    # between 2 bboxes
+
+    cdef list ns1 = bb1.edgenorms
+    cdef list ns2 = bb2.edgenorms
+    cdef int egcnt1 = bb1.edgecount
+    cdef int egcnt2 = bb2.edgecount
+    cdef cv.vector edgenorm
+    cdef int egdx
+    cdef cv.vector2d proj1
+    cdef cv.vector2d proj2
+
+    cdef list ipts = []
+
+    for egdx in range(egcnt1):
+        edgenorm = <cv.vector>ns1[egdx]
+        proj1 = <cv.vector2d>project_c(bb1.corners,edgenorm)
+        proj2 = <cv.vector2d>project_c(bb2.corners,edgenorm)
+        if not <bint>overlap_c(proj1,proj2):
+            return ipts
+    for egdx in range(egcnt2):
+        edgenorm = <cv.vector>ns2[egdx]
+        proj1 = <cv.vector2d>project_c(bb1.corners,edgenorm)
+        proj2 = <cv.vector2d>project_c(bb2.corners,edgenorm)
+        if not <bint>overlap_c(proj1,proj2):
+            return ipts
+    return ipts
+
+cpdef list intersection(bb1,bb2):
+    return intersection_c(bb1,bb2)
+
 cdef float distance_to_border_c(cv.vector pt, list border):
     edgenorms = get_norms_c(border)
     dists = []
@@ -97,6 +129,9 @@ cdef list get_norms_c(list verts):
         dx = v2.x - v1.x
         dy = v2.y - v1.y
         dv = sqrt(dx**2 + dy**2)
+        #if dv == 0.0:
+        #    print 'dv',dv,dx,dy
+        #    print v1,v2
         norm = cv.vector(dy/dv,-dx/dv,0)
         norms.append(norm)
     norms.append(norms.pop(0))
@@ -184,6 +219,7 @@ def inscribe(subjects):
 
 cdef class xy_bbox:
     cdef public xy_bbox parent
+    cdef public object owner
     cdef public list children
     cdef public list corners
     cdef public list edgenorms
@@ -192,6 +228,7 @@ cdef class xy_bbox:
     cdef public cv.vector center
 
     cdef public int segment_id
+    cdef public bint bottomlevel
 
     # this is temporary!
     def copy(self):
@@ -200,12 +237,50 @@ cdef class xy_bbox:
     def intersect_xy(self, other, info = None):
         if info is None:
             info = {
+                'self':self,
+                'other':other, 
                 'self members':[], 
                 'other members':[], 
                 'center':None, 
                     }
         if intersect_xy(self.copy(),other.copy()):
-            if self.children and other.children:
+            if self.children and not other.children:
+                children_isect = False
+                subcenters = []
+                for ch in self.children:
+                    chiinfo = self.intersect_xy(ch,info = info)
+                    if not chiinfo is None:
+                        children_isect = True
+                        subcenters.append(chiinfo['center'])
+                        for sm in chiinfo['self members']:
+                            if not sm in info['self members']:
+                                info['self members'].append(sm)
+                        for osm in chiinfo['other members']:
+                            if not osm in info['other members']:
+                                info['other members'].append(osm)
+                if children_isect:
+                    info['center'] = cv.com(subcenters)
+                    return info
+                else: return None
+            elif not self.children and other.children:
+                children_isect = False
+                subcenters = []
+                for och in other.children:
+                    chiinfo = self.intersect_xy(och,info = info)
+                    if not chiinfo is None:
+                        children_isect = True
+                        subcenters.append(chiinfo['center'])
+                        for sm in chiinfo['self members']:
+                            if not sm in info['self members']:
+                                info['self members'].append(sm)
+                        for osm in chiinfo['other members']:
+                            if not osm in info['other members']:
+                                info['other members'].append(osm)
+                if children_isect:
+                    info['center'] = cv.com(subcenters)
+                    return info
+                else: return None
+            elif self.children and other.children:
                 children_isect = False
                 subcenters = []
                 for ch in self.children:
@@ -220,13 +295,6 @@ cdef class xy_bbox:
                             for osm in chiinfo['other members']:
                                 if not osm in info['other members']:
                                     info['other members'].append(osm)
-                            #if not ipair[0] in info['self members']:
-                            #    info['self members'].append(ipair[0])
-                            #if not ipair[1] in info['self members']:
-                            #    info['other members'].append(ipair[1])
-                            #for im in ipair:
-                            #    if not im in members:
-                            #        members.append(im)
                 if children_isect:
                     info['center'] = cv.com(subcenters)
                     return info
@@ -236,10 +304,6 @@ cdef class xy_bbox:
                 info['other members'].append(other)
                 info['center'] = cv.midpoint(self.center,other.center)
                 return info
-                #members = [self,other]
-                #if self.parent is self:
-                #    return {'members':members}
-                #else: return members
         else: return None
 
     def plot_corners(self, color = 'black'):
@@ -257,16 +321,19 @@ cdef class xy_bbox:
         for ch in self.children:
             ch.plot(colors[:])
 
-    def __init__(self,corners = None,children = None):
+    def __init__(self,corners = None,children = None,owner = None):
         # bboxes are always in world coords
         # either pass in corners or children or both
+        self.owner = owner
         self.parent = self
         self.children = []
         if not children is None:
+            self.bottomlevel = False
             for ch in children:
                 self.add_child(ch)
             if corners is None:
                 corners = self.project_children()
+        else: self.bottomlevel = True
 
         self.corners = corners
         self.edgenorms = get_norms_c(self.corners)

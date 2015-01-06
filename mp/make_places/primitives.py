@@ -24,10 +24,10 @@ xml_library = {}
 
 def load_xml_library():
     wdir = ui.info['worlddir']
-    tdir = ui.info['texturedir']
+    #tdir = ui.info['texturedir']
     if os.path.isdir(wdir): shutil.rmtree(wdir)
     if not os.path.isdir(wdir):shutil.copytree(ui.info['newworlddir'],wdir)
-    if not os.path.isdir(tdir):shutil.copytree(ui.info['newtexturedir'],tdir)
+    #if not os.path.isdir(tdir):shutil.copytree(ui.info['newtexturedir'],tdir)
 
     for xfi in os.listdir(wdir):
         if not xfi.endswith('.xml'): continue
@@ -46,6 +46,11 @@ class arbitrary_primitive(base):
 
     _scale_uvs_ = False
     def __init__(self, *args, **kwargs):
+        self.coords = kwargs['verts']
+        self.ncoords = kwargs['nverts']
+        self.uv_coords = kwargs['uvs']
+        self.faces = kwargs['faces']
+
         self.xml_filename = kwargs['xmlfilename']
         self.gcol_filename = self.xml_filename.replace('mesh.xml','gcol')
         self.gfxmesh_name = self.xml_filename.replace('.xml','')
@@ -58,22 +63,14 @@ class arbitrary_primitive(base):
         self._default_('prevent_normal_calc',False,**kwargs)
         self._default_('smooth_normals',False,**kwargs)                   
 
-        #self.origin = kwargs['position']
         self._default_('origin',None,**kwargs)
-        #self.position = kwargs['position']
-        
-        self.coords = kwargs['verts']
-        self.ncoords = kwargs['nverts']
-        self.uv_coords = kwargs['uvs']
-        self.faces = kwargs['faces']
-
-        fcnt = len(self.faces)
-        zero = [0]*fcnt
         self._default_('materials',['cubemat'],**kwargs)
         self._default_('phys_materials',['/common/pmat/Stone'],**kwargs)
+        
+        fcnt = len(self.faces)
+        zero = [0]*fcnt
         self._default_('phys_face_materials',zero,**kwargs)
         self._default_('face_materials',zero[:],**kwargs)
-        #self.face_materials = kwargs['face_materials']
 
         self._default_('tag','_arb_',**kwargs)
         self.modified = False
@@ -109,7 +106,7 @@ class arbitrary_primitive(base):
         return self
 
     # CAN THIS BE DONE IN PLACE?
-    def __add__(self, other):
+    def __add__111(self, other):
         other_offset = len(self.coords)
         org = cv.vector(0,0,0)
         verts = self.coords + other.coords
@@ -139,7 +136,6 @@ class arbitrary_primitive(base):
         face_materials = self.face_materials + other.face_materials
         xmlfile = self.xml_filename
         pwargs = {
-            #'origin' : org, 
             'verts' : verts, 
             'nverts' : nverts, 
             'uvs' : uvs, 
@@ -224,7 +220,8 @@ class arbitrary_primitive(base):
         #return (vs, fa)
 
     def find_centroid(self):
-        com = cv.center_of_mass(self.coords)   
+        if len(self.coords) < 1:com = None
+        else:com = cv.center_of_mass(self.coords)   
         return com
 
     def origin_to_centroid(self):
@@ -233,7 +230,8 @@ class arbitrary_primitive(base):
 
     def reset_position(self, pos):
         self.origin = pos
-        self.translate(cv.flip(pos))
+        if not pos is None:
+            self.translate(cv.flip(pos))
 
     def reposition_origin(self):
         if self.origin is None:self.origin_to_centroid()

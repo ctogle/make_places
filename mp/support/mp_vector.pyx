@@ -581,6 +581,32 @@ def spline(c1,c2,c3,c4,scnt):
     filled = [vector(*i) for i in zip(cox,coy,coz)]
     return filled
 
+cdef list line_normals_c(list verts):
+    cdef list norms = []
+    cdef int vcnt = len(verts)
+    cdef int vdx
+    cdef vector v1
+    cdef vector v2
+    cdef float dx
+    cdef float dy
+    cdef float dv
+    cdef vector norm
+    for vdx in range(vcnt):
+        v1,v2 = verts[vdx-1],verts[vdx]
+        dx = v2.x - v1.x
+        dy = v2.y - v1.y
+        dv = sqrt(dx**2 + dy**2)
+        norm = vector(dy/dv,-dx/dv,0)
+        norms.append(norm)
+    norms.append(norms.pop(0))
+    return norms
+
+cpdef list line_normals(list verts):
+    return line_normals_c(verts)
+
+
+
+
 
 
 

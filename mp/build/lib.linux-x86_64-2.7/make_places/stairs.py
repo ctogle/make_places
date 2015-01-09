@@ -1,14 +1,43 @@
 import make_places.fundamental as fu
+import make_places.scenegraph as sg
+import make_places.blueprints as mbp
 import make_places.walls as wa
+import make_places.floors as fl
+
 import mp_utils as mpu
 import mp_vector as cv
-from make_places.scenegraph import node
-from make_places.floors import floor
+
+#from make_places.scenegraph import node
+#from make_places.floors import floor
 
 import pdb
 
+class shaft_plan(mbp.blueprint):
+    def __init__(self, position, **kwargs):
+        self.position = position
+        self._default_('floors',3,**kwargs)
+        self._default_('floor_heights',[0.5]*self.floors,**kwargs)
+        self._default_('ceiling_heights',[0.5]*self.floors,**kwargs)
+        self._default_('wall_heights',[4.0]*self.floors,**kwargs)
+        self._default_('length',8,**kwargs)
+        self._default_('width',8,**kwargs)
+
+    def build(self):
+        pieces = []
+        shargs = {
+            'position':self.position.copy(), 
+            'floor_heights':self.floor_heights, 
+            'ceiling_heights':self.ceiling_heights, 
+            'wall_heights':self.wall_heights, 
+            'length':self.length, 
+            'width':self.width, 
+            'floors':self.floors, 
+                }
+        pieces.append(shaft(**shargs))
+        return pieces
+
 _ramp_count_ = 0
-class ramp(floor):
+class ramp(fl.floor):
 
     def get_name(self):
         global _ramp_count_
@@ -26,16 +55,16 @@ class ramp(floor):
             self.length = self.width
             self.width = l
 
-        floor.__init__(self, *args, **kwargs)
+        fl.floor.__init__(self, *args, **kwargs)
         if self.gapped:
             print('failed to make ramp!!')
         else:
             prim = self.primitives[0]
             high_side = kwargs['high_side']
             differ = kwargs['differential']
-            prim.translate_face(cv.vector(0,0,differ),high_side)
+            #prim.translate_face(cv.vector(0,0,differ),high_side)
 
-class shaft(node):
+class shaft(sg.node):
     def __init__(self, *args, **kwargs):
         self._default_('grit_renderingdistance',100.0,**kwargs)
         self._default_('consumes_children',True,**kwargs)
@@ -53,7 +82,7 @@ class shaft(node):
         self.corners = self.find_corners()
         ramps = self.ramps(*args, **kwargs)
         self.add_child(*ramps)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def find_corners(self):
         pos = self.tform.position
@@ -90,7 +119,7 @@ class shaft(node):
             'length':self.length, 
             'width':platformwidth, 
                 }
-        platform = floor(**pargs)
+        platform = fl.floor(**pargs)
         pieces.append(ramp1)
         pieces.append(ramp2)
         pieces.append(platform)
@@ -149,7 +178,7 @@ class shaft(node):
 
 
 
-class shaft_____old(node):
+class shaft_____old(sg.node):
 
     def __init__(self, *args, **kwargs):
         self._default_('grit_renderingdistance',100.0,**kwargs)
@@ -180,7 +209,7 @@ class shaft_____old(node):
         self.top = 'roof'
         ramps = self.ramps(*args, **kwargs)
         self.add_child(*ramps)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def find_corners(self):
         pos = self.tform.position

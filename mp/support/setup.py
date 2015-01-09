@@ -12,6 +12,7 @@ ext_modules3 = ('mp_vector', [Extension('mp_vector',['mp_vector.pyx', 'mp_vector
 ext_modules4 = ('mp_terrain', [Extension('mp_terrain',['mp_terrain.pyx'])])
 #ext_modules4 = ('mp_terrain', [Extension('mp_terrain',['mp_terrain.pyx','mp_utils.pyx'])])
 ext_modules5 = ('mp_primitives', [Extension('mp_primitives',['mp_primitives.pyx'])])
+ext_modules6 = ('mp_bboxes2', [Extension('mp_bboxes2',['mp_bboxes2.pyx'])])
 
 def ext_setup(ext_name, ext_modules):
     setup(name = ext_name, 
@@ -24,6 +25,7 @@ ext_setup(*ext_modules2)
 ext_setup(*ext_modules3)
 ext_setup(*ext_modules4)
 ext_setup(*ext_modules5)
+ext_setup(*ext_modules6)
 
 #python setup.py build_ext --inplace
 

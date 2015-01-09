@@ -161,8 +161,6 @@ def write_class(clname, gmesh, cmesh, rd, lod):
     lod = 'true' if lod else 'false'
     lines = [
         '\nclass `' + clname + '` (ColClass) {\n', 
-        #'    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
-        #'    colMesh = \'/solemn/world/' + cmesh + '\';\n'
         '    gfxMesh = `' + gmesh + '`;\n'
         '    colMesh = `' + cmesh + '`;\n'
         '    renderingDistance = ' + str(rd) + ';\n', 
@@ -178,7 +176,6 @@ def write_lod_class(clname, gmesh, cmesh, rd, lod):
     lodclname = 'lod_' + clname
     lines = [
         '\nclass `'+ lodclname + '` (BaseClass) {\n',
-        #'    gfxMesh = \'/solemn/world/' + gmesh + '\';\n'
         '    gfxMesh = `' + gmesh + '`;\n'
         '    castShadows = false;\n', 
         '    renderingDistance = ' + str(rd) + ';\n',
@@ -267,61 +264,12 @@ def create_gcol(prim):
                     ' \"'+m+'\";\n')
         handle.write('\t}\n}\n')
 
-    '''#
-    lindamp = 1.0
-    angdamp = 1.0
-    linsleepthresh = 1.0
-    angsleepthresh = 1.0
-    glines = [
-        'TCOL1.0\n\n', 
-        'attributes {\n', 
-        '\tstatic;\n', 
-        '\tlinear_damping ' + str(lindamp) + ';\n', 
-        '\tangular_damping ' + str(angdamp) + ';\n', 
-        '\tlinear_sleep_threshold ' + str(linsleepthresh) + ';\n', 
-        '\tangular_sleep_threshold ' + str(angsleepthresh) + ';\n', 
-        '}\n\n', 
-        'compound {\n', 
-            ]
-    # handle children if necessary
-    glines.append('}\n')
-    faces = prim.get_vertexes_faces_phys()
-    #(vertexes, faces) = prim.get_vertexes_faces_phys()
-    glines += 'trimesh {\n'
-    glines += '\tvertexes {\n'
-    #for v in vertexes:
-    coords = prim.coords
-    for vdx in range(len(coords)):
-        p = coords[vdx]
-        x,y,z = p.x,p.y,p.z
-        #x = v.position.x
-        #y = v.position.y
-        #z = v.position.z
-        #' '.join([str(v.pos[0]),str(v.pos[1]),str(v.pos[2])])+\
-        glines += '\t\t' + ' '.join([str(x),str(y),str(z)]) + ';\n'
-    glines += '\t}\n'
-    glines += '\tfaces {\n'
-    for m in faces.keys():
-        for f in faces[m]:
-            glines += '\t\t'+\
-                ' '.join([str(f[0]),str(f[1]),str(f[2])])+\
-                ' \"'+m+'\";\n'
-    glines += '\t}\n}\n'
-
-    gfile = os.path.join(world_dir,filename)
-    with open(gfile,'w') as handle:
-        [handle.write(gli) for gli in glines]
-    '''#
-
 def reset_world_scripts():
     global classlines, used_classes, maplines, used_mats, matlines
     used_classes = {}
     used_mats = {}
 
     world_start = [
-        #'\ninclude "materials_constant.lua"\n', 
-        #'include "materials.lua"\n', 
-        #'include "classes.lua"\n\n']
         '\ninclude `materials_constant.lua`\n', 
         'include `materials.lua`\n', 
         'include `classes.lua`\n\n']
@@ -365,7 +313,7 @@ def create_element(*args):
 def create_elem(elem, center = True):
     import make_places.scenegraph as sg
     sgr = sg.sgraph(nodes = [elem])
-    sgr.make_scene_g(center = center)
+    sgr.make_scene(center = center)
     #print 'creating node\n', elem
 
 

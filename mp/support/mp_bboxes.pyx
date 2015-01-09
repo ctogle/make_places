@@ -219,6 +219,7 @@ def inscribe(subjects):
 
 cdef class xy_bbox:
     cdef public xy_bbox parent
+    cdef public bbox bb
     cdef public object owner
     cdef public list children
     cdef public list corners
@@ -243,7 +244,8 @@ cdef class xy_bbox:
                 'other members':[], 
                 'center':None, 
                     }
-        if intersect_xy(self.copy(),other.copy()):
+        #if intersect_xy(self.copy(),other.copy()):
+        if intersect_xy(self.bb,other.bb):
             if self.children and not other.children:
                 children_isect = False
                 subcenters = []
@@ -342,6 +344,8 @@ cdef class xy_bbox:
         cvs = [cv.v1_v2_c(self.center,v) for v in self.corners]
         cdists = [c.magnitude() for c in cvs]
         self.radius = max(cdists)
+
+        self.bb = self.copy()
 
     def project_children(self):
         all_verts = []

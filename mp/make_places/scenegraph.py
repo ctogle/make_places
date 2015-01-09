@@ -1,6 +1,5 @@
 import make_places.fundamental as fu
 import make_places.primitives as pr
-import make_places.blend_in as blgeo
 import make_places.gritty as gritgeo
 
 import mp_utils as mpu
@@ -67,13 +66,9 @@ class sgraph(fu.base):
             strr += '\n'.join([n.__str__() for n in self.nodes])
         return strr
 
-    def make_scene_b(self, center = False):
+    def make_scene(self, center = False):
         for nd in self.nodes:
-            nd.make_b(center = center)
-
-    def make_scene_g(self, center = False):
-        for nd in self.nodes:
-            nd.make_g(center = center)
+            nd.make(center = center)
 
 _node_count_ = 0
 class node(fu.base):
@@ -277,17 +272,13 @@ class node(fu.base):
                 tpm.is_lod = True
                 scene_type.create_primitive(tpm,**kwargs)
 
-    def make_b(self, *args, **kwargs):
-        for ch in self.tform.children: ch.make_b(*args, **kwargs)
-        self.make_primitives_in_scene(blgeo)
-
-    def make_g(self, *args, **kwargs):
+    def make(self, *args, **kwargs):
 
         #if self.converts_to_lod:
         #    self.convert_to_lod()
 
         if self.consumes_children: self.consume()
-        else: [ch.owner.make_g(*args, **kwargs) for ch in self.tform.children]
+        else: [ch.owner.make(*args, **kwargs) for ch in self.tform.children]
 
         self.make_primitives_in_scene(gritgeo)
 

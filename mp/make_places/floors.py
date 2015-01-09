@@ -1,12 +1,131 @@
 import make_places.fundamental as fu
+import make_places.scenegraph as sg
+import make_places.blueprints as mbp
+
 import mp_utils as mpu
+import mp_bboxes as mpbb
 import mp_vector as cv
+
 #from make_places.fundamental import element
-from make_places.scenegraph import node
-from make_places.primitives import unit_cube
+#from make_places.scenegraph import node
+#from make_places.primitives import unit_cube
+
+class floor_sector(mbp.blueprint):
+    # a sector is a convex 2d projection of a space to be stitched to other
+    # sectors to form a building floor plan
+    # should be able to fill a space as necessary
+    # a building is made of references to a list of floor_plans
+    # each floor is pointed to a single plan
+    # the plans are a chosen to stack appropriately geometrically
+
+    def __init__(self, *args, **kwargs):
+        self._default_('fgaps',[],**kwargs)
+        self._default_('cgaps',[],**kwargs)
+        self._default_('shafted',False,**kwargs)
+        self._default_('floor_height',0.5,**kwargs)
+        self._default_('ceiling_height',0.5,**kwargs)
+        self._default_('wall_height',4.0,**kwargs)
+        if kwargs.has_key('corners'):
+            self.corners = kwargs['corners']
+            c1,c3 = self.corners[0],self.corners[2]
+            self.length = abs(c3.x - c1.x)
+            self.width = abs(c3.y - c1.y)
+            self.position = cv.center_of_mass(self.corners)
+        else:
+            l,w,p = kwargs['length'],kwargs['width'],kwargs['position']
+            self.corners = mpu.make_corners(p,l,w,0)
+            self.length = l
+            self.width = w
+            self.position = p
+        self.set_bboxes() 
+
+    def set_bboxes(self):
+        com_vects = [
+            cv.v1_v2(v,self.position).normalize().scale_u(0.5) 
+                for v in self.corners]
+        self.small_corners = [
+            c.copy().translate(tv) for c,tv in 
+                zip(self.corners,com_vects)]
+        self.big_corners = [
+            c.copy().translate(tv.flip()) for c,tv in 
+                zip(self.corners,com_vects)]
+        self.bboxes = [mpbb.bbox(corners = self.small_corners)]
+
+    def get_bboxes(self):
+        return self.bboxes
+
+    def reducible(self,wpool):
+        bwalls = self.find_walls(wpool)
+        ibwalls = [w for w in bwalls if w.sort == 'interior']
+        if self.fgaps: return False
+        if len(ibwalls) == 1: return True
+        else: return False
+        #if len(bwalls) - len(ibwalls) > 3*len(ibwalls): return True
+
+    def find_walls(self, wpool):
+        mine = []
+        for w in wpool:
+            if cv.inside(w.v1,self.big_corners) and\
+                    cv.inside(w.v2,self.big_corners):
+                mine.append(w)
+        self.bounding_walls = mine
+        return mine
+
+    def wall_verts(self):
+        pairs = []
+        ccnt = len(self.corners)
+        for cdx in range(1,ccnt):
+            c1,c2 = self.corners[cdx-1],self.corners[cdx]
+            pairs.append((c1.copy(),c2.copy()))
+        c1,c2 = self.corners[-1],self.corners[0]
+        pairs.append((c1.copy(),c2.copy()))
+        return pairs
+
+    def build_lod(self,floor = True,ceiling = True):
+        pieces = []
+        fh = self.floor_height
+        ch = self.ceiling_height
+        wh = self.wall_height
+        loff = wh + ch
+        lheight = loff + fh
+        piece = mbp.ucube()
+        piece.is_lod = True
+        #piece = pr.ucube(is_lod = True)
+        piecenode = sg.node(
+            position = self.position.copy().translate_z(-fh), 
+            scales = cv.vector(self.length,self.width,wh+ch+fh), 
+            lod_primitives = [piece])
+
+        pieces.append(piecenode)
+        #pieces.append(fl.floor(**largs))
+        return pieces
+
+    def build(self,hasfloor = True,hasceiling = True):
+        #print 'BUILD FLOOR SECTOR!'
+
+        pieces = []
+        fargs = {
+            'gaps':self.fgaps, 
+            'position':self.position.copy(), 
+            'length':self.length,
+            'width':self.width, 
+            'floor_height':self.floor_height, 
+                }
+        coff = self.ceiling_height + self.wall_height
+        cargs = {
+            'gaps':self.cgaps, 
+            'position':self.position.copy().translate_z(coff), 
+            'length':self.length,
+            'width':self.width, 
+            'floor_height':self.ceiling_height, 
+                }
+
+        if hasfloor: pieces.append(floor(**fargs))
+        if hasceiling: pieces.append(floor(**cargs))
+        return pieces
 
 _floor_count_ = 0
-class floor(node):
+class floor(sg.node):
 
     def get_name(self):
         global _floor_count_
@@ -24,7 +143,7 @@ class floor(node):
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self.primitives = self.make_primitives(
             self.length,self.width,self.floor_height,self.gaps)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def find_corners(self, length, width):
         x = length/2.0
@@ -99,7 +218,9 @@ class floor(node):
 
     def make_floor_segment(self, pos, length, width, flheight):
         segnum = self.seg_number()
-        fl = unit_cube(tag = '_floor_segment_' + segnum)
+        #fl = unit_cube(tag = '_floor_segment_' + segnum)
+        fl = mbp.ucube()
+        fl.tag = '_floor_segment_' + segnum
         fl.scale(cv.vector(length, width, flheight))
         fl.translate(cv.vector(pos.x,pos.y,pos.z-flheight))
         return [fl]

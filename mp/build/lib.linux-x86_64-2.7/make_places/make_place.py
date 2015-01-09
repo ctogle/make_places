@@ -12,15 +12,15 @@ import make_places.roads as roads
 import make_places.newroads as newroads
 import make_places.floors as floors
 import make_places.walls as walls
-import make_places.terrain as terr
 import make_places.newterrain as nmpt
 import make_places.profiler as prf
 
-import make_places.blend_in as blgeo
 import make_places.gritty as gritgeo
 
 import os
 import numpy as np
+
+import pdb
 
 def ucube():
     gritgeo.reset_world_scripts()
@@ -257,7 +257,7 @@ def buildfew():
         'position':cv.vector(-10,-10,0), 
         'rotation':cv.vector(0,0,ang), 
             }]
-    built = [blg.newbuilding(**ba) for ba in bargs]
+    built = [blg.building(**ba) for ba in bargs]
     gritgeo.create_element(built)
     gritgeo.output_world_scripts()
 
@@ -313,9 +313,9 @@ def profile_block():
 
 def city():
     gritgeo.reset_world_scripts()
-    elem = cities.city()
-    gritgeo.create_element(elem)
+    cities.city()
     gritgeo.output_world_scripts()
+    cities.plot_try_data()
 
 def profile_city():
     prf.profile_function(city)
@@ -373,11 +373,15 @@ def profile_newterrain():
 
 def blgplan():
     gritgeo.reset_world_scripts()
-    newblg = blg.newbuilding()
+    newblg = blg.building()
     #    position = cv.vector(10,10,-10), 
     #    rotation = cv.vector(0,0,fu.PI/3.0))
+    pdb.set_trace()
     gritgeo.create_element(newblg)
     gritgeo.output_world_scripts()
+
+def profile_blgplan():
+    prf.profile_function(blgplan)
 
 def bplan():
     gritgeo.reset_world_scripts()

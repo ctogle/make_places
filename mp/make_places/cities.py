@@ -3,15 +3,12 @@ import make_places.primitives as pr
 import make_places.scenegraph as sg
 import make_places.waters as mpw
 import make_places.newnewroads as nrds
-from make_places.scenegraph import node
-from make_places.roads import road_system
-from make_places.roads import highway
-#from make_places.buildings import building
-from make_places.buildings import newbuilding as building
 import make_places.buildings as blg
-from make_places.terrain import terrain
-from make_places.newterrain import make_terrain as terrain
+import make_places.newterrain as mtr
 import make_places.pkler as pk
+import make_places.profiler as prf
+
+import make_places.gritty as gritgeo
 
 import mp_vector as cv
 import mp_utils as mpu
@@ -24,7 +21,7 @@ import random as rm
 import pdb
 import os
 
-class block(node):
+class block(sg.node):
 
     bl_themes = {
         'suburbs' : {
@@ -73,7 +70,7 @@ class block(node):
 
         children = self.make_buildings_from_road(*args, **kwargs)
         self.add_child(*children)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def terrain_points(self):
         pts = []
@@ -105,8 +102,7 @@ class block(node):
         buildings = []
 
         if rd.style == 'interstate': bcnt = 0
-        if blg._newbuilding_count_ >= 300: bcnt = 0
-        #print 'BCNT',bcnt,blg._newbuilding_count_
+        if blg._building_count_ >= 500: bcnt = 0
 
         for bdx in range(bcnt):
             flcnt = self.get_building_floor_count()
@@ -126,7 +122,7 @@ class block(node):
                     'rotation':cv.vector(0,0,ang), 
                         }
 
-                buildings.append(building(**blarg))
+                buildings.append(blg.building(**blarg))
                 bboxes.append(buildings[-1].get_bbox())
         self.buildings = buildings
         return buildings
@@ -160,9 +156,7 @@ class block(node):
             blen = rm.randrange(minblen,maxblen)
             bwid = rm.randrange(minbwid,maxbwid)
 
-            d_to_road = rdwidth/2.0 + bwid/2.0 + rm.randrange(int(bwid/4.0))
-            #d_to_road = rdwidth + rm.randrange(bwid)
-            #d_to_road = mpu.clamp(d_to_road,int((bwid+0.5)/2.0),bwid)
+            d_to_road = rdwidth/2.0 + bwid/2.0 + rm.randrange(int(bwid))
             stry = rm.randrange(int(seglen))
 
             base = leadcorner.copy()
@@ -172,11 +166,10 @@ class block(node):
             postry = base
             corners = mpu.make_corners(postry,blen,bwid,rdpitch)
             boxtry = mpbb.xy_bbox(corners = corners)
-            #boxtry = [mpbb.bbox(corners = corners)]
             return boxtry,postry,blen,bwid
 
         try_cnt = 0
-        max_tries = 250
+        max_tries = 200
         tries_exceeded = False
         boxtry,boxpos,blen,bwid = get_random()
 
@@ -184,8 +177,6 @@ class block(node):
         for bb in bboxes:
             isect = boxtry.intersect_xy(bb)
             if isect:
-                # hack?
-                #if len(isect['other members']) > 1:
                 if [io.bottomlevel for io in isect['other members']].count(True) > 0:
                     acceptable = False
 
@@ -203,16 +194,16 @@ class block(node):
             for bb in bboxes:
                 isect = boxtry.intersect_xy(bb)
                 if isect:
-                    #if len(isect['other members']) > 1:
                     if [io.bottomlevel for io in isect['other members']].count(True) > 0:
                         acceptable = False
 
-            #if not acceptable:
-            #    for bb in bboxes: bb.plot()
-            #    boxtry.plot(colors = ['green','blue','purple'])
-            #    plt.show()
-
         print 'tried',try_cnt,'times to place a building'
+
+        global trydatax
+        global trydatay
+        trydatay.append(try_cnt)
+        trydatax.append(len(trydatay))
+
         if tries_exceeded:return False,None,None,None
         else:return boxpos, blen, bwid, rdpitch
 
@@ -222,120 +213,105 @@ class block(node):
         flcnt = int(mpu.clamp(flcnt,1,mflc))
         return flcnt
 
-class city(node):
-
-    def __init__(self, *args, **kwargs):
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
-        children = self.make_city_parts(*args,**kwargs)
-        self.add_child(*children)
-        node.__init__(self, *args, **kwargs)
-
-    def make_blocks_from_roads(self, *args, **kwargs):
-        #road_system_ = args[0]
-        #roads = road_system_.roads
-        #bboxes = road_system_.get_bbox()
-        #bboxes = args[0]
-        #roads = args[1]
-        bboxes = self.road_bboxes
-        rplans = self.road_system_plans
+trydatax = []
+trydatay = []
+def plot_try_data():
+    global trydatax
+    global trydatay
+    plt.plot(trydatax,trydatay)
+    plt.show()
 
 
-        blcnt = 0
-        blocks = []
-        for rd in rplans:
-            if not issubclass(rd.__class__,nrds.road_plan):
-                print 'skipping',rd
-                continue
 
-            blocks.append(block(name = 'block_' + str(blcnt + 1), 
-                road = rd, side = 'right',bboxes = bboxes,parent = self))
-            lasttheme = blocks[-1].theme
-            blcnt += 1
 
-            blocks.append(block(name = 'block_' + str(blcnt + 1), 
-                theme = lasttheme, parent = self, 
-                road = rd, side = 'left',bboxes = bboxes))
-            blcnt += 1
 
-        self.blocks = blocks
-        self.bboxes = bboxes
-        return blocks
+def city():
+    summary = []
+    rplans,iplans,bboxes,fpts,hpts,rpts = lay_roads(50,summary)
+    rplans,iplans,bboxes,fpts,hpts,rpts =\
+        build_blocks_from_roads(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
+    rplans,iplans,bboxes,fpts,hpts,rpts =\
+        build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
+    build_waters(-0.5,summary)
+    for su in summary: print su
 
-    def make_terrain(self, *args, **kwargs):
-        target_polygon_edge_length = 20
-        target_primitive_edge_length = 200
-        tkwargs = {
-            'parent':self, 
-            'fixed_pts':kwargs['pts_of_interest'], 
-            'hole_pts':kwargs['hole_pts'], 
-            'region_pts':kwargs['region_bounds'], 
-            'polygon_edge_length':target_polygon_edge_length, 
-            'primitive_edge_length':target_primitive_edge_length, 
-                }
-        ter = terrain(**tkwargs)
-        return [ter]
+def lay_roads(gsteps = 50,summary = []):
+    summary.append('\nlay_roads:\n')
+    summary.append('\t' + str(gsteps) + ' growth steps')
+    ret,took = prf.measure_time('making road plans',nrds.make_road_system_plans,gsteps)
+    summary.append(' '.join(
+        ['\t','making road plans took',
+        str(np.round(took,3)),'seconds']))
 
-    def make_road_system(self, *args, **kwargs):
-        '''#
-        if 'road_system' in kwargs.keys():
-            road_sys = kwargs['road_system']
-        else:
-            rsargs = {
-                'name':'road_system', 
-                'seeds':[
-                    cv.vector(0,-1000,0),
-                    cv.vector(1000,0,0),
-                    cv.vector(-1000,0,0),
-                    cv.vector(0,1000,0)], 
-                'region_bounds':mpu.make_corners(cv.zero(),2000,2000,0), 
-                #'region_bounds':[(-1000,1000),(-1000,1000)], 
-                'intersection_count':10, 
-                'linkmin':200, 
-                'linkmax':400, 
-                'parent':self, 
-                    }
-        '''#
-        #road_sys,bboxes,fixedpts,holepts = nrds.make_road_system(20)
-        iplans,rplans = nrds.make_road_system_plans(50)
-        rpts = nrds.generate_region_points(iplans,rplans)
+    #iplans,rplans = nrds.make_road_system_plans(gsteps)
+    iplans,rplans = ret
+    rpts = nrds.generate_region_points(iplans,rplans)
+    fpts = []
+    hpts = []
+    bboxes = []
 
-        rsysplans = iplans[:]
-        rsysplans.extend(rplans)
-        self.road_system_plans = rsysplans
-
-        rsys = []
-        fpts = []
-        hpts = []
-        bboxes = []
-        for rp in rsysplans:
+    def build_plans(plans):
+        for rp in plans:
+            gritgeo.create_element(rp.build())
             bboxes.append(rp.xybb)
-            rsys.extend(rp.build())
             fpts.extend(rp.terrain_points())
             hpts.extend(rp.terrain_holes())
 
-        self.road_system = rsys
-        self.road_bboxes = bboxes
-        return rsys,fpts,hpts,rpts
+    build_plans(rplans)
+    build_plans(iplans)
+    return rplans,iplans,bboxes,fpts,hpts,rpts
 
-    def make_city_parts(self, *args, **kwargs):
-        road_sys,tpts,hpts,rpts = self.make_road_system(*args, **kwargs)
-        #rpts = mpu.make_corners(cv.zero(),2000,2000,0)
-        blocks = self.make_blocks_from_roads()
-        #blocks = []
-        pts_of_int = tpts
-        hole_pts = hpts
-        for bl in blocks: pts_of_int.extend(bl.terrain_points())
-        for bl in blocks: hole_pts.extend(bl.terrain_holes())
-        sea_level = -0.3 # road_sys[0]._suggested_sea_level_
-        terra = self.make_terrain(sealevel = sea_level, 
-            pts_of_interest = pts_of_int, hole_pts = hole_pts, 
-            region_bounds = rpts)
-        ocean = [mpw.waters(position = cv.zero(),depth = 20,
-                sealevel = sea_level,length = 4000,width = 4000)]
-        parts = road_sys + blocks + terra + ocean
-        return parts
+def build_blocks_from_roads(rplans,iplans,bboxes,fpts,hpts,rpts,summary):
+    blcnt = 0
+    for rd in rplans:
+        if not issubclass(rd.__class__,nrds.road_plan):
+            print 'skipping',rd
+            continue
 
-class hashima(city):
+        ablock = block(name = 'block_' + str(blcnt + 1), 
+            road = rd,side = 'right',bboxes = bboxes)
+        lasttheme = ablock.theme
+        blcnt += 1
+        gritgeo.create_element(ablock)
+        fpts.extend(ablock.terrain_points())
+        hpts.extend(ablock.terrain_holes())
+
+        ablock = block(name = 'block_' + str(blcnt + 1), 
+            theme = lasttheme,road = rd, 
+            side = 'left',bboxes = bboxes)
+        blcnt += 1
+        gritgeo.create_element(ablock)
+        fpts.extend(ablock.terrain_points())
+        hpts.extend(ablock.terrain_holes())
+    return rplans,iplans,bboxes,fpts,hpts,rpts
+
+def build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary = []):
+    ter,took = prf.measure_time('generate terrain',mtr.make_terrain,
+        fixed_pts = fpts, hole_pts = hpts, region_pts = rpts, 
+        polygon_edge_length = 10, primitive_edge_length = 150)
+    #ter = mtr.make_terrain(fixed_pts = fpts,
+    #    hole_pts = hpts,region_pts = rpts, 
+    #    polygon_edge_length = 10, 
+    #    primitive_edge_length = 150)
+    summary.append('\nbuild_terrain:\n')
+    summary.append(' '.join(['\t',
+        'generating terrain took',str(np.round(took,3)),'seconds']))
+    summary.append('\t' + 'primtive edge length:' + str(ter.summary[2]))
+    summary.append('\t' + 'polygon edge length:' + str(ter.summary[0]))
+    summary.append('\t' + 'target polygon edge length:' + str(ter.summary[1]))
+    summary.append('\t' + 'final split count:' + str(ter.summary[3]))
+    gritgeo.create_element(ter)
+    return rplans,iplans,bboxes,fpts,hpts,rpts
+
+def build_waters(sea_level,summary):
+    ocean = mpw.waters(position = cv.zero(),depth = 20,
+        sealevel = sea_level,length = 4000,width = 4000)
+    gritgeo.create_element(ocean)
+
+
+
+
+class hashima(sg.node):
 
     hashimawallsxml = os.path.join(
         pr.primitive_data_path, 'hashima_walls.mesh.xml')

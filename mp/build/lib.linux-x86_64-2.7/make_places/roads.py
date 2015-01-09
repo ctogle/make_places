@@ -3,11 +3,12 @@ import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
 import make_places.primitives as pr
+import make_places.blueprints as mbp
 #from make_places.scenegraph import node
 import make_places.scenegraph as sg
 from make_places.floors import floor
 from make_places.primitives import arbitrary_primitive
-from make_places.primitives import ucube
+#from make_places.primitives import ucube
 from make_places.primitives import uoctagon
 import make_places.pkler as pk
 
@@ -876,7 +877,8 @@ class highway(road):
         return rdsegs
 
     def make_leg(self, v, alpha):
-        leg = pr.ucube()
+        #leg = pr.ucube()
+        leg = mbp.ucube()
         leg_leng = 20
         leg.scale(cv.vector(5,5,leg_leng))
         leg_pos = v.copy().translate_z(-leg_leng-2.0)

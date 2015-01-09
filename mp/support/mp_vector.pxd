@@ -66,6 +66,7 @@ cdef vector vzip_c(vector v1, vector v2)
 cdef vector midpoint_c(vector v1, vector v2)
 cdef vector com(list coords)
 
+cdef list line_normals_c(list verts)
 
 
 

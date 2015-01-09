@@ -846,10 +846,10 @@ def make_terrain(**someinput):
         hpts = someinput['hole_pts'][hdx]
         holes.append(mpbb.bbox(corners = hpts))
 
-    #for pdx in range(tpiececount):
-    #    p = pieces[pdx]
-    #    p.cut_holes(holes)
-    #    print 'terrain piece',pdx + 1,'of',tpiececount,'cut holes'
+    for pdx in range(tpiececount):
+        p = pieces[pdx]
+        #p.cut_holes(holes)
+        #print 'terrain piece',pdx + 1,'of',tpiececount,'cut holes'
 
     reneightime = time.time()
     print 'reneighboring...'

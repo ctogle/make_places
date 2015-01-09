@@ -1,316 +1,758 @@
-from make_places.scenegraph import node
+import make_places.scenegraph as sg
 import make_places.fundamental as fu
-import make_places.blueprints as bp
+import make_places.primitives as pr
+import make_places.blueprints as mbp
+import make_places.floors as fl
+import make_places.walls as wa
+import make_places.stairs as st
+
 import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
-import make_places.primitives as pr
-from make_places.stairs import ramp
-from make_places.stairs import shaft
-from make_places.floors import floor
-from make_places.walls import wall
-from make_places.walls import perimeter
 
 import random as rm
 import os
 
 import pdb
 
-
-
-
-
-_story_count_ = 0
-class story(node):
-
-    def get_name(self):
-        global _story_count_
-        nam = 'story ' + str(_story_count_)
-        _story_count_ += 1
-        return nam
+class floor_plan(mbp.blueprint):
 
     def __init__(self, *args, **kwargs):
-        self.floor_number = args[0]
-        self._default_('name',self.get_name(),**kwargs)
-        self._default_('add_ceiling',True,**kwargs)
-        self._default_('shafts',[],**kwargs)
-        self._default_('consumes_children',True,**kwargs)
-        #self._default_('consumes_children',False,**kwargs)
-        self._default_('grit_renderingdistance',250.0,**kwargs)
-        self._default_('grit_lod_renderingdistance',1000.0,**kwargs)
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
-        self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
-        self._default_('length',20.0,**kwargs)
-        self._default_('width',20.0,**kwargs)
+        self._default_('length',100,**kwargs)
+        self._default_('width',50,**kwargs)
         self._default_('floor_height',0.5,**kwargs)
+        self._default_('max_sections',25,**kwargs)
         self._default_('ceiling_height',0.5,**kwargs)
-        self._default_('wall_width',0.4,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
-        #self._default_('ext_gaped',False,**kwargs)
-        self._default_('ext_gaped',True,**kwargs)
-        self._default_('rid_top_bottom_walls',True,**kwargs)
-        children = self.make_children(*args, **kwargs)
-        self.add_child(*children)
-        self.lod_primitives = self.make_lod(*args,**kwargs)
-        node.__init__(self, *args, **kwargs)
-        self.assign_material('concrete')
+        self.corners = mpu.make_corners(cv.zero(),self.length,self.width,0)
+        self.interior_walls = []
+        self.exterior_walls = []
+        self.sectors = []
+        self.set_story_height()
+        self.divide_space()
 
-    def make_lod(self, *args, **kwargs):
-        lod = pr.ucube()
+    def set_story_height(self):
+        self.story_height = self.floor_height +\
+            self.wall_height + self.ceiling_height
+        for ew in self.exterior_walls:
+            ew.wall_height = self.wall_height
+            ew.floor_height = self.floor_height
+            ew.ceiling_height = self.ceiling_height
+        for ew in self.interior_walls:
+            ew.wall_height = self.wall_height
+            ew.floor_height = self.floor_height
+            ew.ceiling_height = self.ceiling_height
+        for ew in self.sectors:
+            ew.wall_height = self.wall_height
+            ew.floor_height = self.floor_height
+            ew.ceiling_height = self.ceiling_height
+        return self.story_height
+
+    def reduce_sectors(self, cuts = None):
+        seccnt = len(self.sectors)
+        if cuts is None: cuts = int(rm.choice([0.25,0.5,0.75])*seccnt) + 1
+        extrawalls = []
+        extrasects = []
+        for cu in range(cuts):
+            secw = rm.choice(self.exterior_walls).sector
+            if not secw.reducible(self.exterior_walls): continue
+            if secw in extrasects: continue
+            extrasects.append(secw)
+            swalls = []
+            swalls.extend(secw.find_walls(self.exterior_walls))
+            swalls.extend(secw.find_walls(self.interior_walls))
+            for sw in swalls:
+                if sw.sort == 'exterior':
+                    if not sw in extrawalls:
+                        extrawalls.append(sw)
+                elif sw.sort == 'interior': self.switch_wall_sort(sw)
+        for sc in extrasects: self.sectors.remove(sc)
+        for ew in extrawalls: self.exterior_walls.remove(ew)
+        # 
+        #print 'reduce should cut down the floor sectors'
+    
+    def resolve_walls(self,ewalls,iwalls,sect):
+        # ewalls and iwalls are new but will be added soon
+        eewalls = self.exterior_walls
+        eiwalls = self.interior_walls
+        
+        def resolve_verts(shared,one,two):
+            done = cv.distance(shared,one)
+            dtwo = cv.distance(shared,two)
+            if done < dtwo:
+                ipair = [shared,one]
+                epair = [one,two]
+            elif done > dtwo:
+                ipair = [shared,two]
+                epair = [two,one]
+            return ipair, epair
+
+        newalls = []
+        niwalls = []
+
+        etoiwalls = []
+        extrawalls = []
+
+        for ew in ewalls: # for each new potential wall
+            ewvs = [ew.v1,ew.v2] # positions of ew endpoints
+            ewn = ew.normal.copy()
+            ewt = ew.v1v2.copy().normalize()
+            ewewnproj = mpbb.project(ewvs,ewn) # projection of ew onto ewn; always a dot
+
+            for eew in eewalls: # for each existing exterior wall
+                eewvs = [eew.v1,eew.v2] # positions of eew endpoints
+                eewn = eew.normal.copy()
+                eewt = eew.v1v2.copy().normalize()
+                eeweewnproj = mpbb.project(eewvs,eewn) # projection of eew onto eewn; always a dot
+
+                eewewnproj = mpbb.project(eewvs,ewn) # projection of eew onto ew
+                eweewnproj = mpbb.project(ewvs,eewn) # projection of ew onto eew
+
+                if mpbb.overlap(eewewnproj,ewewnproj) or\
+                    mpbb.overlap(eweewnproj,eeweewnproj):
+                    # if each wall is a dot in the other's normal projection, the overlap is parallel
+                    if eewewnproj.x == eewewnproj.y and eweewnproj.x == eweewnproj.y:
+                        # note that eewt and ewt are antiparallel typically
+                        ewewtproj = mpbb.project(ewvs,ewt) # projection of ew onto ew tangent space
+                        eewewtproj = mpbb.project(eewvs,ewt) # projection of eew onto ew tangent space
+                        eweewtproj = mpbb.project(ewvs,eewt) # projection of ew onto eew tangent space
+                        eeweewtproj = mpbb.project(eewvs,eewt) # projection of eew onto eew tangent space
+
+                        # be sure they overlap in one another's tangent space
+                        if mpbb.overlap(ewewtproj,eewewtproj) and\
+                                mpbb.overlap(eweewtproj,eeweewtproj):
+
+                            # make sure they are not just sharing an endpoint
+                            if not ewewtproj.x == eewewtproj.y and\
+                                    not ewewtproj.y == eewewtproj.x:
+
+                                evals = ewvs + eewvs
+            
+                                # if theres a complete overlap
+                                if ewewtproj.x == eewewtproj.x and\
+                                        ewewtproj.y == eewewtproj.y:
+
+                                    extrawalls.append(ew)
+                                    etoiwalls.append(eew)
+
+                                # if they share a single endpoint
+                                elif ewewtproj.x == eewewtproj.x:
+                                    if ewt == eewt:
+                                        ipair,epair = resolve_verts(evals[0],evals[1],evals[3])
+                                    elif ewt == cv.flip(eewt):
+                                        ipair,epair = resolve_verts(evals[0],evals[1],evals[2])
+
+                                    extrawalls.append(ew)
+                                    extrawalls.append(eew)
+
+                                    if ew.length > eew.length:
+                                        epair.reverse()
+
+                                    niw = wa.wall_plan(*ipair, 
+                                            sector = sect,sort = 'interior', 
+                                            wall_height = self.wall_height)
+                                    new = wa.wall_plan(*epair, 
+                                            sector = sect,sort = 'exterior', 
+                                            wall_height = self.wall_height)
+                                    niwalls.append(niw)
+                                    newalls.append(new)
+
+                                # or perhaps the other endpoint
+                                elif ewewtproj.y == eewewtproj.y:
+
+                                    if ewt == eewt:
+                                        ipair,epair = resolve_verts(evals[1],evals[0],evals[2])
+                                    elif ewt == cv.flip(eewt):
+                                        ipair,epair = resolve_verts(evals[1],evals[0],evals[3])
+
+                                    extrawalls.append(ew)
+                                    extrawalls.append(eew)
+
+                                    if ew.length > eew.length:
+                                        epair.reverse()
+
+                                    niw = wa.wall_plan(*ipair,sector = sect,sort = 'interior', 
+                                            wall_height = self.wall_height)
+                                    new = wa.wall_plan(*epair,sector = sect,sort = 'exterior',
+                                            wall_height = self.wall_height)
+                                    niwalls.append(niw)
+                                    newalls.append(new)
+
+                                else:
+                                    #print 'the complicated case'
+                                    return False
+
+                    # overlap is nonparallel
+                    else:
+                        ewewtproj = mpbb.project(ewvs,ewt) # projection of ew onto ew tangent space
+                        eewewtproj = mpbb.project(eewvs,ewt) # projection of eew onto ew tangent space
+                        eweewtproj = mpbb.project(ewvs,eewt) # projection of ew onto eew tangent space
+                        eeweewtproj = mpbb.project(eewvs,eewt) # projection of eew onto eew tangent space
+
+                        # be sure they overlap in one another's tangent space
+                        if mpbb.overlap(ewewtproj,eewewtproj) and\
+                                mpbb.overlap(eweewtproj,eeweewtproj):
+
+                            if eweewtproj.x == eweewtproj.y and\
+                                    (eweewtproj.x == eeweewtproj.x or\
+                                        eweewtproj.x == eeweewtproj.y):
+                                #print 'perp endpoint intersection...'
+                                pass
+
+                            elif eewewtproj.x == eewewtproj.y and\
+                                    (eewewtproj.x == ewewtproj.x or\
+                                        eewewtproj.x == ewewtproj.y):
+                                #print 'perp endpoint intersection...'
+                                pass
+
+                            else:
+                                #print 'perp overlap case'
+                                return False
+
+        for ew in extrawalls:
+            if ew in ewalls: ewalls.remove(ew)
+            if ew in iwalls: iwalls.remove(ew)
+            if ew in eewalls: eewalls.remove(ew)
+            if ew in eiwalls: eiwalls.remove(ew)
+        [ewalls.append(new) for new in newalls]
+        [iwalls.append(niw) for niw in niwalls]
+        for ew in etoiwalls:self.switch_wall_sort(ew)
+        return True
+
+    def switch_wall_sort(self, wall):
+        if wall.sort == 'interior':
+            self.exterior_walls.append(wall)
+            self.interior_walls.remove(wall)
+            wall.sort = 'exterior'
+            wall.face_away()
+        elif wall.sort == 'exterior':
+            self.exterior_walls.remove(wall)
+            self.interior_walls.append(wall)
+            wall.sort = 'interior'
+            wall.face_away()
+
+    def should_shaft(self,newpos,newl,neww):
+            sdists = [cv.distance(newpos,sc.position) 
+                            for sc in self.sectors]
+            if not sdists: sdmin = 100
+            else: sdmin = min(sdists)
+            if sdmin > 20 and newl >= 20 and neww >= 20:
+                shpos = newpos.copy()
+                shl = 10
+                shw = 12
+                gaps = self.add_shaft(shpos,shl,shw)
+                return gaps
+            else: return []
+
+    def add_shaft(self,pos,l,w):
+            shargs = {
+                'position':pos.copy(), 
+                'length':l, 
+                'width':w, 
+                #'wall_heights':self.wall_heights, 
+                #'floor_heights':self.floor_heights, 
+                #'ceiling_heights':self.ceiling_heights, 
+                    }
+            gaps = [(cv.zero(),l,w)]
+            self.shaft_kwargs.append(shargs)
+            return gaps
+
+    def grow(self,length = None,side = None,force = False):
+        if side is None:
+            side = rm.choice(self.exterior_walls)
+            if side.unswitchable:
+                #print 'found the entrance while growing'
+                return False
+
+        if length is None:
+            glengmax = 20 # this is decided by projecting each v1v2
+            gleng = rm.choice([8,12,16,20,24,28,32])
+        else: gleng = length
+
+        bdist = side.distance_to_border(self.corners)
+        if bdist < 8 and not force:
+            #print 'too close to a border to grow'
+            return False
+        elif gleng > bdist: gleng = bdist
+
+        side.face_away()
+        c1 = side.v2.copy()
+        c2 = side.v1.copy()
+        cn = side.normal.copy()
+        c3,c4 = mbp.extrude_edge(c1,c2,gleng,cn)
+        newcorners = [c1,c2,c3,c4]
+        sect = fl.floor_sector(corners = newcorners, 
+                floor_height = self.floor_height, 
+                ceiling_height = self.ceiling_height, 
+                wall_height = self.wall_height)
+        gaps = self.should_shaft(sect.position,sect.length,sect.width)
+        sect.fgaps = gaps[:]
+        sect.cgaps = gaps[:]
+        if gaps: sect.shafted = True
+        for esect in self.sectors:
+            ebb = esect.get_bboxes()
+            nbb =  sect.get_bboxes()
+            if mpbb.intersects(ebb,nbb):
+                if gaps: self.shaft_kwargs.pop(-1)
+                #print 'new sect intersected!'
+                return False
+
+        cpairs = [(c2,c3),(c3,c4),(c4,c1)]
+        extwalls = [wa.wall_plan(*cp, 
+            sector = sect, 
+            sort = 'exterior', 
+            wall_height = self.wall_height) 
+                for cp in cpairs] 
+        intwalls = []
+        if self.resolve_walls(extwalls,intwalls,sect):
+            self.switch_wall_sort(side)
+
+            self.sectors.append(sect)
+            self.exterior_walls.extend(extwalls)
+            self.interior_walls.extend(intwalls)
+            return True
+
+        else: return False
+    
+    def build_basement_lod(self,bottom = False):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            built.extend(sector.build_lod())
+
+        #for b in built: b.converts_to_lod = True
+        self.sectors.insert(1,porch)
+        return built
+
+    def build_basement(self,bottom = False):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            if bottom:
+                tgaps = sector.fgaps[:]
+                sector.fgaps = []
+            built.extend(sector.build())
+            if bottom: sector.fgaps = tgaps
+
+        for wall in self.exterior_walls:
+            built.extend(wall.build(solid = True))
+        #for wall in self.interior_walls: built.extend(wall.build())
+
+        self.sectors.insert(1,porch)
+        return built
+
+    def build_lobby_lod(self):
+        built = []
+        for sector in self.sectors:
+            built.extend(sector.build_lod())
+        return built
+
+    def build_lobby(self):
+        built = []
+        for sector in self.sectors: built.extend(sector.build())
+        for wall in self.exterior_walls: built.extend(wall.build())
+        for wall in self.interior_walls: built.extend(wall.build())
+        return built
+    
+    def build_lod(self):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            built.extend(sector.build_lod())
+        self.sectors.insert(1,porch)
+        return built
+
+    def build(self):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            built.extend(sector.build())
+        for wall in self.exterior_walls:
+            wswitch = wall.unswitchable
+            wall.unswitchable = False
+            built.extend(wall.build(skirt = True))
+            wall.unswitchable = wswitch
+        for wall in self.interior_walls: built.extend(wall.build())
+        self.sectors.insert(1,porch)
+        return built
+
+    def build_rooftop_lod(self):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            if sector.shafted:
+                tgaps = sector.cgaps[:]
+                sector.cgaps = []
+                built.extend(sector.build_lod())
+                sector.cgaps = tgaps
+            else:
+                built.extend(sector.build(hasceiling = False))
+        for wall in self.exterior_walls:
+            if wall.sector.shafted:
+                built.extend(wall.build())
+            else:
+                wh = wall.wall_height
+                wall.wall_height = 1.0
+                built.extend(wall.build(solid = True))
+                wall.wall_height = wh
+        for wall in self.interior_walls:
+            if wall.sector.shafted:
+                built.extend(wall.build())
+        self.sectors.insert(1,porch)
+        return built
+
+    def build_rooftop(self):
+        built = []
+        porch = self.sectors.pop(1)
+        for sector in self.sectors:
+            if sector.shafted:
+                tgaps = sector.cgaps[:]
+                sector.cgaps = []
+                built.extend(sector.build())
+                sector.cgaps = tgaps
+            else:
+                built.extend(sector.build(hasceiling = False))
+        for wall in self.exterior_walls:
+            wswitch = wall.unswitchable
+            wall.unswitchable = False
+            if wall.sector.shafted:
+                built.extend(wall.build())
+            else:
+                wh = wall.wall_height
+                wall.wall_height = 1.0
+                built.extend(wall.build(solid = True))
+                wall.wall_height = wh
+            wall.unswitchable = wswitch
+        for wall in self.interior_walls:
+            if wall.sector.shafted:
+                built.extend(wall.build())
+        self.sectors.insert(1,porch)
+        return built
+
+    def get_shaft_plans(self):
+        return self.shaft_kwargs
+
+    def main_space(self):
         l,w = self.length,self.width
-        h = self.wall_height + self.floor_height + self.ceiling_height
-        #h = self.wall_height + self.floor_height
-        fl = self.floor_[0]
-        zrot = 0
-        #pos = fl.tform.position[0]
-        pos = fl.tform.position
-        #pos[2] -= self.floor_height
-        lod.scale(cv.vector(l,w,h))
-        #lod.scale([l,w,h])
-        lod.rotate_z(zrot)
-        lod.translate(pos)
-        #lod.is_lod = True
+        subl = rm.choice([0.25*l,0.5*l,0.75*l])
+        subw = rm.choice([0.25*w,0.5*w,0.75*w])
+        subl = mpu.clamp(subl,20,l)
+        subw = mpu.clamp(subw,20,l)
+        mx = -l/2.0 + subl/2.0
+        my = -w/2.0 + 8 + subw/2.0
+        mx = 0.0
+        my = - w/2.0 + subw/2.0 + 10.0
 
-        self.tform.children[0].owner.primitives[0].has_lod = True
+        # could mx,my be correlated with the lod offset problem?
+        #print 'lwslsw',l,w,subl,subw,mx,my
 
-        return [lod]
+        pos = cv.vector(mx,my,0)
+        #pos = cv.zero() # this investigates the above question
 
-    def make_children(self, *args, **kwargs):
-        floor_ = self.make_floor(*args, **kwargs)
-        if self.add_ceiling:ceiling = self.make_ceiling(*args, **kwargs)
-        else:ceiling = []
-        ext_walls = self.make_exterior_walls(*args, **kwargs)
-        #int_walls = self.make_interior_walls(*args, **kwargs)
-        return floor_ + ceiling + ext_walls #+ int_walls
+        self.shaft_kwargs = []
+        sect = fl.floor_sector(
+            floor_height = self.floor_height, 
+            ceiling_height = self.ceiling_height, 
+            wall_height = self.wall_height, 
+            length = subl, 
+            width = subw, 
+            position = pos)
+        gaps = self.should_shaft(sect.position,subl,subw)
+        sect.fgaps = gaps[:]
+        sect.cgaps = gaps[:]
+        if gaps: sect.shafted = True
+        cpairs = sect.wall_verts()
+        extwalls = [wa.wall_plan(*cp, 
+            sector = sect, 
+            sort = 'exterior', 
+            wall_height = self.wall_height) 
+                for cp in cpairs]
+        intwalls = []
 
-    def make_floor(self, *args, **kwargs):
-        flleng = self.length
-        flwidt = self.width
-        gaps = []
-        if self.floor_number > -1:
-            for sh in self.shafts:
-                gaps.extend(sh.floor_gaps)
-        flpos = cv.zero()
-        flargs = {
-            'uv_parent':self, 
-            'position':flpos, 
-            'length':flleng, 
-            'width':flwidt, 
-            'gaps':gaps,
-            'height':self.floor_height, 
+        self.interior_walls = intwalls
+        self.exterior_walls = extwalls
+        self.sectors = [sect]
+        
+        self.entrance = extwalls[0]
+        porch_length = 6
+        self.grow(porch_length,self.entrance,True)
+        self.porch = self.sectors[-1]
+        self.exterior_walls.pop(-1)
+        self.exterior_walls.pop(-1)
+        self.exterior_walls.pop(-1)
+        self.switch_wall_sort(self.entrance)
+        self.entrance.unswitchable = True
+
+    def order_exterior_walls(self):
+        def find_next(av2):
+            for edx in range(len(ewalls)):
+                ew = ewalls[edx]
+                if cv.near(ew.v1,av2):
+                    return edx
+        ewalls = self.exterior_walls
+        ordered = []
+        ordered.append(ewalls.pop(0))
+        while ewalls:
+            lastv2 = ordered[-1].v2
+            ndx = find_next(lastv2)
+            if ndx is None:ordered.append(ewalls.pop(0))
+            else:ordered.append(ewalls.pop(ndx))
+        self.exterior_walls = ordered
+
+    def join_walls(self):
+        self.order_exterior_walls()
+        ewalls = self.exterior_walls
+        for ew in ewalls:ew.face_away()
+
+        n1 = ewalls[-1].normal.copy().xy()
+        n2 = ewalls[0].normal.copy().xy()
+        n3 = ewalls[1].normal.copy().xy()
+
+        ewcnt = len(ewalls)
+        for wdx in range(ewcnt):
+            pdx = wdx - 1
+            ndx = wdx + 1 if wdx < ewcnt - 1 else 0
+            ew = ewalls[wdx]
+            pw = ewalls[pdx]
+            nw = ewalls[ndx]
+
+            n1 = pw.normal.copy().xy()
+            n2 = ew.normal.copy().xy()
+            n3 = nw.normal.copy().xy()
+
+            angle1 = -1.0*cv.angle_between(n1,n2)/2.0
+            angle2 =      cv.angle_between(n2,n3)/2.0
+        
+            ew.rear_tip_rot = angle1
+            ew.lead_tip_rot = angle2
+        
+        #print 'finish join walls function!'
+
+    def divide_space(self):
+        sections = self.max_sections
+        self.main_space()
+        for sect in range(sections):
+            grew = self.grow()
+            if grew is False:
+                #print 'growth rejected'
+                pass
+            elif grew is None:
+                #print 'division aborted'
+                break
+        #print '\n\tgrew', sect, 'of', sections
+        #self.join_walls()
+
+batch_count = 0
+class building_plan(mbp.blueprint):
+
+    def __init__(self, *args, **kwargs):
+        self._default_('length',200,**kwargs)
+        self._default_('width',200,**kwargs)
+        self._default_('floors',10,**kwargs)
+        self._default_('basements',2,**kwargs)
+        self.corners = mpu.make_corners(cv.zero(), 
+                        self.length,self.width,0)
+
+        self.st0plan = floor_plan(
+            length = self.length, width = self.width)
+
+        self.floor_heights = [1]*self.basements
+        self.floor_heights.extend([0.8,0.8,0.8])
+        self.floor_heights.extend([0.5]*(self.floors - 3))
+
+        self.floor_heights = [0.5]*(self.floors + self.basements)
+
+        self.ceiling_heights = [1]*self.basements
+        self.ceiling_heights.extend([0.8,0.8,0.8])
+        self.ceiling_heights.extend([0.5]*(self.floors - 3))
+
+        self.ceiling_heights = [0.5]*(self.floors + self.basements)
+
+        self.wall_heights = [10]*self.basements
+        self.wall_heights.extend([8,6,6])
+        self.wall_heights.extend([4]*(self.floors - 3))
+
+        shargs = self.st0plan.get_shaft_plans()
+        for sh in shargs:
+            # this will break when the floor_height or ceiling_height change
+            sh['position'].translate_z(-11.0*self.basements)
+            sh['floors'] = self.floors + self.basements
+            sh['wall_heights'] = self.wall_heights[:]
+            sh['floor_heights'] = self.floor_heights[:]
+            sh['ceiling_heights'] = self.ceiling_heights[:]
+
+        self.shaft_plans = [st.shaft_plan(**sh) for sh in shargs]
+
+    def build_fence(self):
+        fence = []
+        pwarg = {
+            'corners':self.corners, 
+            'gaped':False, 
+            'rid_top_bottom_walls':False, 
+            'consumes_children':True, 
                 }
-        floor_ = floor(**flargs)
-        #for flp in floor_.primitives:
-        #    flp.remove_face('bottom')
-        self.floor_ = [floor_]
-        return [floor_]
-
-    def make_ceiling(self, *args, **kwargs):
-        flleng = self.length
-        flwidt = self.width
-        gaps = []
-        if self.floor_number > -2:
-            for sh in self.shafts:
-                gaps.extend(sh.floor_gaps)
-        czpos = self.wall_height+self.ceiling_height#+self.floor_height
-        flpos = cv.vector(0,0,czpos)
-        flargs = {
-            'uv_parent':self, 
-            'position':flpos, 
-            'length':flleng, 
-            'width':flwidt, 
-            'gaps':gaps,
-            'floor_height':self.ceiling_height, 
+        pfwarg = {
+            'position':cv.zero(), 
+            'length':self.length, 
+            'width':self.width, 
                 }
-        ceil = floor(**flargs)
-        #for flp in ceil.primitives:
-        #    flp.remove_face('top')
-        self.ceiling = [ceil]
-        return [ceil]
+        fence.append(wa.perimeter(**pwarg))
+        #fence.append(fl.floor(**pfwarg))
+        return fence
 
-    def make_exterior_walls(self, *args, **kwargs):
-        #floor_pieces = kwargs['floor']
-        floor_pieces = self.floor_
-        rid = self.rid_top_bottom_walls
-        peargs = [{
-            #'parent':fl, 
-            #'parent':self, 
-            #'uv_parent':fl, 
-            'rid_top_bottom_walls':rid, 
-            'floor':fl, 
-            'wall_offset':-self.wall_width/2.0, 
-            'gaped':self.ext_gaped, 
-            'wall_height':self.wall_height, 
-            'wall_width':self.wall_width, 
-            'wall_offset':-self.wall_width/2.0, 
-                } for fl in floor_pieces]
-        perims = [perimeter(**pe) for pe in peargs]
-        return perims
+    def build_shafts(self):
+        shplans = self.shaft_plans
+        shafts = []
+        for shplan in shplans:
+            shafts.extend(shplan.build())
+        return shafts
 
-    def make_interior_walls(self, *args, **kwargs):
-        comps = []
-        kwargs['gaped'] = False
-        for sh in self.shafts:
-            topo = sh.topology[self.floor_number]
-            entry = topo[0]
-            shwg = sh.wall_gaps
-            kwargs['wall_gaps'] = [
-                shwg[0] if entry is 'front' else [],
-                shwg[1] if entry is 'right' else [],
-                shwg[2] if entry is 'back' else [],
-                shwg[3] if entry is 'left' else [],
-                ]
-            shcorns = sh.corners
-            kwargs['corners'] = shcorns
-            kwargs['parent'] = self
-            comps.append(perimeter(**kwargs))
-        return comps
+    def build_foundation(self):
+        bacount = self.basements
+        whopts = self.wall_heights
+        basements = []
+        
+        newstpos = cv.zero()
+        for stdx in range(bacount):
+            this_st_plan = self.st0plan
+            this_st_plan.wall_height = whopts.pop(0)
+            this_st_plan.set_story_height()
+            newstpos = newstpos.copy()
+            newstpos.z -= this_st_plan.story_height
 
-class basement(story):
+            newpieces = this_st_plan.build_basement(
+                        bottom = stdx == bacount - 1)
 
-    def __init__(self, *args, **kwargs):
-        self._default_('consumes_children',True,**kwargs)
-        self._default_('wall_height',8,**kwargs)
-        self._default_('ext_gaped',False,**kwargs)
-        story.__init__(self, *args, **kwargs)
+            lodpieces = this_st_plan.build_basement_lod(
+                        bottom = stdx == bacount - 1)
+            newpieces.extend(lodpieces)
 
-class roofwedge(pr.arbitrary_primitive):
-    roofxml = os.path.join(pr.primitive_data_path, 'roof_angled.mesh.xml') 
-    #vehicledata = pr.primitive_data_from_xml(vehiclexml)
-    #offset = [0,0,0]
+            newstory = sg.node(
+                name = 'abasement' + str(stdx), 
+                children = newpieces, 
+                consumes_children = True, 
+                position = newstpos)
+            basements.append(newstory)
+        return basements
 
-    def __init__(self, *args, **kwargs):
-        proofdata = pr.primitive_data_from_xml(self.roofxml)
-        #pvehdata = self.vehicledata
-        pr.arbitrary_primitive.__init__(self, *args, **proofdata)
-        self._default_('tag','_roof_',**kwargs)
-        self._scale_uvs_ = False
-        #self.translate(self.offset)
+    def build_stories(self):
 
-class wedged_roof(node):
-    def __init__(self, *args, **kwargs):
-        self._default_('consumes_children',True,**kwargs)
-        self._default_('length',10,**kwargs)
-        self._default_('width',10,**kwargs)
-        self._default_('height',5,**kwargs)
-        self.primitives = self.make_roof(*args, **kwargs)
-        node.__init__(self, *args, **kwargs)
+        def roll_for_reduction(sdx):
+            return rm.random()*(float(sdx)/flcount) > 0.2
 
-    def make_roof(self, *args, **kwargs):
-        l,w,h = self.length,self.width,self.height
-        seg1 = roofwedge()
-        seg2 = roofwedge()
-        flip = True if rm.random() < 0.25 else False
-        seg2.rotate_z(fu.PI)
-        if flip:
-            seg1.rotate_z(fu.PI/2.0)
-            seg2.rotate_z(fu.PI/2.0)
-        seg1.scale(cv.vector(l,w,h))
-        seg2.scale(cv.vector(l,w,h))
-        return [seg1,seg2]
+        flcount = self.floors
+        stories = []
+        newstpos = cv.vector(0,0,0)
+        whopts = self.wall_heights
+        fhopts = self.floor_heights
+        chopts = self.ceiling_heights
 
-class rooftop(story):
+        reduces = 3
 
-    def __init__(self, *args, **kwargs):
-        self._default_('theme','suburbs',**kwargs)
-        self._default_('grit_renderingdistance',1000,**kwargs)
-        self._default_('wall_height',1,{})
-        def_ceiling = True if self.theme == 'suburbs' else False
-        self._default_('add_ceiling',def_ceiling,**kwargs)
-        self._default_('ext_gaped',False,**kwargs)
-        self._default_('rid_top_bottom_walls',False,**kwargs)
-        story.__init__(self, *args, **kwargs)
-        veggies = self.vegetate()
-        self.add_child(*veggies)
-        if hasattr(self,'ceiling'):self.ceiling[0].assign_material('cubemat')
+        for stdx in range(flcount):
+            this_st_plan = self.st0plan
+            this_st_plan.wall_height = whopts.pop(0)
+            this_st_plan.floor_height = fhopts.pop(0)
+            this_st_plan.ceiling_height = chopts.pop(0)
+            this_st_plan.set_story_height()
 
-    def make_ceiling(self, *args, **kwargs):
-        flleng = self.length/2.0
-        flwidt = self.width/2.0
-        flheit = rm.randrange(int(min([flleng,flwidt])),
-                            int(max([flleng,flwidt])+1))
+            if roll_for_reduction(stdx) and reduces > 0:
+                reduces -= 1
+                this_st_plan.reduce_sectors()
 
-        czpos = self.wall_height#+self.ceiling_height#+self.floor_height
-        rfpos = cv.vector(0,0,czpos)
-        rfargs = {
-            #'uv_parent':self, 
-            'position':rfpos, 
+            if stdx == 0:
+                newpieces = this_st_plan.build_lobby()
+                lodpieces = this_st_plan.build_lobby_lod()
+            
+            else:
+                newpieces = this_st_plan.build()
+                lodpieces = this_st_plan.build_lod()
+            newpieces.extend(lodpieces)
 
-            'length':flleng, 
-            'width':flwidt, 
-            'height':flheit, 
-                }
-        ceil = wedged_roof(**rfargs)
-        self.ceiling = [ceil]
-        return [ceil]
+            newstory = sg.node(
+                name = 'astory' + str(stdx), 
+                children = newpieces, 
+                consumes_children = True, 
+                position = newstpos)
+            stories.append(newstory)
+            newstpos = newstpos.copy()
+            newstpos.z += this_st_plan.story_height
+        self.roof_position = newstpos
+        return stories
 
-    def vegetate(self):
-        vchildren = []
-        #pdb.set_trace()
-        return vchildren
+    def build_rooftop(self):
+        rooftop = []
+        newstpos = self.roof_position
+        this_st_plan = self.st0plan
+        newpieces = this_st_plan.build_rooftop()
 
+        lodpieces = this_st_plan.build_rooftop_lod()
+        newpieces.extend(lodpieces)
 
-        for ter in terras:
-            fdat = ter.face_data()
-            vcargs = []
-            fcnt = len(fdat)
-            for fdx in range(fcnt):
-                if rm.choice([0,1,1,1]):
-                    verts = [v.position for v in fdat[fdx]]
-                    vegbox = mpbb.bbox(corners = verts)
-                    if not mpbb.intersects(bboxes, vegbox):
-                    #if not vegbox.intersects(bboxes, vegbox):
-                        nvcarg = (verts,None,[fdx])
-                        vcargs.append(nvcarg)
+        newstory = sg.node(
+            name = 'aroof', 
+            children = newpieces, 
+            consumes_children = True,
+            position = newstpos)
+        rooftop.append(newstory)
+        return rooftop
+    
+    def batch_name(self):
+        global batch_count
+        name = '_story_batch_' + str(batch_count)
+        batch_count += 1
+        return name
 
-            # stitch the nvcargs together based on how contiguous they are
-            dx = 0
-            vccnt = len(vcargs)
-            vcmax = 4
-            fewer = []
-            while dx < vccnt:
-                left = vccnt - dx
-                if left >= vcmax: vc_this_round = vcmax
-                else: vc_this_round = left % vcmax
-                relev = vcargs[dx:dx+vc_this_round]
-                reverts = [r[0] for r in relev]
-                refaces = range(vc_this_round)
-                fewer.append((reverts,[],refaces))
-                dx += vc_this_round
+    def batch_stories(self, stories):
+        stcnt = len(stories)
 
-            for varg in fewer:
-                vchild = veg.vegetate(*varg)
-                vchildren.append(vchild)
+        max_batch_number = 10
+        stheight = self.st0plan.story_height
+        batch_number = int(((self.length+self.width)/2.0)/stheight)
+        batch_number = int(mpu.clamp(batch_number,1,max_batch_number))
+        if batch_number == 1: return stories
 
-        return vchildren
+        batches = []
+        dex0 = 0
+        while dex0 < stcnt:
+            sts_left = stcnt - dex0
+            if sts_left >= batch_number: 
+                sts_this_round = batch_number
+            else: sts_this_round = sts_left % batch_number
+            this_batchs = stories[dex0:dex0+sts_this_round]
+            dex0 += sts_this_round
 
-_story_batch_count_ = 0
-class story_batch(node):
+            batch = sg.node(name = self.batch_name(), 
+                children = this_batchs,consumes_children = True)
+            batches.append(batch)
+
+        return batches
+
+    def build(self):
+        found = self.build_foundation()
+        stories = self.build_stories()
+        rooftop = self.build_rooftop()
+        shafts = self.build_shafts()
+        #fence = self.build_fence()
+        built = []
+        built.extend(found)
+        built.extend(stories)
+        built.extend(rooftop)
+        built = self.batch_stories(built)
+        built.extend(shafts)
+        #built.extend(fence)
+        return built
+
+_building_count_ = 0
+class building(sg.node):
 
     def get_name(self):
-        global _story_batch_count_
-        nam = 'story batch ' + str(_story_batch_count_)
-        _story_batch_count_ += 1
+        global _building_count_
+        nam = 'building ' + str(_building_count_)
+        _building_count_ += 1
         return nam
 
     def __init__(self, *args, **kwargs):
-        self._default_('name','storybatch',**kwargs)
-        self._default_('consumes_children',True,**kwargs)
-        self._default_('grit_renderingdistance',250,**kwargs)
-        self._default_('grit_lod_renderingdistance',1000,**kwargs)
-        node.__init__(self, *args, **kwargs)
-
-_newbuilding_count_ = 0
-class newbuilding(node):
-
-    def get_name(self):
-        global _newbuilding_count_
-        nam = 'building ' + str(_newbuilding_count_)
-        _newbuilding_count_ += 1
-        return nam
-
-    def __init__(self, *args, **kwargs):
-        #global _new_building_count_
         if kwargs.has_key('length') and kwargs['length'] < 40:
             kwargs['length'] = 40
         if kwargs.has_key('width') and kwargs['width'] < 40:
@@ -323,22 +765,23 @@ class newbuilding(node):
         kwargs['uv_scales'] = cv.vector(10,10,10)
         self._default_('uv_tform',
             self.def_uv_tform(*args,**kwargs),**kwargs)
-        self.building_plan = bp.building_plan(**kwargs)
+        self.building_plan = building_plan(**kwargs)
         children = self.building_plan.build()
 
         for ch in children:
             ch.uv_tform.parent = self.uv_tform
 
         self.add_child(*children)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
         self.assign_material('concrete')
 
-        print 'built building', _newbuilding_count_
+        print 'built building', _building_count_
 
     def get_bbox(self, *args, **kwargs):
         cornas = self.find_corners()
         #bb = mpbb.bbox(corners = cornas)
-        bb = mpbb.xy_bbox(corners = cornas,owner = self)
+        #bb = mpbb.xy_bbox(corners = cornas,owner = self)
+        bb = mpbb.xy_bbox(corners = cornas)
         return bb
 
     def terrain_points(self):
@@ -363,276 +806,6 @@ class newbuilding(node):
         zang = ttf.rotation.z
         corners = mpu.make_corners(pos,length,width,zang)
         return corners
-
-
-
-
-
-
-_building_count_ = 0
-class building(node):
-
-    hard_min_length = 20
-    hard_min_width = 20
-
-    def get_name(self):
-        global _building_count_
-        nam = 'building ' + str(_building_count_)
-        _building_count_ += 1
-        return nam
-
-    def __init__(self, *args, **kwargs):
-        self._default_('theme','suburbs',**kwargs)
-        self._default_('name',self.get_name(),**kwargs)
-        self._default_('grit_renderingdistance',250.0,**kwargs)
-        self._default_('grit_lod_renderingdistance',1000.0,**kwargs)
-        self._default_('floors',5,**kwargs)
-        self._default_('length',40,**kwargs)
-        self._default_('width',30,**kwargs)
-        self._default_('tform',
-            self.def_tform(*args,**kwargs),**kwargs)
-        kwargs['uv_scales'] = cv.vector(2,2,2)
-        self._default_('uv_tform',
-            self.def_uv_tform(*args,**kwargs),**kwargs)
-        self._default_('materials',['imgtex'],**kwargs)
-        self._default_('wall_height',4,**kwargs)
-        self._default_('wall_width',0.4,**kwargs)
-        self._default_('floor_height',1,**kwargs)
-        self._default_('ceiling_height',0.5,**kwargs)
-        #self._default_('building_name','__abldg__',**kwargs)
-        self._default_('roof_access',True,**kwargs)
-        shafts = self.make_shafts(*args, **kwargs)
-        self.shafts = shafts
-        stories = self.make_floors_from_shafts(*args, **kwargs)
-        foundation = self.make_foundation()
-        
-        story_batches = self.batch_stories(stories)
-        #story_batches = self.batch_stories(foundation + stories)
-        #story_batches = foundation + stories
-        #story_batches = stories
-        
-        children = shafts + story_batches + foundation
-        #children = shafts + story_batches
-        self.add_child(*children)
-        node.__init__(self, *args, **kwargs)
-        #self.assign_material('concrete')
-
-    def make_foundation(self):
-        shafts = self.shafts
-        bname = self.name
-        #bname = self.building_name
-        bump = 0.0
-        bpos = cv.vector(0,0,bump)
-        ww = self.wall_width
-        basement_floor_height = self.floor_height
-        basement_ceiling_height = self.ceiling_height
-        basement_wall_height = 10
-        baheight = basement_ceiling_height + basement_wall_height + basement_floor_height
-        #baheight = basement_floor_height + basement_wall_height
-
-        bpos.translate_z(-baheight)
-        #mpu.translate_vector(bpos,cv.vector(0,0,-baheight))
-
-        #[s.translate([0,0,-baheight]) for s in self.shafts]
-        baargs = {
-            #'parent':self, 
-            'uv_parent':self, 
-            'name':bname+'_basement_0', 
-            'position':bpos, 
-            'shafts':shafts, 
-            'length':self.length, 
-            'width':self.width, 
-            'floor_height':basement_floor_height, 
-            'ceiling_height':basement_ceiling_height, 
-            'wall_height':basement_wall_height, 
-            'wall_width':ww, 
-                }
-        found = [basement(-1, **baargs)]
-        return found
-
-    def batch_stories(self, stories, max_best_number = 10):
-        stcnt = len(stories)
-        stheight = self.wall_height + self.floor_height + self.ceiling_height
-        best_number = int(((self.length+self.width)/2.0)/stheight)
-        best_number = min([best_number,max_best_number])
-        if best_number <= 0: best_number = 1
-        dex0 = 0
-        batches = []
-        stbargs = []
-        b0_z = 0.0
-        #b0_z = -stheight
-        while dex0 < stcnt:
-
-            sts_left = stcnt - dex0
-            if sts_left >= best_number: 
-                sts_this_round = best_number
-            else: sts_this_round = sts_left % best_number
-            batches.append(stories[dex0:dex0+sts_this_round])
-            dex0 += sts_this_round
-
-            b0 = batches[-1][0]
-            for b in batches[-1][1:]:
-                b.tform.position.z -= b0.tform.position.z
-            b0.tform.position.z = b0_z
-            stbatpos = b0.tform.position.copy()
-            stbatpos.z = b0_z
-            b0_z += len(batches[-1])*stheight
-            b0.tform.position.z = 0.0
-
-            stbargs.append({
-                'name':'_storybatch_'+str(len(batches)), 
-                'position':stbatpos, 
-                'children':batches[-1], 
-                'parent':self, 
-                'uv_parent':self, 
-                    })
-        
-        stbatches = [story_batch(**stbgs) for stbgs in stbargs]
-        for stbat,bat in zip(stbatches,batches):
-            for ba in bat: ba.set_parent(stbat)
-        #    #for ba in bat: ba.tform.parent = stbat.tform
-        return stbatches
-
-    def terrain_points(self):
-        tpts = self.find_corners()
-        cv.translate_coords(tpts,cv.vector(0,0,-0.5))
-        center = cv.center_of_mass(tpts)
-        center.translate(cv.zero().translate_z(-0.5))
-        #mpu.translate_vector(center,cv.vector(0,0,-0.5))
-        #fu.translate_coords(tpts,[0,0,9])
-        tpts = mpu.dice_edges(tpts, dices = 1)
-        tpts.append(center)
-        #tpts.append(mpu.center_of_mass(tpts))
-        return tpts
-
-    def make_shafts(self, *args, **kwargs):
-        flcnt = self.floors
-        if not self.roof_access: flcnt -= 1
-        if flcnt == 1: return []
-        shargs = [{
-            #'parent':self, 
-            'uv_parent':self, 
-            'position':cv.zero(),
-            'rotation':cv.zero(), 
-            'wall_height':self.wall_height, 
-            'floor_height':self.floor_height, 
-            'ceiling_height':self.ceiling_height, 
-            'length':8, 
-            'width':8, 
-            'bottom':-1, 
-            'top':'roof',
-            'floors':flcnt, 
-                }]
-        shafts = [shaft(**sh) for sh in shargs]
-        return shafts
-
-    def get_bbox(self, *args, **kwargs):
-        cornas = self.find_corners()
-        #bb = mpbb.bbox(corners = cornas)
-        bb = mpbb.xy_bbox(corners = cornas,owner = self)
-        return bb
-
-    def find_corners(self):
-        length = self.length
-        width = self.width
-        pos = cv.zero()
-        c1, c2, c3, c4 = pos.copy(),pos.copy(),pos.copy(),pos.copy()
-        c1.x -= length/2.0
-        c1.y -= width/2.0
-        c2.x += length/2.0
-        c2.y -= width/2.0
-        c3.x += length/2.0
-        c3.y += width/2.0
-        c4.x -= length/2.0
-        c4.y += width/2.0
-        corncoords = [c1, c2, c3, c4]
-        zang = self.tform.rotation.z
-        cv.rotate_z_coords(corncoords,zang)
-        cv.translate_coords(corncoords,self.tform.position)#this doesnt need to be true()??!?!
-        return [c1, c2, c3, c4]
-
-    def make_floors_from_shafts(self, *args, **kwargs):
-        shafts = self.shafts
-        bname = self.name
-        bpos = cv.zero()
-        ww = self.wall_width
-        l,w = self.length,self.width
-
-        floors = []
-        flcnt = self.floors
-        fllengs = [self.length]*flcnt
-        flwidts = [self.width]*flcnt
-        flheits = [self.floor_height]*flcnt
-        clheits = [self.ceiling_height]*flcnt
-        flwlhts = [self.wall_height]*flcnt
-        hthresh = rm.randrange(int(flcnt/2.0),int(7.0*(flcnt+1)/8.0))
-        if hthresh < 5: hthresh = 5
-        lfactor = rm.choice([0.5,0.6,0.7,0.8,0.9])
-        wfactor = rm.choice([0.5,0.6,0.7,0.8,0.9])
-        fllengs = [l if fdx < hthresh else lfactor*l 
-            #max([lfactor*l,min([l,self.hard_min_length])]) 
-                for fdx,l in enumerate(fllengs)]
-        flwidts = [w if fdx < hthresh else wfactor*w 
-            #max([wfactor*w,min([w,self.hard_min_width])]) 
-                for fdx,w in enumerate(flwidts)]
-        #fllengs = [l if flcnt < flcnt/2.0 else 0.75*l for l in fllengs]
-        #flwidts = [w if flcnt < flcnt/2.0 else 0.75*w for w in flwidts]
-        #pdb.set_trace()
-        #bump = 1.0 # what the hell is with this?
-        bump = 0.0 # what the hell is with this?
-        for fdx in range(flcnt):
-            #stname = bname + '_story_' + str(fdx)
-            fheight = flheits[fdx]
-            cheight = clheits[fdx]
-            wheight = flwlhts[fdx]
-            fl_pos = bpos.copy()
-            fl_pos.z += bump
-            stheight = wheight + fheight + cheight
-            bump += stheight
-            stargs = {
-                #'parent':self, 
-                'uv_parent':self, 
-                #'name':stname, 
-                'position':fl_pos, 'shafts':shafts, 
-                'length':fllengs[fdx], 
-                'width':flwidts[fdx], 
-                'floor_height':fheight, 
-                'ceiling_height':cheight, 
-                'wall_height':wheight, 
-                'wall_width':ww, 
-                'stories_below':floors, 
-                    }
-            floors.append(story(fdx, **stargs))
-
-        roof_name = bname + '_roof_'
-        fl_pos = bpos.copy()
-        #fl_pos[2] += stheight*(flcnt)
-        #bump += floors[-1].ceiling_height
-        fl_pos.z += bump
-        rfarg = {
-            'theme':self.theme, 
-            'parent':self, 
-            #'uv_parent':self, 
-            'name':roof_name, 
-            'position':fl_pos, 
-            'length':fllengs[-1], 
-            'width':flwidts[-1], 
-            'floor_height':flheits[-1], 
-            'shafts':shafts, 
-            'wall_height':1, 
-            'wall_width':ww, 
-                }
-        if self.roof_access:
-            rfarg['gaps'] = []
-            for sh in shafts:
-                for gap in sh.floor_gaps:
-                    topgap = gap[:]
-                    rfarg['gaps'].append(topgap)
-        roof = rooftop(flcnt, **rfarg)
-        floors.append(roof)
-        return floors
-
-
 
 
 

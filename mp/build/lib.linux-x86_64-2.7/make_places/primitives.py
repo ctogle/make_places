@@ -1,6 +1,6 @@
 import make_places.fundamental as fu
 import mp_utils as mpu
-import mp_primitives as mpp
+#import mp_primitives as mpp
 import mp_vector as cv
 from make_places.fundamental import base
 import make_places.profiler as prf
@@ -187,11 +187,7 @@ class arbitrary_primitive(base):
                 for n in cd:
                     self.ncoords[n] = newnormal
 
-    def get_vertexes(self):
-        return mpp.vertices_from_data(self.coords,self.ncoords,self.uv_coords)
-
     def get_vertexes_faces_phys(self):
-        #vs = self.get_vertexes()
         mcnt = len(self.phys_materials)
         fcnt = len(self.face_materials)
         fa = {}
@@ -202,10 +198,8 @@ class arbitrary_primitive(base):
                 if self.phys_face_materials[fmdx] == mdx:
                     fa[ma].append(self.faces[fmdx])
         return fa
-        #return (vs, fa)
 
     def get_vertexes_faces(self):
-        #vs = self.get_vertexes()
         mcnt = len(self.materials)
         fcnt = len(self.face_materials)
         fa = {}
@@ -217,7 +211,6 @@ class arbitrary_primitive(base):
                     fa[ma].append(self.faces[fmdx])
             if not fa[ma]: del fa[ma]
         return fa
-        #return (vs, fa)
 
     def find_centroid(self):
         if len(self.coords) < 1:com = None
@@ -388,30 +381,17 @@ def xml_from_primitive_data(prim):
     faces = prim.get_vertexes_faces()
     _32bitindices = prim.requires_32bit_indices()
     _normals = prim.has_normals()
-    sig = 4
-    doround = False
-
+    
     xlines.append("<mesh>\n")
     xlines.append("    <sharedgeometry>\n")
     xlines.append("        <vertexbuffer positions=\"true\" normals=\""+_normals+"\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
     #xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
-
-    #for v in vertexes:
 
     coords  = prim.coords
     ncoords = prim.ncoords
     ucoords = prim.uv_coords
     vcnt = len(coords)
     for vdx in range(vcnt):
-        #x = v.position.x
-        #y = v.position.y
-        #z = v.position.z
-        #nx = v.normal.x
-        #ny = v.normal.y
-        #nz = v.normal.z
-        #ux = v.uv.x
-        #uy = v.uv.y
-
         p = coords[vdx]
         x,y,z = p.x,p.y,p.z
         n = ncoords[vdx]
@@ -506,7 +486,7 @@ def primitive_from_xml(xmlfile):
 
 cubexml = os.path.join(primitive_data_path, 'cube.mesh.xml')
 cubedata = primitive_data_from_xml(cubexml)
-class unit_cube(arbitrary_primitive):
+class unit_cube___________(arbitrary_primitive):
     cubexml = os.path.join(primitive_data_path, 'cube.mesh.xml')
 
     def __init__(self, *args, **kwargs):
@@ -651,8 +631,9 @@ class unit_octagon(arbitrary_primitive):
         self.modified = True
 
 #UCUBE = unit_cube()
-def ucube(*args, **kwargs):
+def ucube____(*args, **kwargs):
     #pcube = dcopy(UCUBE)
+    #pcube = unit_cube(*args, **kwargs)
     pcube = unit_cube(*args, **kwargs)
     return pcube
 

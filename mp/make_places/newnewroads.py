@@ -34,7 +34,7 @@ class segment(mbp.blueprint):
         segment_number += 1
         return num
 
-    materials = ['cubemat']
+    materials = ['cubemat','concrete']
     phys_materials = ['/common/pmat/Stone']
     def __init__(self,p1,p2,a1,a2,lanecnt,rwidth,swwidth,swheight,uvguide):
         self.lanes = lanecnt
@@ -110,6 +110,9 @@ class segment(mbp.blueprint):
     def build(self):
         xmlfile = '.'.join(['road_segment',
             self.get_segment_number(),'mesh','xml'])
+
+        #self.road_faces = range(0,len(faces)-8)
+        
         return mbp.blueprint.build(self,xmlfile,False,False)
 
 road_batch_count = 0
@@ -307,7 +310,7 @@ class road_plan(mbp.blueprint):
         #mbp.plot(self.vertices)
 
     def set_safe_vertices(self):
-        margin = 50
+        margin = 75
         safe = []
         vcnt = len(self.vertices)
         for vdx in range(vcnt):
@@ -806,10 +809,12 @@ def fractate(steps = 30):
 
     mingrowlength = 200
     for step in range(steps):
-        gtip = rm.choice(rplans)
-        if gtip.total_length < mingrowlength:
-            print 'tip is too short to grow!'
-            continue
+        available = [rp for rp in rplans if rp.total_length > mingrowlength]
+        gtip = rm.choice(available)
+        #gtip = rm.choice(rplans)
+        #if gtip.total_length < mingrowlength:
+        #    print 'tip is too short to grow!'
+        #    continue
         #stepstyle = steplookup[step]
         stepstyle = 'generic'
         iplans,rplans = grow(iplans,rplans,gtip,stepstyle)

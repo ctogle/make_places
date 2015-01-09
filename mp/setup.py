@@ -8,7 +8,7 @@ from Cython.Distutils import build_ext
 
 #from setuptools import setup,Extension
 
-core_modules = []
+core_modules = ['blueprints']
 ext_modules = [
     Extension('mp_utils', ['support/mp_utils.c']), 
     Extension('mp_vector', ['support/mp_vector.c']), 

@@ -1,14 +1,123 @@
 import make_places.fundamental as fu
+import make_places.scenegraph as sg
+import make_places.blueprints as mbp
 import make_places.walls as wa
+import make_places.floors as fl
+
 import mp_utils as mpu
 import mp_vector as cv
-from make_places.scenegraph import node
-from make_places.floors import floor
+
+#from make_places.scenegraph import node
+#from make_places.floors import floor
 
 import pdb
 
+###############################################################################
+stair_factory = stairs()
+stair_factory._build()
+def build_stairs(**buildopts):
+    stair_factor._rebuild(**buildopts)
+    return stair_factory._primitive_from_slice()
+
+class stairs(blueprint):
+
+    def __init__(self,steps = 5,l = 10,w = 4,h = 8):
+        blueprint.__init__(self)
+        self.steps = steps
+        self.l = l
+        self.w = w
+        self.h = h
+
+    def _rebuild(self,steps = None,l = None,w = None,h = None):
+        bflag = False
+        if not steps is None:
+            self.steps = steps
+            bflag = True
+        if not l is None:
+            self.l = l
+            bflag = True
+        if not w is None:
+            self.w = w
+            bflag = True
+        if not h is None:
+            self.h = h
+            bflag = True
+        if bflag: self._build()
+
+    def _build(self):
+        l,w,h = float(self.l),float(self.w),float(self.h)
+        steps = self.steps
+        stepheight = h/steps
+        steplength = l/steps
+        p = cv.zero()
+        line = []
+        for sx in range(steps):
+            line.append(p.copy())
+            p.translate_z(stepheight)
+            line.append(p.copy())
+            p.translate_y(steplength)
+        line.append(p.copy())
+
+        topleft = [pt.copy().translate_x(-w/2.0) for pt in line] 
+        topright = [pt.copy().translate_x(w/2.0) for pt in line] 
+        blength = sqrt(l**2 + h**2)
+        bottom = point_line(cv.zero(),cv.vector(0,l,h),blength,steps)
+        for bdx in range(steps):
+            bottom.insert(2*bdx+1,bottom[2*bdx+1].copy())
+        cv.translate_coords_z(bottom[1:],-stepheight)
+        bottomleft = [pt.copy().translate_x(-w/2.0) for pt in bottom] 
+        bottomright = [pt.copy().translate_x(w/2.0) for pt in bottom] 
+
+        self._bridge(topleft,topright,m = 'concrete')
+        self._bridge(bottomleft,topleft,m = 'concrete')
+        self._bridge(topright,bottomright,m = 'concrete')
+        self._bridge(bottomright,bottomleft,m = 'concrete')
+        
+        self._assign_material('grass',slice(-4,-1))
+
+        return self._primitive_from_slice()
+
+def test_stair_factory():
+    bopts = {'steps':10,'l':10,'w':4,'h':8}
+    sprim1 = build_stairs(**bopts)
+    sprim2 = build_stairs(**bopts)
+    sprim3 = build_stairs(**bopts)
+    sprim2.translate_x(-10.0)
+    sprim3.translate_x( 10.0)
+    stairnode = sg.node(primitives = [sprim1,sprim2,sprim3])
+    gritgeo.create_element(stairnode)
+    print 'stair test'
+
+###############################################################################
+
+
+
+class shaft_plan(mbp.blueprint):
+    def __init__(self, position, **kwargs):
+        self.position = position
+        self._default_('floors',3,**kwargs)
+        self._default_('floor_heights',[0.5]*self.floors,**kwargs)
+        self._default_('ceiling_heights',[0.5]*self.floors,**kwargs)
+        self._default_('wall_heights',[4.0]*self.floors,**kwargs)
+        self._default_('length',8,**kwargs)
+        self._default_('width',8,**kwargs)
+
+    def build(self):
+        pieces = []
+        shargs = {
+            'position':self.position.copy(), 
+            'floor_heights':self.floor_heights, 
+            'ceiling_heights':self.ceiling_heights, 
+            'wall_heights':self.wall_heights, 
+            'length':self.length, 
+            'width':self.width, 
+            'floors':self.floors, 
+                }
+        pieces.append(shaft(**shargs))
+        return pieces
+
 _ramp_count_ = 0
-class ramp(floor):
+class ramp(fl.floor):
 
     def get_name(self):
         global _ramp_count_
@@ -26,16 +135,16 @@ class ramp(floor):
             self.length = self.width
             self.width = l
 
-        floor.__init__(self, *args, **kwargs)
+        fl.floor.__init__(self, *args, **kwargs)
         if self.gapped:
             print('failed to make ramp!!')
         else:
             prim = self.primitives[0]
             high_side = kwargs['high_side']
             differ = kwargs['differential']
-            prim.translate_face(cv.vector(0,0,differ),high_side)
+            #prim.translate_face(cv.vector(0,0,differ),high_side)
 
-class shaft(node):
+class shaft(sg.node):
     def __init__(self, *args, **kwargs):
         self._default_('grit_renderingdistance',100.0,**kwargs)
         self._default_('consumes_children',True,**kwargs)
@@ -53,7 +162,7 @@ class shaft(node):
         self.corners = self.find_corners()
         ramps = self.ramps(*args, **kwargs)
         self.add_child(*ramps)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def find_corners(self):
         pos = self.tform.position
@@ -90,7 +199,7 @@ class shaft(node):
             'length':self.length, 
             'width':platformwidth, 
                 }
-        platform = floor(**pargs)
+        platform = fl.floor(**pargs)
         pieces.append(ramp1)
         pieces.append(ramp2)
         pieces.append(platform)
@@ -148,96 +257,6 @@ class shaft(node):
 
 
 
-
-class shaft_____old(node):
-
-    def __init__(self, *args, **kwargs):
-        self._default_('grit_renderingdistance',100.0,**kwargs)
-        self._default_('consumes_children',True,**kwargs)
-        self._default_('length',10.0,**kwargs)
-        self._default_('width',10.0,**kwargs)
-        self._default_('wall_width',0.4,**kwargs)
-        self._default_('floor_height',0.5,**kwargs)
-        self._default_('ceiling_height',0.5,**kwargs)
-        self._default_('wall_height',4,**kwargs)
-        self._default_('floors',2,**kwargs)
-        self._default_('direction','north',**kwargs)
-        self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
-        self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
-        l = self.length
-        w = self.width
-        self.corners = self.find_corners()
-        #self.corners = fu.find_corners(self.tform.position, l, w)
-        m = 0.25
-        self.wall_gaps = [
-            [[m,l-2*m]], 
-            [[m,w-2*m]], 
-            [[m,l-2*m]],
-            [[m,w-2*m]],
-                ]
-        self.floor_gaps = [[self.tform.position, l, w]]
-        self.bottom = -1
-        self.top = 'roof'
-        ramps = self.ramps(*args, **kwargs)
-        self.add_child(*ramps)
-        node.__init__(self, *args, **kwargs)
-
-    def find_corners(self):
-        pos = self.tform.position
-        l,w = self.length,self.width
-        return mpu.make_corners(pos,l,w,0)
-
-        #c1,c2,c3,c4 = pos.copy(),pos.copy(),pos.copy(),pos.copy()
-        #c2.x += l
-        #c3.x += l
-        #c3.y += w
-        #c4.y += w
-        #return [c1,c2,c3,c4]
-
-    def ramps(self, *args, **kwargs):
-        comps = []
-        ww = self.wall_width
-        floffset = self.wall_height+self.floor_height+self.ceiling_height
-        flcnt = self.floors
-        topology = []
-
-        def get_pos_fb(odd):
-            bpos = cv.vector(rl*odd-rl/2.0,0.0,0.0)
-            return bpos, rl, rw
-
-        def get_pos_rl(odd):
-            bpos = cv.vector(0.0,rw*odd-rw/2.0,0.0)
-            return bpos, rl, rw
-
-        if self.direction == 'east':
-            sides = ['right','left']
-            rw, rl = [4.0, 8.0]
-            get_pos = get_pos_rl
-
-        elif self.direction == 'north':
-            sides = ['front','back']
-            rw, rl = [8.0, 4.0]
-            get_pos = get_pos_fb
-
-        for fdx in range(flcnt):
-            odd = fdx % 2.0
-            rpos, rl, rw = get_pos(odd)
-            rpos.z += floffset * fdx
-            lside = sides[0] if odd else sides[1]
-            hside = sides[1] if odd else sides[0]
-            rparg = {
-                'parent':self,
-                'position':rpos, 
-                'length':rl, 
-                'width':rw, 
-                'high_side':hside, 
-                'differential':floffset, 
-                    }
-            topology.append((lside,hside))
-            ramp_ = ramp(**rparg)
-            comps.append(ramp_)
-        self.topology = topology
-        return comps
 
 
 

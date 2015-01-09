@@ -1,16 +1,180 @@
 import make_places.fundamental as fu
-#from make_places.fundamental import element
-from make_places.scenegraph import node
-import make_places.scenegraph as scg
+import make_places.scenegraph as sg
+import make_places.blueprints as mbp
 import make_places.primitives as pr
-from make_places.primitives import unit_cube
+
 import mp_utils as mpu
+import mp_bboxes as mpbb
 import mp_vector as cv
 
 import numpy as np
+import random as rm
+
+class wall_plan(mbp.blueprint):
+    def __init__(self,v1,v2,sector = None,sort = 'exterior',**kwargs):
+        self.sort = sort
+        self.sector = sector
+        self._default_('wall_width',0.5,**kwargs)
+        self._default_('wall_height',4.0,**kwargs)
+        self._default_('unswitchable',False,**kwargs)
+        self.v1 = v1
+        self.v2 = v2
+        self.v1v2 = cv.v1_v2(v1,v2)
+        self.center = cv.midpoint(v1,v2)
+        self.lead_tip_rot = 0.0
+        self.rear_tip_rot = 0.0
+        self.length = self.v1v2.magnitude()
+        self.normal = cv.cross(self.v1v2,cv.zhat).normalize()
+        self.tangent = self.v1v2.copy().normalize()
+
+    def distance_to_border(self, border):
+
+        def distance_to_edge(pt,e1,e2,norm):
+            eproj = mpbb.project([e1,e2],norm)
+            pproj = mpbb.project([pt],norm)
+            return abs(eproj.x - pproj.x)
+
+        edgenorms = mpbb.get_norms(border)
+        pt = self.center 
+        dists = []
+        for edx in range(len(border)):
+            e1 = border[edx-1]
+            e2 = border[edx]
+            norm = edgenorms[edx-1]
+            dists.append(distance_to_edge(pt,e1,e2,norm))
+            #dists.append(mpbb.distance_to_edge(pt,e1,e2))
+        dists.append(dists.pop(0))
+        distance = min(dists)
+        return distance
+
+    def face_away(self):
+        intpt = self.sector.position.copy()
+        midpt = cv.midpoint(self.v1,self.v2)
+        tstpt = midpt.copy().translate(self.normal)
+        if cv.distance(intpt,midpt) > cv.distance(intpt,tstpt):
+            self.normal.flip()
+
+        certain_tangent = cv.zhat.cross(self.normal)
+        tstpt = midpt.copy().translate(certain_tangent)
+        if cv.distance(self.v1,midpt) > cv.distance(self.v1,tstpt):
+            v1 = self.v1
+            self.v1 = self.v2
+            self.v2 = v1
+            self.v1v2 = cv.v1_v2(self.v1,self.v2)
+            self.tangent = self.v1v2.copy().normalize()
+
+    def fill_windows(self, windows):
+        filled = []
+        for wo in windows:
+            w1off = self.tangent.copy().scale_u(wo[0])
+            w1 = self.v1.copy().translate(w1off)
+            w2off = self.tangent.copy().scale_u(wo[1])
+            w2 = w1.copy().translate(w2off)
+
+            wheight = mpu.clamp(int(0.5*self.wall_height),2.0,5.0)
+            woff = wheight/2.0 + 1.0
+
+            bheight = woff - wheight/2.0
+            bottom = wall(w1.copy(),w2.copy(),wall_height = bheight, 
+                wall_width = self.wall_width,gaped = False,
+                rid_top_bottom = False)
+
+            hoff = woff + wheight/2.0
+            hheight = self.wall_height - hoff
+            w1.z += hoff 
+            w2.z += hoff
+            head = wall(w1,w2,wall_height = hheight,
+                wall_width = self.wall_width,
+                gaped = False,rid_top_bottom = False)
+
+            filled.append(head)
+            filled.append(bottom)
+        return filled
+
+    def fill_doors(self, doors):
+        filled = []
+        for do in doors:
+            d1off = self.tangent.copy().scale_u(do[0])
+            d1 = self.v1.copy().translate(d1off)
+            d2off = self.tangent.copy().scale_u(do[1])
+            d2 = d1.copy().translate(d2off)
+
+            dheight = mpu.clamp(int(0.75*self.wall_height),3.0,5.0)
+            hheight = self.wall_height - dheight
+            hoff = dheight
+            d1.z += hoff
+            d2.z += hoff
+            head = wall(d1,d2,wall_height = hheight,
+                wall_width = self.wall_width, 
+                rid_top_bottom = False,gaped = False)
+            filled.append(head)
+        return filled
+
+    def build(self, solid = False, skirt = False, flh = 0.0, clh = 0.0):
+        #print 'BUILD WALL!'
+
+        wargs = {
+            'rid_top_bottom':False,
+            'wall_width':self.wall_width, 
+            'wall_height':self.wall_height + flh + clh,
+            'gaped':False, 
+                }
+
+        doorwidth = 3.0
+        windowwidth = 3.0
+
+        if solid:
+            doors = []
+            windows = []
+        else:
+            if self.sort == 'interior':
+                if self.length > 2.0*doorwidth:
+                    dpfa = rm.choice([0.25,0.5,0.75])
+                    dpos = dpfa*self.length - doorwidth/2.0
+                    doors = [[dpos,doorwidth]]
+                else: doors = []
+                windows = []
+                doors.extend(windows)
+
+            else:
+                doors = []
+
+                wlen = float(self.length)
+                gcnt = int(wlen/(windowwidth*3))
+                if gcnt % 2 != 0: gcnt -= 1
+                windows = []
+                if gcnt > 0: gspa = wlen/gcnt
+                for gn in range(gcnt):
+                    gp = (gn + 0.5)*gspa - windowwidth/2.0
+                    windows.append((gp,windowwidth))
+                doors.extend(windows)
+
+            if self.unswitchable:
+                doorwidth = 3.0
+                dpos = 0.5*self.length - doorwidth/2.0
+                doors.insert(gcnt/2,[dpos,doorwidth])
+
+        wargs['gaps'] = doors
+        v1 = self.v1.copy().translate_z(-flh)
+        v2 = self.v2.copy().translate_z(-flh)
+
+        pieces = [wall(v1,v2,**wargs)]
+        pieces.extend(self.fill_doors(doors))
+        pieces.extend(self.fill_windows(windows))
+        if skirt:
+            swargs = {
+                'rid_top_bottom':False,
+                'wall_width':self.wall_width, 
+                'wall_height' : flh + clh, 
+                'gaped': False, 
+                    }
+            sv1 = v1.copy().translate_z(-flh-clh)
+            sv2 = v2.copy().translate_z(-flh-clh)
+            pieces.append(wall(sv1,sv2,**swargs))
+        return pieces
 
 _wall_count_ = 0
-class wall(node):
+class wall(sg.node):
 
     def get_name(self):
         global _wall_count_
@@ -40,7 +204,7 @@ class wall(node):
         kwargs['position'] = pos
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def gape_wall(self):
         wlen = float(self.length)
@@ -55,7 +219,8 @@ class wall(node):
         return gaps
 
     def make_wall_segment(self, pos, v1, v2, wall_scales):
-        wall_ = unit_cube()
+        #wall_ = unit_cube()
+        wall_ = mbp.ucube()
         if self.rid_top_bottom:
             wall_.remove_face('top','bottom')
         length = cv.distance_xy(v1,v2)
@@ -101,7 +266,7 @@ class wall(node):
         return prims
 
 _perim_count_ = 0
-class perimeter(node):
+class perimeter(sg.node):
     
     def get_name(self):
         global _perim_count_
@@ -127,7 +292,7 @@ class perimeter(node):
         self.gapes = [self.gaped]*len(self.wall_gaps)
         self.add_child(*self.make_walls(self.corners,
             gapes = self.gapes,gaps = self.wall_gaps))
-        node.__init__(self, *args, **kwargs)
+        sg.node.__init__(self, *args, **kwargs)
 
     def add_corner_offset(self, cns):
         off = -self.wall_offset

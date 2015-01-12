@@ -1,14 +1,16 @@
 import make_places.fundamental as fu
+import make_places.primitives as pr
 import make_places.scenegraph as sg
 import make_places.blueprints as mbp
+import make_places.gritty as gritgeo
 
 import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
 
-#from make_places.fundamental import element
-#from make_places.scenegraph import node
-#from make_places.primitives import unit_cube
+import matplotlib.pyplot as plt
+
+import pdb
 
 class floor_sector(mbp.blueprint):
     # a sector is a convex 2d projection of a space to be stitched to other
@@ -75,10 +77,14 @@ class floor_sector(mbp.blueprint):
         pairs = []
         ccnt = len(self.corners)
         for cdx in range(1,ccnt):
-            c1,c2 = self.corners[cdx-1],self.corners[cdx]
-            pairs.append((c1.copy(),c2.copy()))
-        c1,c2 = self.corners[-1],self.corners[0]
-        pairs.append((c1.copy(),c2.copy()))
+            c1,c2 = self.corners[cdx-1].copy(),self.corners[cdx].copy()
+            #c1.translate_z(-0.5)
+            #c2.translate_z(-0.5)
+            pairs.append((c1,c2))
+        c1,c2 = self.corners[-1].copy(),self.corners[0].copy()
+        #c1.translate_z(-0.5)
+        #c2.translate_z(-0.5)
+        pairs.append((c1,c2))
         return pairs
 
     def build_lod(self,floor = True,ceiling = True):
@@ -103,29 +109,40 @@ class floor_sector(mbp.blueprint):
     def build(self,hasfloor = True,hasceiling = True):
         #print 'BUILD FLOOR SECTOR!'
 
-        pieces = []
-        fargs = {
-            'gaps':self.fgaps, 
-            'position':self.position.copy(), 
-            'length':self.length,
-            'width':self.width, 
-            'floor_height':self.floor_height, 
-                }
-        coff = self.ceiling_height + self.wall_height
-        cargs = {
-            'gaps':self.cgaps, 
-            'position':self.position.copy().translate_z(coff), 
-            'length':self.length,
-            'width':self.width, 
-            'floor_height':self.ceiling_height, 
-                }
+        if not hasfloor and not hasceiling: return []
+        final = pr.empty_primitive()
+        if hasfloor:
+            if self.fgaps: fgap = self.fgaps[0]
+            else: fgap = None
+            fopts = {
+                'gap':fgap,
+                'l':self.length,
+                'w':self.width,
+                'h':self.floor_height,
+                    }
+            afloor = build_floor(**fopts)
+            final.consume(afloor)
+        if hasceiling:
+            if self.cgaps: cgap = self.cgaps[0]
+            else: cgap = None
+            copts = {
+                'gap':cgap,
+                'l':self.length,
+                'w':self.width,
+                'h':self.floor_height,
+                    }
+            aceiling = build_floor(**copts)
+            coff = self.ceiling_height + self.wall_height
+            aceiling.translate_z(coff)
+            final.consume(aceiling)
 
-        if hasfloor: pieces.append(floor(**fargs))
-        if hasceiling: pieces.append(floor(**cargs))
-        return pieces
+        piecenode = sg.node(
+            position = self.position.copy(),
+            primitives = [final])
+        return [piecenode]
 
 _floor_count_ = 0
-class floor(sg.node):
+class floorold(sg.node):
 
     def get_name(self):
         global _floor_count_
@@ -225,6 +242,62 @@ class floor(sg.node):
         fl.translate(cv.vector(pos.x,pos.y,pos.z-flheight))
         return [fl]
 
+class newfloor(mbp.blueprint):
+
+    def __init__(self,l = 10,w = 10,h = 1,gap = None):
+        mbp.blueprint.__init__(self)
+        self.l = l
+        self.w = w
+        self.h = h
+        self.gap = gap
+
+    def _build_gap(self):
+        l,w,h,g = self.l,self.w,self.h,self.gap
+        gp,gl,gw = g
+        iloop = mpu.make_corners(gp,gl,gw,0)
+        oloop = mpu.make_corners(cv.zero(),l,w,0)
+        iloop.append(iloop[0])
+        oloop.append(oloop[0])
+
+        newfaces = self._bridge(iloop,oloop)
+        self._project_uv_xy(newfaces)
+
+        iloopb = [c.copy() for c in iloop]
+        oloopb = [c.copy() for c in oloop]
+        [c.translate_z(-h) for c in iloopb]
+        [c.translate_z(-h) for c in oloopb]
+
+        newfaces = self._bridge(oloopb,iloopb)
+        self._project_uv_xy(newfaces)
+
+        newfaces = self._bridge(iloopb,iloop)
+
+    def _build_nogap(self):
+        l,w,h = self.l,self.w,self.h
+        corners = mpu.make_corners(cv.zero(),l,w,0)
+        us = mbp.polygon(4)
+        cv.translate_coords(us,cv.one().scale_u(0.5))
+        cv.scale_coords_x(us,l)
+        cv.scale_coords_y(us,w)
+        self._quad(*corners,us = us)
+        [c.translate_z(-h) for c in corners]
+        corners.reverse()
+        self._quad(*corners,us = us)
+
+    def _build(self):
+        if self.gap is None: self._build_nogap()
+        else: self._build_gap()
+
+floor_factory = newfloor()
+floor_factory._build()
+def build_floor(**opts):
+    floor_factory._rebuild(**opts)
+    return floor_factory._primitive_from_slice()
+    
+def test_floor_factory():
+    fopts = {'l':20,'w':30,'h':0.5,'gap':(cv.zero(),10,10)}
+    afloor = build_floor(**fopts)
+    gritgeo.create_primitive(afloor)
 
 
 

@@ -54,12 +54,12 @@ cdef class matrix:
             self.rows = rows
             #self.columns = self.columns_from_rows(rows)
 
-cdef matrix rotation_matrix(float ang,char axis = 'z'):
-    if axis == 'z':
-        r1 = vector(cos(ang),-sin(ang),0)
-        r2 = vector(sin(ang), cos(ang),0)
-        r3 = vector(       0,        0,1)
-        return matrix(rows = [r1,r2,r3])
+cdef matrix rotation_matrix____(float ang,char axis = 'z'):
+    #if axis == 'z':
+    r1 = vector(cos(ang),-sin(ang),0)
+    r2 = vector(sin(ang), cos(ang),0)
+    r3 = vector(       0,        0,1)
+    return matrix(rows = [r1,r2,r3])
 
 # 2d classes/functions
 
@@ -199,8 +199,6 @@ cdef class vector:
             self.x /= mag
             self.y /= mag
             self.z /= mag
-        #else:
-        #    print 'vector of length 0 cannot be normalized'
         return self
 
     cpdef vector flip(self):
@@ -209,9 +207,31 @@ cdef class vector:
         self.z *= -1.0
         return self
 
+    cpdef vector rotate_x(self, float zang):
+        cdef float cosz = cos(zang)
+        cdef float sinz = sin(zang)
+        cdef float newy = cosz*self.y - sinz*self.z
+        cdef float newz = sinz*self.y + cosz*self.z
+        self.y = newy
+        self.z = newz
+        return self
+
+    cpdef vector rotate_y(self, float zang):
+        cdef float cosz = cos(zang)
+        cdef float sinz = sin(zang)
+        cdef float newx = cosz*self.x - sinz*self.z
+        cdef float newz = sinz*self.x + cosz*self.z
+        self.x = newx
+        self.z = newz
+        return self
+
     cpdef vector rotate_z(self, float zang):
-        cdef matrix rotmat = rotation_matrix(zang)
-        rotmat.multiply(self)
+        cdef float cosz = cos(zang)
+        cdef float sinz = sin(zang)
+        cdef float newx = cosz*self.x - sinz*self.y
+        cdef float newy = sinz*self.x + cosz*self.y
+        self.x = newx
+        self.y = newy
         return self
 
     cpdef vector translate_x(self, float tx):
@@ -340,6 +360,28 @@ cpdef vector midpoint(vector v1, vector v2):
     cdef vector pt = midpoint_c(v1, v2)
     return pt
 
+cdef void rotate_x_coords_c(list coords, float ang):
+    cdef int ccnt = len(coords)
+    cdef int cdx
+    cdef vector coo
+    for cdx in range(ccnt):
+        coo = <vector>coords[cdx]
+        coo.rotate_x(ang)
+
+cpdef rotate_x_coords(list coords, float ang):
+    rotate_x_coords_c(coords,ang)
+
+cdef void rotate_y_coords_c(list coords, float ang):
+    cdef int ccnt = len(coords)
+    cdef int cdx
+    cdef vector coo
+    for cdx in range(ccnt):
+        coo = <vector>coords[cdx]
+        coo.rotate_y(ang)
+
+cpdef rotate_y_coords(list coords, float ang):
+    rotate_y_coords_c(coords,ang)
+
 cdef void rotate_z_coords_c(list coords, float ang):
     cdef int ccnt = len(coords)
     cdef int cdx
@@ -395,6 +437,39 @@ cdef void translate_coords_c(list coords, vector t):
 cpdef translate_coords(list coords, vector t):
     translate_coords_c(coords,t)
 
+cdef void scale_coords_x_c(list coords, float s):
+    cdef int ccnt = len(coords)
+    cdef int cdx
+    cdef vector coo
+    for cdx in range(ccnt):
+        coo = <vector>coords[cdx]
+        coo.x *= s
+
+cpdef scale_coords_x(list coords, float s):
+    scale_coords_x_c(coords,s)
+
+cdef void scale_coords_y_c(list coords, float s):
+    cdef int ccnt = len(coords)
+    cdef int cdx
+    cdef vector coo
+    for cdx in range(ccnt):
+        coo = <vector>coords[cdx]
+        coo.y *= s
+
+cpdef scale_coords_y(list coords, float s):
+    scale_coords_y_c(coords,s)
+
+cdef void scale_coords_z_c(list coords, float s):
+    cdef int ccnt = len(coords)
+    cdef int cdx
+    cdef vector coo
+    for cdx in range(ccnt):
+        coo = <vector>coords[cdx]
+        coo.z *= s
+
+cpdef scale_coords_z(list coords, float s):
+    scale_coords_z_c(coords,s)
+    
 cdef void scale_coords_c(list coords, vector t):
     cdef int ccnt = len(coords)
     cdef int cdx

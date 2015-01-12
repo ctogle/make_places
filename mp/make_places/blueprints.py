@@ -114,14 +114,39 @@ class blueprint(fu.base):
                 pm = len(self.pmats) - 1
         return pm
 
-    def _assign_material(self,m,dslice = slice(None)):
-        many = dslice.stop - dslice.start
+    def _assign_material(self,m,rng):
         m = self._lookup_mat(m)
-        self.face_mats[dslice][:] = [m]*many
-        print 'many',many,m
+        for dx in rng:
+            self.face_mats[dx] = m
 
-        print 'fm',self.face_mats
-        pdb.set_trace()
+    def _project_uv_xy(self,faces):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                p = self.pcoords[fdx]
+                nu = p.copy().xy()
+                self.ucoords[fdx] = nu
+
+    def _reset_data(self):
+        self.pcoords = []
+        self.ncoords = []
+        self.ucoords = []
+        self.faces = []
+        self.face_mats = []
+        self.face_pmats = []
+
+    def _build(self):pass
+
+    def _rebuild(self,**opts):
+        bflag = False
+        for oke in opts.keys():
+            oval = opts[oke]
+            if not self.__dict__[oke] == oval:
+                bflag = True
+                self.__dict__[oke] = oval
+        if bflag:
+            self._reset_data()
+            self._build()
 
     def __init__(self):
         global blueprint_count
@@ -139,7 +164,14 @@ class blueprint(fu.base):
         self.pmats = ['/common/pmat/Stone']
 
     def _trifan(self,apex,blade,ns = None,us = None,m = None,pm = None):
-        pdb.set_trace()
+        tcnt = len(blade) - 1
+        for trdx in range(tcnt):
+            c2dx = trdx
+            c3dx = trdx+1
+            c1 = apex.copy()
+            c2 = blade[c2dx].copy()
+            c3 = blade[c3dx].copy()
+            self._triangle(c1,c2,c3,ns,us,m,pm)
 
     # given two loops of equal length, bridge with quads
     def _tripie(self,loop,ns = None,us = None,m = None,pm = None):
@@ -157,6 +189,23 @@ class blueprint(fu.base):
     # given two loops of equal length, bridge with quads
     def _bridge(self,loop1,loop2,ns = None,us = None,m = None,pm = None):
         if not len(loop1) == len(loop2): raise ValueError
+        nfstart = len(self.faces)
+        lcnt = len(loop1)
+        for ldx in range(1,lcnt):
+            v1 = loop1[ldx-1]
+            v2 = loop2[ldx-1]
+            v3 = loop2[ldx]
+            v4 = loop1[ldx]
+            self._quad(v1,v2,v3,v4,ns,us,m,pm)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
+
+    # given two loops of possibly nonequal length, bridge with quads/tris
+    def _bridge_asymmetric(self,loop1,loop2,ns = None,us = None,m = None,pm = None):
+
+        pdb.set_trace()
+
+        if not len(loop1) == len(loop2): raise ValueError
         lcnt = len(loop1)
         for ldx in range(1,lcnt):
             v1 = loop1[ldx-1]
@@ -166,8 +215,26 @@ class blueprint(fu.base):
             self._quad(v1,v2,v3,v4,ns,us,m,pm)
 
     # given a line of points make n faces between angles a1 and a2
-    def _revolve(self,line,a1,a2,n,ns = None,us = None,m = None,pm = None):
-        pdb.set_trace()
+    def _revolve_z(self,loop,a1,a2,n,ns = None,us = None,m = None,pm = None):
+        rotstep = (a2-a1)/float(n)
+        for step in range(n):
+            ta1 = a1+step*rotstep
+            ta2 = a1+(step+1)*rotstep
+            loop1 = [p.copy().rotate_z(ta1) for p in loop]
+            loop2 = [p.copy().rotate_z(ta2) for p in loop]
+            self._bridge(loop1,loop2,ns = ns,us = us,m = m,pm = pm)
+
+    # given a curve of points make faces to extrude loop along the curve
+    def _extrude(self,loop,curve,ns = None,us = None,m = None,pm = None):
+        tailloop = [l.copy() for l in loop]
+        n = len(curve)
+        for step in range(1,n):
+            tn = cv.v1_v2(curve[step-1],curve[step])
+            tiploop = [l.copy().translate(tn) for l in tailloop]
+            # i want to rotate tiploop according to tangents - need quat
+            # rotation...
+            self._bridge(tailloop,tiploop)
+            tailloop = [l.copy() for l in tiploop]
 
     # given four points, add two new triangle faces
     def _quad(self,v1,v2,v3,v4,ns = None,us = None,m = None,pm = None):
@@ -247,7 +314,7 @@ class blueprint(fu.base):
             'has_lod' : hlod,
                 }
         mesh = pr.arbitrary_primitive(**pwargs)
-        mesh._scale_uvs_ = True
+        #mesh._scale_uvs_ = True
         return mesh
         
 
@@ -350,48 +417,6 @@ class blueprint(fu.base):
 
 
 
-class stairs(blueprint):
-
-    def __init__(self,steps = 5,l = 10,w = 4,h = 8):
-        blueprint.__init__(self)
-        self.steps = steps
-        self.l = l
-        self.w = w
-        self.h = h
-
-    def _build(self):
-        l,w,h = float(self.l),float(self.w),float(self.h)
-        steps = self.steps
-        stepheight = h/steps
-        steplength = l/steps
-        p = cv.zero()
-        line = []
-        for sx in range(steps):
-            line.append(p.copy())
-            p.translate_z(stepheight)
-            line.append(p.copy())
-            p.translate_y(steplength)
-        line.append(p.copy())
-
-        topleft = [pt.copy().translate_x(-w/2.0) for pt in line] 
-        topright = [pt.copy().translate_x(w/2.0) for pt in line] 
-        blength = sqrt(l**2 + h**2)
-        bottom = point_line(cv.zero(),cv.vector(0,l,h),blength,steps)
-        for bdx in range(steps):
-            bottom.insert(2*bdx+1,bottom[2*bdx+1].copy())
-        cv.translate_coords_z(bottom[1:],-stepheight)
-        bottomleft = [pt.copy().translate_x(-w/2.0) for pt in bottom] 
-        bottomright = [pt.copy().translate_x(w/2.0) for pt in bottom] 
-
-        self._bridge(topleft,topright,m = 'concrete')
-        self._bridge(bottomleft,topleft,m = 'concrete')
-        self._bridge(topright,bottomright,m = 'concrete')
-        self._bridge(bottomright,bottomleft,m = 'concrete')
-        
-        self._assign_material('grass',slice(-4,-1))
-
-        return self._primitive_from_slice()
-
 class cylinder(blueprint):
 
     def __init__(self,r = 10,h = 20):
@@ -410,37 +435,94 @@ class cylinder(blueprint):
         bottom.append(bottom[0])
         top.append(top[0])
         self._bridge(bottom,top,m = 'metal')
-        return self._primitive_from_slice()
 
 class cube(blueprint):
 
-    def __init__(self,l = 1,w = 1,h = 1,a = 0):
+    def __init__(self,l = 1,w = 1,h = 1,a = 0,m = 'cubemat'):
         blueprint.__init__(self)
         self.l = l
         self.w = w
         self.h = h
         self.a = a
+        self.m = m
 
     def _build(self):
         l,w,h,a = self.l,self.w,self.h,self.a
         bcorners = mpu.make_corners(cv.zero(),l,w,fu.to_deg(a))
         tcorners = [bc.copy().translate_z(h) for bc in bcorners]
         bcorners.reverse()
-        self._quad(*bcorners,m = 'concrete')
-        self._quad(*tcorners,m = 'concrete')
+        self._quad(*bcorners,m = self.m)
+        self._quad(*tcorners,m = self.m)
         tcorners.reverse()
         bcorners.append(bcorners[0])
         tcorners.append(tcorners[0])
-        self._bridge(bcorners,tcorners)
-        return self._primitive_from_slice()
+        self._bridge(bcorners,tcorners,m = self.m)
+
+    def _primitive_from_slice(self,*args,**kwargs):
+        prim = blueprint._primitive_from_slice(self,*args,**kwargs)
+        prim._scale_uvs_ = True
+        return prim
 
 cube_factory = cube()
 cube_factory._build()
-def ucube():return cube_factory._primitive_from_slice()
+def ucube(**opts):
+    cube_factory._rebuild(**opts)
+    return cube_factory._primitive_from_slice()
 
 
 
 
+
+
+
+def test_trifan():
+    bpt = blueprint()
+    apex = cv.one()
+    blade = [apex.copy().translate_x(5)]
+    blade.append(blade[-1].copy().translate_y(3))
+    blade.append(blade[-1].copy().translate_x(-2))
+
+    bpt._trifan(apex,blade)
+
+    bprim = bpt._primitive_from_slice()
+    gritgeo.reset_world_scripts()
+    gritgeo.create_primitive(bprim)
+    gritgeo.output_world_scripts()
+
+def test_extrude():
+    bpt = blueprint()
+    pentb = polygon(16)
+    pentb.append(pentb[0])
+    pentb.reverse()
+
+    curve = [cv.zero()]
+    cstep = cv.vector(1,2,6)
+    curve.append(curve[-1].copy().translate(cstep))
+    cstep = cv.vector(3,2,5)
+    curve.append(curve[-1].copy().translate(cstep))
+    cstep = cv.vector(1,-1,4)
+    curve.append(curve[-1].copy().translate(cstep))
+
+    bpt._extrude(pentb,curve)
+
+    bprim = bpt._primitive_from_slice()
+    gritgeo.reset_world_scripts()
+    gritgeo.create_primitive(bprim)
+    gritgeo.output_world_scripts()
+
+def test_revolve():
+    bpt = blueprint()
+    pentb = polygon(8)
+    cv.translate_coords_x(pentb,5.0)
+    cv.rotate_x_coords(pentb,fu.to_rad(90))
+    pentb.append(pentb[0])
+
+    bpt._revolve_z(pentb,fu.to_rad(30),fu.to_rad(135),16)
+
+    bprim = bpt._primitive_from_slice()
+    gritgeo.reset_world_scripts()
+    gritgeo.create_primitive(bprim)
+    gritgeo.output_world_scripts()
 
 
 
@@ -459,7 +541,7 @@ class floors(blueprint):
             thisbump = 12
             cv.translate_coords_z(bcorners,thisbump)
             cv.translate_coords_z(tcorners,thisbump)
-        return self._primitive_from_slice()
+        #return self._primitive_from_slice()
       
 
 
@@ -473,11 +555,22 @@ class floors(blueprint):
 
 def test():
     bpt = blueprint()
+    pentb = polygon(8)
+    pentt = [p.copy().translate_z(5) for p in pentb]
+    pentb.reverse()
+    bpt._tripie(pentt)
+    bpt._tripie(pentb)
+    pentb.reverse()
+    pentb.append(pentb[0])
+    pentt.append(pentt[0])
+    bpt._bridge(pentt,pentb)
+    bprim = bpt._primitive_from_slice()
+    bprim.scale(cv.vector(2,2,10))
     #bpp = cube()
     #bpp = cylinder()
-    bpp = stairs()
+    #bpp._build()
     gritgeo.reset_world_scripts()
-    gritgeo.create_primitive(bpp._build())
+    gritgeo.create_primitive(bprim)
     gritgeo.output_world_scripts()
 
 def speed1():
@@ -508,6 +601,29 @@ def speed1():
 
 
 
+def polygon(sides):
+    angle = 360.0/sides
+    turns = [x*angle for x in range(sides)]
+    poly = [cv.zero()]
+    current_angle = 0.0
+    for si in range(sides):
+        l,t = 1.0,turns[si]
+        current_angle = t
+        dx = l*cos(fu.to_rad(current_angle))
+        dy = l*sin(fu.to_rad(current_angle))
+        new = poly[-1].copy().translate_x(dx).translate_y(dy)
+        poly.append(new)
+    poly.pop()
+    cv.translate_coords(poly,cv.center_of_mass(poly).flip())
+    return poly
+
+def poly_test():
+    for x in range(5):
+        poly = polygon(x+3)
+        plot(poly)
+        plt.show()
+
+        
 
 # walk_line makes an xy outline of a building
 def walk_line(corners):

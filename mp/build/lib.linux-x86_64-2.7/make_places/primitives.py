@@ -356,9 +356,25 @@ class arbitrary_primitive(base):
         self.modified = True
         return self
 
+    def scale_x(self, sx):
+        cv.scale_coords_x(self.coords, sx)
+        if self._scale_uvs_: self.scale_uvs(cv.vector(sx,0,0))
+        self.modified = True
+        return self
+
+    def scale_y(self, sy):
+        cv.scale_coords_y(self.coords, sy)
+        if self._scale_uvs_: self.scale_uvs(cv.vector(0,sy,0))
+        self.modified = True
+        return self
+
+    def scale_z(self, sz):
+        cv.scale_coords_z(self.coords, sz)
+        if self._scale_uvs_: self.scale_uvs(cv.vector(0,0,sz))
+        self.modified = True
+        return self
+
     def rotate_z(self, ang_z):
-        #self.coords = mpu.rotate_z_coords(self.coords, ang_z)
-        #self.ncoords = mpu.rotate_z_coords(self.ncoords, ang_z)
         cv.rotate_z_coords(self.coords, ang_z)
         cv.rotate_z_coords(self.ncoords, ang_z)
         self.modified = True
@@ -482,6 +498,16 @@ def primitive_data_from_xml(xmlfile):
 
 def primitive_from_xml(xmlfile):
     pwargs = primitive_data_from_xml(xmlfile)
+    return arbitrary_primitive(**pwargs)
+
+def empty_primitive():
+    xmlfile = 'empty.mesh.xml'
+    pwargs = {
+        'verts':[],'nverts':[], 
+        'uvs' :[],'faces':[], 
+        'materials':[],'face_materials':[], 
+        'xmlfilename':xmlfile, 
+            }
     return arbitrary_primitive(**pwargs)
 
 cubexml = os.path.join(primitive_data_path, 'cube.mesh.xml')

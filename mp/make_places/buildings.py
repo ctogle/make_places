@@ -236,10 +236,10 @@ class floor_plan(mbp.blueprint):
                             for sc in self.sectors]
             if not sdists: sdmin = 100
             else: sdmin = min(sdists)
-            if sdmin > 20 and newl >= 20 and neww >= 20:
+            if sdmin > 20 and newl >= 20 and neww >= 24:
                 shpos = newpos.copy()
                 shl = 10
-                shw = 12
+                shw = 16
                 gaps = self.add_shaft(shpos,shl,shw)
                 return gaps
             else: return []
@@ -437,7 +437,7 @@ class floor_plan(mbp.blueprint):
         subl = rm.choice([0.25*l,0.5*l,0.75*l])
         subw = rm.choice([0.25*w,0.5*w,0.75*w])
         subl = mpu.clamp(subl,20,l)
-        subw = mpu.clamp(subw,20,l)
+        subw = mpu.clamp(subw,24,w)
         mx = -l/2.0 + subl/2.0
         my = -w/2.0 + 8 + subw/2.0
         mx = 0.0
@@ -581,7 +581,8 @@ class building_plan(mbp.blueprint):
             sh['floor_heights'] = self.floor_heights[:]
             sh['ceiling_heights'] = self.ceiling_heights[:]
 
-        self.shaft_plans = [st.shaft_plan(**sh) for sh in shargs]
+        #self.shaft_plans = [st.shaft_plan(**sh) for sh in shargs]
+        self.shaft_plans = shargs
 
     def build_fence(self):
         fence = []
@@ -604,7 +605,23 @@ class building_plan(mbp.blueprint):
         shplans = self.shaft_plans
         shafts = []
         for shplan in shplans:
-            shafts.extend(shplan.build())
+            #pdb.set_trace()
+
+            bopts = {
+                'floors':shplan['floors'],
+                'l':shplan['length'],
+                'w':shplan['width'], 
+                'flheights':shplan['floor_heights'], 
+                'clheights':shplan['ceiling_heights'], 
+                'waheights':shplan['wall_heights'], 
+                    }
+            shp = st.build_shaft(**bopts)
+            shaftnode = sg.node(
+                #parent = self, 
+                position = shplan['position'],
+                primitives = [shp])
+
+            shafts.append(shaftnode)
         return shafts
 
     def build_foundation(self):

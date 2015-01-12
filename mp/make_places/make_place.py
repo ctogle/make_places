@@ -151,11 +151,7 @@ def profile_road_network_terrain():
 
 def afloor():
     gritgeo.reset_world_scripts()
-    elem = floors.floor(position = cv.vector(0,0,0))
-    pcube = pr.ucube()
-    pcube.translate(cv.vector(10,2,5))
-    gritgeo.create_element(elem)
-    gritgeo.create_primitive(pcube)
+    floors.test_floor_factory()
     gritgeo.output_world_scripts()
 
 def awall():
@@ -184,12 +180,6 @@ def astory():
     pcube = pr.ucube()
     gritgeo.create_primitive(pcube)
     gritgeo.create_element(st)
-    gritgeo.output_world_scripts()
-
-def ashaft():
-    gritgeo.reset_world_scripts()
-    sh = blg.shaft()
-    gritgeo.create_element(sh)
     gritgeo.output_world_scripts()
 
 def someshafts():
@@ -443,6 +433,11 @@ def testlod():
 def somestairs():
     gritgeo.reset_world_scripts()
     mpstairs.test_stair_factory()
+    gritgeo.output_world_scripts()
+
+def ashaft():
+    gritgeo.reset_world_scripts()
+    mpstairs.test_shaft_factory()
     gritgeo.output_world_scripts()
 
 

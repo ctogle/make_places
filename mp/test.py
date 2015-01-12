@@ -22,8 +22,12 @@ import matplotlib.pyplot as plt
 #nrds.test()
 
 
-mp.somestairs()
-#mp.profile_buildfew_g()
+#mp.somestairs()
+#mp.ashaft()
+
+
+#mp.afloor()
+mp.profile_buildfew()
 #mp.tg()
 #mp.block()
 #mp.terrain()

@@ -14,6 +14,7 @@ import make_places.floors as floors
 import make_places.walls as walls
 import make_places.newterrain as nmpt
 import make_places.profiler as prf
+import make_places.stairs as mpstairs
 
 import make_places.gritty as gritgeo
 
@@ -185,12 +186,6 @@ def astory():
     gritgeo.create_element(st)
     gritgeo.output_world_scripts()
 
-def ashaft():
-    gritgeo.reset_world_scripts()
-    sh = blg.shaft()
-    gritgeo.create_element(sh)
-    gritgeo.output_world_scripts()
-
 def someshafts():
     gritgeo.reset_world_scripts()
     sh1 = blg.shaft(position = [-10,0,0],direction = 'north')
@@ -315,7 +310,7 @@ def city():
     gritgeo.reset_world_scripts()
     cities.city()
     gritgeo.output_world_scripts()
-    cities.plot_try_data()
+    #cities.plot_try_data()
 
 def profile_city():
     prf.profile_function(city)
@@ -439,7 +434,15 @@ def testlod():
     gritgeo.create_element(no)
     gritgeo.output_world_scripts()
 
+def somestairs():
+    gritgeo.reset_world_scripts()
+    mpstairs.test_stair_factory()
+    gritgeo.output_world_scripts()
 
+def ashaft():
+    gritgeo.reset_world_scripts()
+    mpstairs.test_shaft_factory()
+    gritgeo.output_world_scripts()
 
 
 

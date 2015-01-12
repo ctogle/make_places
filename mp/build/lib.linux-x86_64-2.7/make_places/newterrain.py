@@ -664,6 +664,7 @@ class terrain_piece:
                     splits = dx
                     break
 
+        self.final_poly_length = poly_table[splits]
         self.final_splits = splits
         self.set_local_points()
         for sdx in range(splits):
@@ -804,7 +805,7 @@ def make_terrain(**someinput):
     boundary = region_pts_to_boundary(someinput['region_pts'])
     fixed = someinput['fixed_pts']
 
-    mesh_corners = triangle_cover(boundary,someinput['primitive_edge_length'])
+    mesh_corners = triangle_cover(boundary,prim_length)
     mesh_corners = intersects_xy(mesh_corners,boundary)
 
     global_points = []
@@ -874,11 +875,16 @@ def make_terrain(**someinput):
     tprimitives = [p.mesh() for p in pieces]
     tlodprimitives = [p.mesh(lod = True) for p in pieces]
     
+    p1 = pieces[0]
+    summ = [p1.final_poly_length,p1.poly_size,
+            p1.primitive_size,p1.final_splits]
+
     terrain_node = sg.node(
         grit_renderingdistance = prim_length, 
         grit_lod_renderingdistance = 5000, 
         primitives = tprimitives, 
         lod_primitives = tlodprimitives)
+    terrain_node.summary = summ
     return terrain_node
 
 if __name__ == '__main__':

@@ -876,7 +876,12 @@ def make_terrain(**someinput):
     tlodprimitives = [p.mesh(lod = True) for p in pieces]
     
     p1 = pieces[0]
-    summ = [p1.final_poly_length,p1.poly_size,p1.primitive_size,p1.final_splits]
+    summ = [p1.final_poly_length,p1.poly_size,
+            p1.primitive_size,p1.final_splits]
+    primbase = 0.5*p1.primitive_size
+    primheight = sqrt(p1.primitive_size**2 - primbase**2)
+    squnits = primbase*primheight*len(tprimitives)
+    print squnits,'square units of terrain were generated!'
 
     terrain_node = sg.node(
         grit_renderingdistance = prim_length, 

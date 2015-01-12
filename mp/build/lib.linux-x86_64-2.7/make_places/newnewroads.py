@@ -809,10 +809,12 @@ def fractate(steps = 30):
 
     mingrowlength = 200
     for step in range(steps):
-        gtip = rm.choice(rplans)
-        if gtip.total_length < mingrowlength:
-            print 'tip is too short to grow!'
-            continue
+        available = [rp for rp in rplans if rp.total_length > mingrowlength]
+        gtip = rm.choice(available)
+        #gtip = rm.choice(rplans)
+        #if gtip.total_length < mingrowlength:
+        #    print 'tip is too short to grow!'
+        #    continue
         #stepstyle = steplookup[step]
         stepstyle = 'generic'
         iplans,rplans = grow(iplans,rplans,gtip,stepstyle)

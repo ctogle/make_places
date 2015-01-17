@@ -11,36 +11,23 @@ import matplotlib.pyplot as plt
 
 
 
+#mp.wall_speed_test()
 
+#mp.ahouse()
 
-#mbp.test()
-#mbp.speed1()
-
-#mp.profile_newterrain()
-#mp.profile_newroadsys()
-
-#nrds.test()
-
+mp.material_demo()
 
 #mp.somestairs()
 #mp.ashaft()
-
-
+#mp.awall()
 #mp.afloor()
-mp.profile_buildfew()
-#mp.tg()
-#mp.block()
-#mp.terrain()
+
+#mp.profile_buildfew()
 #mp.profile_block()
-#mp.city()
 #mp.profile_city()
-#mp.profile_terrain_g()
-#mp.bplan()
-#mp.profile_blgplan()
-#mp.buildfew()
-#mp.testlod()
 
-
+#mp.terrain()
+#mp.roadholetest()
 
 
 

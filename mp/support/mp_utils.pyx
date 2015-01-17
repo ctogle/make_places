@@ -19,6 +19,8 @@ from libc.math cimport hypot
 import numpy as np
 import random as rm
 
+import cStringIO as sio
+
 #from numpy import pi
 
 stuff = 'hi'
@@ -158,6 +160,120 @@ cpdef list offset_faces(list faces, int offset):
             fa[tfdx] += offset
     return faces
 
+xheader =\
+'''
+<mesh>
+  <sharedgeometry>
+    <vertexbuffer positions="true" normals = "true" colours_diffuse = "false" texture_coord_dimensions_0 = "float2" texture_coords = "1">
+'''
+cpdef str xml_from_primitive_data(object prim):
+    return xml_from_primitive_data_c(prim)
+
+cdef str xml_from_primitive_data_c(object prim):
+    cdef list coords = <list>prim.coords
+    cdef list ncoords = <list>prim.ncoords
+    cdef list ucoords = <list>prim.uv_coords
+    cdef int vcnt = len(coords)
+    cdef int vdx
+    cdef str x
+    cdef str y
+    cdef str z
+    cdef str nx
+    cdef str ny
+    cdef str nz
+    cdef str ux
+    cdef str uy
+    cdef cv.vector p
+    cdef cv.vector n
+    cdef cv.vector2d u
+
+    cdef list mats
+    cdef int mcnt
+    cdef int mdx
+    cdef str m
+
+    cdef list f
+    cdef int fdx
+    cdef int fcnt
+
+    cdef str f1,f2,f3
+
+    cdef str _32bitindices
+    if vcnt > 65000:_32bitindices = 'true'
+    else:_32bitindices = 'false'
+    
+    faces = prim.get_vertexes_faces()
+    mats = faces.keys()
+    mcnt = len(mats)
+
+    sioio = sio.StringIO()
+    siowrite = sioio.write
+    siowrite(xheader)
+
+    for vdx in range(vcnt):
+        p = <cv.vector>coords[vdx]
+        x = str(<double>p.x)
+        y = str(<double>p.y)
+        z = str(<double>p.z)
+        n = <cv.vector>ncoords[vdx]
+        nx = str(<double>n.x)
+        ny = str(<double>n.y)
+        nz = str(<double>n.z)
+        u = <cv.vector2d>ucoords[vdx]
+        ux = str(<double>u.x)
+        uy = str(1.0 - <double>u.y)
+
+        siowrite('\t\t\t<vertex>\n\t\t\t\t<position')
+        siowrite(' x = "')
+        siowrite(x)
+        siowrite(' " y = "')
+        siowrite(y)
+        siowrite('" z = "')
+        sioio.write(z)
+        sioio.write('" />\n')
+        sioio.write('\t\t\t\t<normal x = "')
+        sioio.write(nx)
+        sioio.write('" y = "')
+        sioio.write(ny)
+        sioio.write('" z = "')
+        sioio.write(nz)
+        sioio.write('" />\n')
+        sioio.write('\t\t\t\t<texcoord u = "')
+        sioio.write(ux)
+        sioio.write('" v = "')
+        sioio.write(uy)
+        sioio.write('" />\n')
+        sioio.write('\t\t\t</vertex>\n')
+
+    sioio.write('\t\t</vertexbuffer>\n\t</sharedgeometry>\n\t<submeshes>\n')
+    for mdx in range(mcnt):
+        m = mats[mdx]
+        sioio.write('\t\t<submesh material = "')
+        sioio.write(m)
+        sioio.write('" usesharedvertices = "true" use32bitindexes = "')
+        sioio.write(_32bitindices)
+        sioio.write('" operationtype = "triangle_list" >\n')
+        sioio.write('\t\t\t<faces>\n')
+
+        mfaces = faces[m]
+        fcnt = len(mfaces)
+        for fdx in range(fcnt):
+            f = <list>mfaces[fdx]
+            f1 = str(<int>f[0])
+            f2 = str(<int>f[1])
+            f3 = str(<int>f[2])
+            sioio.write('\t\t\t\t<face v1 = "')
+            sioio.write(f1)
+            sioio.write('" v2 = "')
+            sioio.write(f2)
+            sioio.write('" v3 = "')
+            sioio.write(f3)
+            sioio.write('" />\n')
+
+        sioio.write('\t\t\t</faces>\n\t\t</submesh>\n')
+
+    sioio.write('\t</submeshes>\n</mesh>\n')
+    return sioio.getvalue()
 
 def point_slope(x1,x2,y1,y2):
     if x1 == x2: return None

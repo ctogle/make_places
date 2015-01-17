@@ -475,7 +475,7 @@ class terrain_piece:
     def filter_fixed(self,fixed):
         relevant = []
         for fx in fixed:
-            if cv.inside(fx,self.corners):
+            if cv.inside(fx,self.loose_corners):
                 relevant.append(fx)
         return relevant
 
@@ -522,10 +522,13 @@ class terrain_piece:
         self.center = cv.center_of_mass(verts)
         self.corners = []
         self.tight_corners = []
+        self.loose_corners = []
         for v in verts:
             self.corners.append(v)
-            cvt = cv.v1_v2(v,self.center).normalize()
-            self.tight_corners.append(v.copy().translate(cvt))
+            cvt1 = cv.v1_v2(v,self.center).normalize()
+            cvt2 = cvt1.copy().scale_u(50).flip()
+            self.tight_corners.append(v.copy().translate(cvt1))
+            self.loose_corners.append(v.copy().translate(cvt2))
 
     def on_boundary(self, pos):
         if not cv.inside(pos,self.tight_corners): return True
@@ -583,7 +586,6 @@ class terrain_piece:
             tpt.boundary = True
             return tpt
         else:
-            #if not certainly_new:
             for lpt in self.local_points:
                 if near_xy(tpt.position,lpt.position):
                     if self.splits == self.final_splits:
@@ -798,6 +800,16 @@ def make_map(curves):
 
     plt.show()
 
+def reneighbor_pieces(global_points,nthresh):
+    reneightime = time.time()
+    print 'reneighboring...'
+    for pt in global_points:
+        pt.set_neighbor_count()
+        for pwn in pt.owners:
+            ownerpts = pwn.local_points
+            pt.reneighbors(ownerpts,nthresh)
+    print 'reneighbored!', time.time() - reneightime
+
 def make_terrain(**someinput):
     poly_length = someinput['polygon_edge_length']
     prim_length = someinput['primitive_edge_length']
@@ -810,6 +822,7 @@ def make_terrain(**someinput):
 
     global_points = []
     global_bounding_points = []
+
     pieces = [terrain_piece(
         corners,fixed,prim_length,poly_length,
         global_points,global_bounding_points) 
@@ -833,14 +846,7 @@ def make_terrain(**someinput):
             print 'terrain piece',pdx + 1,'of',tpiececount,'split',p.splits,'times'
     '''#
 
-    reneightime = time.time()
-    print 'reneighboring...'
-    for pt in global_points:
-        pt.set_neighbor_count()
-        for pwn in pt.owners:
-            ownerpts = pwn.local_points
-            pt.reneighbors(ownerpts,poly_length+1)
-    print 'reneighbored!', time.time() - reneightime
+    reneighbor_pieces(global_points,poly_length+1)
 
     holes = []
     for hdx in range(len(someinput['hole_pts'])):
@@ -849,18 +855,17 @@ def make_terrain(**someinput):
 
     for pdx in range(tpiececount):
         p = pieces[pdx]
-        #p.cut_holes(holes)
-        #print 'terrain piece',pdx + 1,'of',tpiececount,'cut holes'
+        p.cut_holes(holes)
+        print 'terrain piece',pdx + 1,'of',tpiececount,'cut holes'
 
-    reneightime = time.time()
-    print 'reneighboring...'
-    for pt in global_points:
-        pt.set_neighbor_count()
-        for pwn in pt.owners:
-            ownerpts = pwn.local_points
-            pt.reneighbors(ownerpts,poly_length+1)
-    print 'reneighbored!', time.time() - reneightime
+    reneighbor_pieces(global_points,poly_length+1)
 
+    global_hole_points = []
+    for tp in global_points:
+        if tp.owners and tp.hole_boundary:
+            global_hole_points.append(tp)
+
+    #plot_tpts(global_hole_points)
     #plot_tpts(global_points)
     #plot_tpts(global_bounding_points)
     
@@ -878,9 +883,13 @@ def make_terrain(**someinput):
     p1 = pieces[0]
     summ = [p1.final_poly_length,p1.poly_size,
             p1.primitive_size,p1.final_splits]
+    primbase = 0.5*p1.primitive_size
+    primheight = sqrt(p1.primitive_size**2 - primbase**2)
+    squnits = primbase*primheight*len(tprimitives)
+    print squnits,'square units of terrain were generated!'
 
     terrain_node = sg.node(
-        grit_renderingdistance = prim_length, 
+        grit_renderingdistance = 1.5*prim_length, 
         grit_lod_renderingdistance = 5000, 
         primitives = tprimitives, 
         lod_primitives = tlodprimitives)

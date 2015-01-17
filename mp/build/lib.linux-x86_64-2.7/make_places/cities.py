@@ -1,6 +1,7 @@
 import make_places.fundamental as fu
 import make_places.primitives as pr
 import make_places.scenegraph as sg
+import make_places.blueprints as mbp
 import make_places.waters as mpw
 import make_places.newnewroads as nrds
 import make_places.buildings as blg
@@ -20,6 +21,63 @@ import numpy as np
 import random as rm
 import pdb
 import os
+
+class newblock(mbp.blueprint):
+
+    bl_themes = {
+        'suburbs' : {
+            'max_buildings' : 40,
+            'max_floors' : 3, 
+            'min_length' : 30, 
+            'min_width' : 30, 
+            'max_length' : 50, 
+            'max_width' : 70, 
+                }, 
+        'residential' : {
+            'max_buildings' : 30,
+            'max_floors' : 10, 
+            'min_length' : 30, 
+            'min_width' : 30, 
+            'max_length' : 80, 
+            'max_width' : 80, 
+                }, 
+        'commercial' : {
+            'max_buildings' : 20,
+            'max_floors' : 30, 
+            'min_length' : 40, 
+            'min_width' : 40, 
+            'max_length' : 80, 
+            'max_width' : 80, 
+                }, 
+        'industrial' : {
+            'max_buildings' : 40,
+            'max_floors' : 6, 
+            'min_length' : 40, 
+            'min_width' : 40, 
+            'max_length' : 60, 
+            'max_width' : 60, 
+                }, 
+            }
+    themes = [ke for ke in bl_themes.keys()]
+
+    def __init__(self,theme = None):
+        mbp.blueprint.__init__(self)
+
+        if theme is None: bth = rm.choice(self.themes)
+        else: bth = theme
+        self.theme = bth
+        self.theme_data = self.bl_themes[self.theme]
+
+block_factory = newblock()
+block_factory._build()
+def build_block(**buildopts):
+    block_factory._rebuild(**buildopts)
+                
+    ################
+    return block_factory._primitive_from_slice()
+
+
+
 
 class block(sg.node):
 
@@ -169,7 +227,7 @@ class block(sg.node):
             return boxtry,postry,blen,bwid
 
         try_cnt = 0
-        max_tries = 200
+        max_tries = 100
         tries_exceeded = False
         boxtry,boxpos,blen,bwid = get_random()
 
@@ -225,17 +283,22 @@ def plot_try_data():
 
 
 
-def city():
+def city(road_steps = 50,roads = True,blocks = True,terrain = True,water = True):
     summary = []
-    rplans,iplans,bboxes,fpts,hpts,rpts = lay_roads(50,summary)
-    rplans,iplans,bboxes,fpts,hpts,rpts =\
-        build_blocks_from_roads(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
-    rplans,iplans,bboxes,fpts,hpts,rpts =\
-        build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
-    build_waters(-0.5,summary)
+    rplans,iplans,bboxes,fpts,hpts,rpts = [],[],[],[],[],[]
+    if roads:
+        rplans,iplans,bboxes,fpts,hpts,rpts =\
+            lay_roads(rplans,iplans,bboxes,fpts,hpts,rpts,road_steps,summary)
+    if blocks:
+        rplans,iplans,bboxes,fpts,hpts,rpts =\
+            build_blocks_from_roads(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
+    if terrain:
+        rplans,iplans,bboxes,fpts,hpts,rpts =\
+            build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
+    if water:build_waters(-0.5,summary)
     for su in summary: print su
 
-def lay_roads(gsteps = 50,summary = []):
+def lay_roads(rplans,iplans,bboxes,fpts,hpts,rpts,gsteps,summary):
     summary.append('\nlay_roads:\n')
     summary.append('\t' + str(gsteps) + ' growth steps')
     ret,took = prf.measure_time('making road plans',nrds.make_road_system_plans,gsteps)
@@ -288,11 +351,7 @@ def build_blocks_from_roads(rplans,iplans,bboxes,fpts,hpts,rpts,summary):
 def build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary = []):
     ter,took = prf.measure_time('generate terrain',mtr.make_terrain,
         fixed_pts = fpts, hole_pts = hpts, region_pts = rpts, 
-        polygon_edge_length = 10, primitive_edge_length = 150)
-    #ter = mtr.make_terrain(fixed_pts = fpts,
-    #    hole_pts = hpts,region_pts = rpts, 
-    #    polygon_edge_length = 10, 
-    #    primitive_edge_length = 150)
+        polygon_edge_length = 10, primitive_edge_length = 200)
     summary.append('\nbuild_terrain:\n')
     summary.append(' '.join(['\t',
         'generating terrain took',str(np.round(took,3)),'seconds']))

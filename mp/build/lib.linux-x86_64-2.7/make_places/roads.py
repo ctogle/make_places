@@ -1,16 +1,17 @@
 import make_places.fundamental as fu
-import mp_utils as mpu
-import mp_bboxes as mpbb
-import mp_vector as cv
 import make_places.primitives as pr
 import make_places.blueprints as mbp
 #from make_places.scenegraph import node
 import make_places.scenegraph as sg
-from make_places.floors import floor
-from make_places.primitives import arbitrary_primitive
+#from make_places.floors import floor
+#from make_places.primitives import arbitrary_primitive
 #from make_places.primitives import ucube
-from make_places.primitives import uoctagon
+#from make_places.primitives import uoctagon
 import make_places.pkler as pk
+
+import mp_utils as mpu
+import mp_bboxes as mpbb
+import mp_vector as cv
 
 import os, pdb
 import numpy as np
@@ -33,13 +34,13 @@ cardinal_norms = [
     cv.yhat.copy().flip(),cv.vector(-1,-1,0).normalize(),
     cv.xhat.copy().flip(),cv.vector(-1,1,0).normalize()]
 
-class vehicle_primitive(arbitrary_primitive):
+class vehicle_primitive(pr.arbitrary_primitive):
     vehiclexml = os.path.join(pr.primitive_data_path, 'truck.mesh.xml') 
     offset = cv.zero()
 
     def __init__(self, *args, **kwargs):
         pvehdata = pr.primitive_data_from_xml(self.vehiclexml)
-        arbitrary_primitive.__init__(self, *args, **pvehdata)
+        pr.arbitrary_primitive.__init__(self, *args, **pvehdata)
         self._default_('tag','_vehicle_',**kwargs)
         self._scale_uvs_ = False
         self.translate(self.offset)
@@ -139,7 +140,7 @@ class intersection(sg.node):
         octang = 22.5
         clipln = clip_length
         octscl = clipln / cos(fu.to_rad(octang))
-        uo = uoctagon()
+        uo = pr.uoctagon()
         uo.scale(cv.vector(octscl,octscl,rh))
         rh = 0.25
         uo.translate_z(-rh-2.0)
@@ -157,12 +158,12 @@ class intersection(sg.node):
         #bboxes = [fu.bbox(corners = corners)]
         return bboxes
 
-class road_segment_primitive(arbitrary_primitive):
+class road_segment_primitive(pr.arbitrary_primitive):
     roadxml = os.path.join(pr.primitive_data_path, 'road.mesh.xml')
 
     def __init__(self, *args, **kwargs):
         proaddata = pr.primitive_data_from_xml(self.roadxml)
-        arbitrary_primitive.__init__(self, *args, **proaddata)
+        pr.arbitrary_primitive.__init__(self, *args, **proaddata)
         self.coords_by_face = self.find_faces()
         self.tag = '_road_'
         self._scale_uvs_ = False

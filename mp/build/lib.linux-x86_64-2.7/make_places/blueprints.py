@@ -1,9 +1,7 @@
 import make_places.scenegraph as sg
 import make_places.fundamental as fu
 import make_places.primitives as pr
-#import make_places.walls as wa
-#import make_places.floors as fl
-#import make_places.stairs as st
+import make_places.materials as mpm
 import make_places.gritty as gritgeo
 import mp_utils as mpu
 import mp_bboxes as mpbb
@@ -18,6 +16,21 @@ import random as rm
 import matplotlib.pyplot as plt
 
 import pdb
+
+def demo_materials():
+    dfms = mpm.enumerate_materials()
+    bp = blueprint()
+    p = cv.zero()
+    l,w = 20,30
+    cs = mpu.make_corners(p,l,w,0)
+    for dfx in range(len(dfms)):
+        p.x = l*dfx
+        tcs = [c.copy().translate(p) for c in cs]
+        dfm = dfms[dfx]
+        nfs = bp._quad(*tcs,m = dfm)
+        bp._project_uv_xy(nfs)
+    demoprim = bp._primitive_from_slice()
+    gritgeo.create_primitive(demoprim)
 
 def plot(verts,number = True,color = 'black',marker = None):
     fig = plt.gcf()
@@ -74,6 +87,23 @@ def point_ring(r,n):
         points.append(st.copy().rotate_z(x*alpha))
     return points
 
+def edge_norms(loop):
+    loopnorm = normal(*loop[:3])
+    es = []
+    for ldx in range(len(loop)):
+        l1,l2 = loop[ldx-1],loop[ldx]
+        en1 = cv.v1_v2(l1,l2).cross(loopnorm).normalize()
+        es.append(en1)
+    return es
+
+def inflate(loop,r = 1):
+    enorms = edge_norms(loop)
+    for ldx in range(len(loop)):
+        e1 = enorms[ldx-1]
+        e2 = enorms[ldx]
+        rnorm = cv.midpoint(e1,e2).normalize().scale_u(r)
+        loop[ldx-1].translate(rnorm)
+
 def normal(c1,c2,c3):
     c1c2 = cv.v1_v2(c1,c2).normalize()
     c2c3 = cv.v1_v2(c2,c3).normalize()
@@ -119,6 +149,54 @@ class blueprint(fu.base):
         for dx in rng:
             self.face_mats[dx] = m
 
+    def _project_uv_xy(self,faces):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                p = self.pcoords[fdx]
+                nu = p.copy().xy2d()
+                self.ucoords[fdx] = nu
+
+    def _project_uv_yz(self,faces):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                p = self.pcoords[fdx]
+                nu = p.copy().yz2d()
+                self.ucoords[fdx] = nu
+
+    def _project_uv_xz(self,faces):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                p = self.pcoords[fdx]
+                nu = p.copy().xz2d()
+                self.ucoords[fdx] = nu
+
+    def _project_uv_flat(self,faces):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                p = self.pcoords[fdx]
+                n = self.ncoords[fdx]
+                if cv.near(n,cv.nxhat) or cv.near(n,cv.xhat):
+                    nu = p.copy().yz2d()
+                elif cv.near(n,cv.nyhat) or cv.near(n,cv.yhat):
+                    nu = p.copy().xz2d()
+                elif cv.near(n,cv.nzhat) or cv.near(n,cv.zhat):
+                    nu = p.copy().xy2d()
+                else:
+                    #print 'n',n
+                    continue
+                self.ucoords[fdx] = nu
+
+    def _flip_faces(self,faces):
+        for nf in faces:
+            face = self.faces[nf]
+            face.reverse()
+            for fdx in face:
+                self.ncoords[fdx].flip()
+
     def _reset_data(self):
         self.pcoords = []
         self.ncoords = []
@@ -152,10 +230,13 @@ class blueprint(fu.base):
         self.face_mats = []
         self.face_pmats = []
 
+        self._extra_primitives = []
+
         self.mats = ['cubemat']
         self.pmats = ['/common/pmat/Stone']
 
     def _trifan(self,apex,blade,ns = None,us = None,m = None,pm = None):
+        nfstart = len(self.faces)
         tcnt = len(blade) - 1
         for trdx in range(tcnt):
             c2dx = trdx
@@ -164,9 +245,12 @@ class blueprint(fu.base):
             c2 = blade[c2dx].copy()
             c3 = blade[c3dx].copy()
             self._triangle(c1,c2,c3,ns,us,m,pm)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
 
     # given two loops of equal length, bridge with quads
     def _tripie(self,loop,ns = None,us = None,m = None,pm = None):
+        nfstart = len(self.faces)
         lcom = cv.center_of_mass(loop)
         tcnt = len(loop)
         for trdx in range(tcnt):
@@ -177,10 +261,13 @@ class blueprint(fu.base):
             c2 = loop[c2dx].copy()
             c3 = loop[c3dx].copy()
             self._triangle(c1,c2,c3,ns,us,m,pm)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
 
     # given two loops of equal length, bridge with quads
     def _bridge(self,loop1,loop2,ns = None,us = None,m = None,pm = None):
         if not len(loop1) == len(loop2): raise ValueError
+        nfstart = len(self.faces)
         lcnt = len(loop1)
         for ldx in range(1,lcnt):
             v1 = loop1[ldx-1]
@@ -188,6 +275,8 @@ class blueprint(fu.base):
             v3 = loop2[ldx]
             v4 = loop1[ldx]
             self._quad(v1,v2,v3,v4,ns,us,m,pm)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
 
     # given two loops of possibly nonequal length, bridge with quads/tris
     def _bridge_asymmetric(self,loop1,loop2,ns = None,us = None,m = None,pm = None):
@@ -227,6 +316,7 @@ class blueprint(fu.base):
 
     # given four points, add two new triangle faces
     def _quad(self,v1,v2,v3,v4,ns = None,us = None,m = None,pm = None):
+        nfstart = len(self.faces)
         if us is None:
             us1 = [cv.vector2d(0,1),cv.vector2d(0,0),cv.vector2d(1,0)]
             us2 = [cv.vector2d(0,1),cv.vector2d(1,0),cv.vector2d(1,1)]
@@ -241,6 +331,8 @@ class blueprint(fu.base):
             ns2 = [ns[0],ns[2],ns[3]]
         self._triangle(v1,v2,v3,ns = ns1,us = us1,m = m,pm = pm)
         self._triangle(v1,v3,v4,ns = ns2,us = us2,m = m,pm = pm)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
 
     # given three points, add new triangle face
     def _triangle(self,v1,v2,v3,ns = None,us = None,m = None,pm = None):
@@ -275,6 +367,7 @@ class blueprint(fu.base):
         self.face_mats.extend(fms)
         self.face_pmats.extend(fpms)
 
+    def _primitives(self):return []
     def _primitive_from_slice(self,dslice = slice(None),
             xmlfile = None,hlod = False,ilod = False):
         if xmlfile is None: xmlfile = self._xmlfilename()

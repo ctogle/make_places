@@ -1,14 +1,11 @@
 import make_places.fundamental as fu
-import mp_utils as mpu
-#import mp_primitives as mpp
-import mp_vector as cv
-from make_places.fundamental import base
 import make_places.profiler as prf
 import make_places.user_info as ui
 
-import xml.etree.cElementTree
-#import xml.etree.ElementTree
+import mp_utils as mpu
+import mp_vector as cv
 
+import xml.etree.cElementTree
 import os, pdb, shutil
 import numpy as np
 from numpy import linalg
@@ -21,6 +18,7 @@ from copy import copy
 
 primitive_data_path = ui.info['primitivedir']
 xml_library = {}
+xml_library_keys = []
 
 def load_xml_library():
     wdir = ui.info['worlddir']
@@ -40,9 +38,10 @@ def load_xml_library():
             gfx = xfi.replace('.xml','')
             col = gcol
             xml_library[xml_rep] = (xfi,gcol,gfx,col)
+    xml_library_keys = xml_library.keys()
 prf.measure_time('load xml library', load_xml_library)
 
-class arbitrary_primitive(base):
+class arbitrary_primitive(fu.base):
 
     _scale_uvs_ = False
     def __init__(self, *args, **kwargs):
@@ -155,12 +154,13 @@ class arbitrary_primitive(base):
         _32bitindices = 'true' if _32bitindices else 'false'
         return _32bitindices
 
-    def has_normals(self):
-        has = 'true' if self.ncoords else 'false'
-        return has
+    #def has_normals(self):
+    #    has = 'true' if self.ncoords else 'false'
+    #    return has
 
     def calculate_normals(self,prevent = False,anyway = False,smooth = False):
-        if self.has_normals() == 'false' and not anyway or prevent: return
+        #if self.has_normals() == 'false' and not anyway or prevent: return
+        if not anyway or prevent: return
         # must iterate over faces, for each vertex, apply new normal
         for fa in self.faces:
             v1 = self.coords[fa[0]]
@@ -231,23 +231,20 @@ class arbitrary_primitive(base):
         else:self.reset_position(self.origin)
         return self.origin
 
-    def write_as_xml(self):
+    def write_as_xml(self,world_dir):
         if self.modified:
             self.calculate_normals(
                 self.prevent_normal_calc, 
                 self.force_normal_calc,
                 self.smooth_normals)
-            xlines, xfile = xml_from_primitive_data(self)
-            self.xml_representation = '\n'.join(xlines)
+            self.xml_representation,xfile = xml_from_primitive_data(self)
         else:
-            #xml = os.path.join(mpdir, 
-            #    'primitive_data', self.xml_filename)
             xml = os.path.join(primitive_data_path,self.xml_filename)
             with open(xml, 'r') as handle:
                 xlines = handle.readlines()
             self.xml_representation = '\n'.join(xlines)
 
-        if self.xml_representation in xml_library.keys():
+        if self.xml_representation in xml_library_keys:
             xfile,gcol,gfx,col = xml_library[self.xml_representation]
             self.xml_filename = xfile
             self.gcol_filename = gcol
@@ -266,9 +263,15 @@ class arbitrary_primitive(base):
             col = self.gcol_filename
             self.colmesh_name = col
             xml_library[self.xml_representation] = (xfile,gcol,gfx,col)
+            xml_library_keys.append(self.xml_representation)
             is_new = True
+            
             #print 'new xml rep!', xfile
-        return xlines, is_new
+            xdir = os.path.join(world_dir,self.xml_filename)
+            with open(xdir,'w') as handle:
+                handle.write(self.xml_representation)
+        #return xlines, is_new
+        return is_new
 
     def translate_x(self, dx):
         cv.translate_coords_x(self.coords, dx)
@@ -392,51 +395,8 @@ def xml_from_primitive_data(prim):
     if xfile in xml_file_names:
         xfile = make_xml_name_unique(xfile)
     xml_file_names.append(xfile)
-    xlines = []
-    #(vertexes, faces) = prim.get_vertexes_faces()
-    faces = prim.get_vertexes_faces()
-    _32bitindices = prim.requires_32bit_indices()
-    _normals = prim.has_normals()
-    
-    xlines.append("<mesh>\n")
-    xlines.append("    <sharedgeometry>\n")
-    xlines.append("        <vertexbuffer positions=\"true\" normals=\""+_normals+"\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
-    #xlines.append("        <vertexbuffer positions=\"true\" normals=\"true\" colours_diffuse=\""+("false")+"\" texture_coord_dimensions_0=\"float2\" texture_coords=\"1\">\n")
-
-    coords  = prim.coords
-    ncoords = prim.ncoords
-    ucoords = prim.uv_coords
-    vcnt = len(coords)
-    for vdx in range(vcnt):
-        p = coords[vdx]
-        x,y,z = p.x,p.y,p.z
-        n = ncoords[vdx]
-        nx,ny,nz = n.x,n.y,n.z
-        try:u = ucoords[vdx]
-        except: pdb.set_trace()
-        ux,uy = u.x,u.y
-
-        #xlines.append("            <vertex>\n")
-        xlines.append(" "*12 + "<vertex>\n")
-        xlines.append("                <position x=\""+str(x)+"\" y=\""+str(y)+"\" z=\""+str(z)+"\" />\n")
-        #if _normals == 'true':
-        xlines.append("                <normal x=\""+str(nx)+"\" y=\""+str(ny)+"\" z=\""+str(nz)+"\" />\n")
-        xlines.append("                <texcoord u=\""+str(ux)+"\" v=\""+str(1.0-uy)+"\" />\n")
-        xlines.append("            </vertex>\n")
-
-    xlines.append("        </vertexbuffer>\n")
-    xlines.append("    </sharedgeometry>\n")
-    xlines.append("    <submeshes>\n")
-    for m in faces.keys():
-        xlines.append("        <submesh material=\""+m+"\" usesharedvertices=\"true\" use32bitindexes=\""+_32bitindices+"\" operationtype=\"triangle_list\">\n")
-        xlines.append("            <faces>\n")
-        for f in faces[m]:
-            xlines.append("                <face v1=\""+str(f[0])+"\" v2=\""+str(f[1])+"\" v3=\""+str(f[2])+"\" />\n")
-        xlines.append("            </faces>\n")
-        xlines.append("        </submesh>\n")
-    xlines.append("    </submeshes>\n")
-    xlines.append("</mesh>\n")
-    return xlines, xfile
+    xrep = mpu.xml_from_primitive_data(prim)
+    return xrep, xfile
 
 def primitive_data_from_xml(xmlfile):
     tree = xml.etree.cElementTree.parse(xmlfile)

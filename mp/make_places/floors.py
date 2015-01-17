@@ -279,6 +279,7 @@ class newfloor(mbp.blueprint):
         cv.translate_coords(us,cv.one().scale_u(0.5))
         cv.scale_coords_x(us,l)
         cv.scale_coords_y(us,w)
+        us = [v.xy2d() for v in us]
         self._quad(*corners,us = us)
         [c.translate_z(-h) for c in corners]
         corners.reverse()

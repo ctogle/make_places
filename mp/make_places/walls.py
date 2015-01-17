@@ -2,13 +2,210 @@ import make_places.fundamental as fu
 import make_places.scenegraph as sg
 import make_places.blueprints as mbp
 import make_places.primitives as pr
+import make_places.portals as po
+import make_places.gritty as gritgeo
 
 import mp_utils as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
 
+import matplotlib.pyplot as plt
 import numpy as np
 import random as rm
+
+import pdb
+
+class newwall(mbp.blueprint):
+
+    def _plot(self):
+        vs = [self.v1,self.v2]
+        mbp.plot(vs,number = False,color = 'blue',marker = 'o')
+
+    def __init__(self,v1 = cv.zero(),v2 = cv.one(),
+            h = 5.0,fh = 0.0,w = 0.5,m = 'brick',
+            sort = 'exterior',sector = None):
+        mbp.blueprint.__init__(self)
+        self.v1 = v1
+        self.v2 = v2
+        self.h = h
+        self.fh = fh
+        self.w = w
+        self.m = m
+        self.sort = sort
+        self.sector = sector
+        self._update_endpoints()
+
+        self._extra_primitives = []
+        self._gaps = []
+        self._portals = []
+
+    def _rebuild(self,**opts):
+        mbp.blueprint._rebuild(self,**opts)
+        okeys = opts.keys()
+        if 'v1' in okeys or 'v2' in okeys:
+            self._update_endpoints()
+
+    def _update_endpoints(self):
+        v1,v2 = self.v1,self.v2
+        self.l = cv.distance(v1,v2)
+        self.center = cv.midpoint(v1,v2)
+        self.tangent = cv.v1_v2(v1,v2).normalize()
+        self.normal = self.tangent.copy()
+        self.normal.rotate_z(fu.to_rad(90)).normalize()
+
+        self._face_away()
+
+    def _face_away(self):
+        if self.sector is None:return
+        intpt = self.sector.center.copy()
+        midpt = self.center.copy()
+        tstpt = midpt.copy().translate(self.normal)
+        if cv.distance(intpt,midpt) > cv.distance(intpt,tstpt):
+            self.normal.flip()
+
+        certain_tangent = cv.zhat.cross(self.normal)
+        tstpt = midpt.copy().translate(certain_tangent)
+        if cv.distance(self.v1,midpt) > cv.distance(self.v1,tstpt):
+            v1 = self.v1
+            self.v1 = self.v2
+            self.v2 = v1
+            self.v1v2 = cv.v1_v2(self.v1,self.v2)
+            self.tangent = self.v1v2.copy().normalize()
+
+    def _build(self):
+        if self.sort == 'exterior':self._build_exterior()
+        elif self.sort == 'interior':self._build_interior()
+
+        spts = []
+        spts.append(self.v1)
+        for g in self._gaps:spts.extend(g)
+        spts.append(self.v2)
+
+        self._build_segments(spts)
+        self._build_portals()
+
+    def _build_exterior(self):
+        fh = self.fh
+        self._window_gap(0.5,fh)
+
+    def _build_interior(self):
+        fh = self.fh
+        self._door_gap(0.5,fh)
+
+    def _gap(self,gx,gw):
+        l,w = self.l,self.w
+        t = self.tangent.copy().scale_u(gx*l)
+        c = self.v1.copy().translate(t)
+        tw = self.tangent.copy().scale_u(-0.5*gw)
+        p1 = c.copy().translate(tw)
+        p2 = c.copy().translate(tw.flip())
+        gapped = self._add_gap(p1,p2)
+        return gapped
+
+    def _add_gap(self,g1,g2):
+        def inside(x1,x2,x3):
+            d12 = cv.distance(x1,x2)
+            d13 = cv.distance(x1,x3)
+            d23 = cv.distance(x2,x3)
+            if d13 <= d12 and d23 <= d12:return True
+            else:return False
+
+        for g in self._gaps:
+            og1,og2 = g
+            if inside(og1,og2,g1) or inside(og1,og2,g2):
+                return None
+        
+        self._gaps.append((g1,g2))
+        return g1,g2
+
+    def _window_gap(self,dx,fh):
+        dw,dh,dz = 1.5,2,1+fh
+        wpts = self._gap(dx,dw)
+        if wpts is None:return
+        wkws = {'z':dz,'w':dw,'h':dh,'gap':wpts,'wall':self}
+        self._portals.append(po.window(**wkws))
+
+    def _door_gap(self,dx,fh):
+        dw,dh,dz = 1.5,3,fh
+        dpts = self._gap(dx,dw)
+        if dpts is None:return
+        dkws = {'z':dz,'w':dw,'h':dh,'gap':dpts,'wall':self}
+        #self._portals.append(po.portal(**dkws))
+        self._portals.append(po.door(**dkws))
+
+    def _build_portals(self):
+        for p in self._portals:
+            p._build()
+            self._extra_primitives.append(p._primitive_from_slice())
+
+    def _build_segments(self,spts):
+        w = self.w
+        scnt = len(spts)
+        self.wnorm = self.normal.copy().scale_u(w*0.5)
+        for s in range(scnt)[::2]:
+            s1,s2 = spts[s],spts[s+1]
+            self._build_segment(s1,s2)
+
+    def _build_segment(self,v1,v2):
+        h,m,wnorm = self.h,self.m,self.wnorm.copy()
+        b1 = v1.copy().translate(wnorm.flip())
+        b2 = v2.copy().translate(wnorm)
+        b3 = v2.copy().translate(wnorm.flip())
+        b4 = v1.copy().translate(wnorm)
+        t1 = b1.copy().translate_z(h)
+        t2 = b2.copy().translate_z(h)
+        t3 = b3.copy().translate_z(h)
+        t4 = b4.copy().translate_z(h)
+        bs = [b1,b2,b3,b4,b1]
+        ts = [t1,t2,t3,t4,t1]
+        nfs = self._bridge(bs,ts,m = m)
+        self._project_uv_flat(nfs)
+
+wall_factory = newwall()
+wall_factory._build()
+def build_wall(**opts):
+    wall_factory._rebuild(**opts)
+    wp = wall_factory._primitive_from_slice()
+    for p in wall_factory._extra_primitives:wp.consume(p)
+    return wp
+
+def test_wall_factory():
+    bopts = {'v1':cv.vector(10,10,0),'v2':cv.vector(50,30,0),'h':10}
+    wprim = build_wall(**bopts)
+    gritgeo.create_primitive(wprim)
+    print 'wall test'
+
+def test_wall_speed(many = 20000):
+    def newway(x):
+        bopts = {
+            'v1':v1.copy().translate_z(4*x),
+            'v2':v2.copy().translate_z(4*x).rotate_z(fu.to_rad(15*x)),
+            'h':4,'w':1}
+        wprim = build_wall(**bopts)
+        gritgeo.create_primitive(wprim)
+
+    def oldway(x):
+        c1 = v1.copy().translate_z(4*x)
+        c2 = v2.copy().translate_z(4*x).rotate_z(fu.to_rad(15*x))
+        nw = wall_plan(c1,c2, 
+            sort = 'interior', 
+            wall_height = 4,wall_width = 1)
+        built = nw.build(solid = True)
+        gritgeo.create_element(built)
+
+    gritgeo.reset_world_scripts()
+
+    v1 = cv.zero()
+    v2 = v1.copy().translate_x(100)
+
+    for x in range(many):
+        newway(x)
+        #oldway(x)
+
+    gritgeo.output_world_scripts()
+
+
+
 
 class wall_plan(mbp.blueprint):
     def __init__(self,v1,v2,sector = None,sort = 'exterior',**kwargs):

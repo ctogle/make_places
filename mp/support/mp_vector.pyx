@@ -277,12 +277,26 @@ cdef vector zero_c():
 cpdef vector zero():
     return zero_c()
 
+cdef vector2d zero2d_c():
+    cdef vector2d new = vector2d(0,0)
+    return new
+
+cpdef vector2d zero2d():
+    return zero2d_c()
+
 cdef vector one_c():
     cdef vector new = vector(1,1,1)
     return new
 
 cpdef vector one():
     return one_c()
+
+cdef vector2d one2d_c():
+    cdef vector2d new = vector2d(1,1)
+    return new
+
+cpdef vector2d one2d():
+    return one2d_c()
 
 cdef vector flip_c(vector f):
     cdef vector new = vector(-1.0*f.x,-1.0*f.y,-1.0*f.z)

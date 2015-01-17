@@ -15,4 +15,6 @@ material `metal` {diffuseMap = `/solemn/textures/metal.png`}
 material `metal2` {diffuseMap = `/solemn/textures/metal2.png`}
 material `road` {diffuseMap = `/solemn/textures/road.png`}
 material `roof` {diffuseMap = `/solemn/textures/rubber.png`}
+material `asphalt` {diffuseMap = `/solemn/textures/asphalt.jpg`}
+material `brick` {diffuseMap = `/solemn/textures/brick.jpg`}
 

@@ -1,7 +1,4 @@
 import make_places.fundamental as fu
-import mp_utils as mpu
-import mp_bboxes as mpbb
-import mp_vector as cv
 import make_places.blueprints as bp
 import make_places.scenegraph as sg
 import make_places.primitives as pr
@@ -15,8 +12,13 @@ import make_places.walls as walls
 import make_places.newterrain as nmpt
 import make_places.profiler as prf
 import make_places.stairs as mpstairs
+import make_places.houses as hss
 
 import make_places.gritty as gritgeo
+
+import mp_utils as mpu
+import mp_bboxes as mpbb
+import mp_vector as cv
 
 import os
 import numpy as np
@@ -149,6 +151,12 @@ def road_network_terrain():
 def profile_road_network_terrain():
     prf.profile_function(road_network_terrain_g)
 
+def ahouse():
+    gritgeo.reset_world_scripts()
+    hprim = hss.build_house()
+    gritgeo.create_primitive(hprim)
+    gritgeo.output_world_scripts()
+
 def afloor():
     gritgeo.reset_world_scripts()
     floors.test_floor_factory()
@@ -156,13 +164,17 @@ def afloor():
 
 def awall():
     gritgeo.reset_world_scripts()
-    v1,v2 = cv.vector(10,10,0), cv.vector(50,30,0)
-    v3,v4 = cv.vector( 0, 0,0), cv.vector( 0,30,0)
-    wargs = {'gaped':False,'rid_top_bottom':False}
-    w1 = walls.wall(v1,v2,**wargs)
-    w2 = walls.wall(v3,v4,**wargs)
-    gritgeo.create_element(w1,w2)
+    #v1,v2 = cv.vector(10,10,0), cv.vector(50,30,0)
+    #v3,v4 = cv.vector( 0, 0,0), cv.vector( 0,30,0)
+    #wargs = {'gaped':False,'rid_top_bottom':False}
+    #w1 = walls.wall(v1,v2,**wargs)
+    #w2 = walls.wall(v3,v4,**wargs)
+    #gritgeo.create_element(w1,w2)
+    walls.test_wall_factory()
     gritgeo.output_world_scripts()
+
+def wall_speed_test():
+    prf.profile_function(walls.test_wall_speed) 
 
 def abox():
     gritgeo.reset_world_scripts()
@@ -197,35 +209,6 @@ def abox_el():
     elems = [fl,pe]
     no = sg.node(children = elems)
     return no
-
-def tg():
-    gritgeo.reset_world_scripts()
-
-    st1 = blg.story(1, position = [0,-20,0], rotation = [0,0,fu.PI/3.0])
-    st2 = blg.story(1, position = [-20,0,0], rotation = [0,0,fu.PI/3.0])
-    stn = sg.node(position = [0,0,-5])
-    stn.add_child(st2)
-    ab = abox_el()
-    built = blg.building(position = [0,20,-5], rotation = [0,0,fu.PI/12.0])
-    poi = built.terrain_points()
-    ter = terr.terrain(splits = 6, pts_of_interest = poi)
-    
-    pcube = pr.ucube()
-    pcube.remove_face('top','front')
-
-    pc = pr.ucube()
-    pc.scale([10,10,10])
-    pc.assign_material('ocean')
-
-    gritgeo.create_primitive(pc)
-    gritgeo.create_primitive(pcube)
-    gritgeo.create_element(st1)
-    gritgeo.create_element(stn)
-    gritgeo.create_element(ab)
-    gritgeo.create_element(built)
-    gritgeo.create_element(ter)
-    
-    gritgeo.output_world_scripts()
 
 def build():
     gritgeo.reset_world_scripts()
@@ -439,6 +422,15 @@ def ashaft():
     gritgeo.reset_world_scripts()
     mpstairs.test_shaft_factory()
     gritgeo.output_world_scripts()
+
+def material_demo():
+    gritgeo.reset_world_scripts()
+    bp.demo_materials()
+    gritgeo.output_world_scripts()
+
+
+
+
 
 
 

@@ -19,30 +19,13 @@ import pdb
 
 class stairs(mbp.blueprint):
 
-    def __init__(self,steps = 8,l = 10,w = 4,h = 8):
+    def __init__(self,steps = 8,l = 10,w = 4,h = 8,m = 'cubemat'):
         mbp.blueprint.__init__(self)
         self.steps = steps
         self.l = l
         self.w = w
         self.h = h
-
-    def _rebuild(self,steps = None,l = None,w = None,h = None):
-        bflag = False
-        if not steps is None:
-            self.steps = steps
-            bflag = True
-        if not l is None:
-            self.l = l
-            bflag = True
-        if not w is None:
-            self.w = w
-            bflag = True
-        if not h is None:
-            self.h = h
-            bflag = True
-        if bflag:
-            self._reset_data()
-            self._build()
+        self.m = m
 
     def _build(self):
         l,w,h = float(self.l),float(self.w),float(self.h)
@@ -67,10 +50,10 @@ class stairs(mbp.blueprint):
         cv.translate_coords_z(bottom[1:],-stepheight)
         bottomleft = [pt.copy().translate_x(-w/2.0) for pt in bottom] 
         bottomright = [pt.copy().translate_x(w/2.0) for pt in bottom] 
-        self._bridge(topleft,topright,m = 'concrete')
-        self._bridge(bottomleft,topleft,m = 'concrete')
-        self._bridge(topright,bottomright,m = 'concrete')
-        self._bridge(bottomright,bottomleft,m = 'concrete')
+        self._bridge(topleft,topright,m = self.m)
+        self._bridge(bottomleft,topleft,m = self.m)
+        self._bridge(topright,bottomright,m = self.m)
+        self._bridge(bottomright,bottomleft,m = self.m)
 
 stair_factory = stairs()
 stair_factory._build()
@@ -95,6 +78,14 @@ class shaft(mbp.blueprint):
 
     def _rebuild(self,**opts):
         mbp.blueprint._rebuild(self,**opts)
+        extra = self.floors - len(self.flheights)
+        if extra > 0:
+            lflh = self.flheights[-1]
+            self.flheights.extend([lflh]*extra)
+            lwah = self.waheights[-1]
+            self.waheights.extend([lwah]*extra)
+            lclh = self.clheights[-1]
+            self.clheights.extend([lclh]*extra)
         self.toheights = [x+y+z for x,y,z in
             zip(self.flheights,self.waheights,self.clheights)]
 
@@ -132,15 +123,14 @@ class shaft(mbp.blueprint):
         p2z = diff - ph/2.0
 
         pform1 = mbp.ucube(m = 'cubemat')
-        #pform1.scale_x(l).scale_y(pw).scale_z(ph)
         pform1.scale(cv.vector(l,pw,ph))
         pform1._scale_uvs_ = False
         pform1.translate_z(-ph/2.0).translate_y(pw/2.0)
         pform2 = mbp.ucube(m = 'cubemat')
-        pform2.scale_x(l).scale_y(pw).scale_z(ph)
+        pform2.scale(cv.vector(l,pw,ph))
         pform2._scale_uvs_ = False
         pform2.translate_z(p2z).translate_y(p2y)
-        sopts = {'steps':s,'l':rl,'w':rw,'h':diff}
+        sopts = {'steps':s,'l':rl,'w':rw,'h':diff,'m':'cubemat'}
         lside = build_stairs(**sopts)
         rside = build_stairs(**sopts)
         lside.rotate_z(fu.PI).translate_y(rl).translate_z(diff)
@@ -187,7 +177,7 @@ def build_shaft(**buildopts):
     return shaft_factory._primitive_from_slice()
 
 def test_shaft_factory():
-    bopts = {'floors':5,'l':10,'w':8}
+    bopts = {'floors':5,'l':10,'w':16}
     sprim1 = build_shaft(**bopts)
     shaftnode = sg.node(primitives = [sprim1])
     gritgeo.create_element(shaftnode)
@@ -204,7 +194,8 @@ def test_shaft_factory():
 
 
 _ramp_count_ = 0
-class ramp(fl.floor):
+#class ramp(fl.floor):
+class ramp(sg.node):
 
     def get_name(self):
         global _ramp_count_

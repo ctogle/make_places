@@ -1,10 +1,11 @@
+import make_places.primitives as pr
+import make_places.scenegraph as sg
+import make_places.blueprints as mbp
+import make_places.gritty as gritgeo
 
 import mp_vector as cv
 import mp_utils as mpu
 import mp_bboxes as mpbb
-import make_places.primitives as pr
-import make_places.scenegraph as sg
-import make_places.blueprints as mbp
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -355,7 +356,6 @@ class terrain_triangle:
                 terrain_triangle(self.parent,[ t3,nt3,nt2])]
     
     def cut_self(self,in1,in2,in3,bboxes):
-
         '''#
         lposs = [tp.position for tp in self.local_points]
         mbp.plot(lposs,marker = '*',color = 'green')
@@ -363,71 +363,32 @@ class terrain_triangle:
             mbp.plot(mc.corners,marker = 's',color = 'red')
         plt.show()
         '''#
-
         ins = [in1,in2,in3]
         incnt = ins.count(True)
         if incnt == 3:
             for tpt in self.local_points:
-                if self in tpt.owners:
-                    tpt.owners.remove(self)
+                tpt.hole_boundary = True
                 for n in tpt.neighbors:
                     if tpt in n.neighbors:
-                        n.neighbors.remove(tpt)
+                        #n.neighbors.remove(tpt)
                         n.hole_boundary = True
-            self.local_points = []
+            #self.local_points = []
         elif incnt == 2:
             for tpt in self.local_points:
-                if self in tpt.owners:
-                    tpt.owners.remove(self)
+                tpt.hole_boundary = True
                 for n in tpt.neighbors:
                     if tpt in n.neighbors:
-                        n.neighbors.remove(tpt)
+                        #n.neighbors.remove(tpt)
                         n.hole_boundary = True
-            self.local_points = []
-
-            '''#
-            outwhich = ins.index(False)
-            shared = self.local_points[outwhich]
-
-            # find intersection from shared and the other 2 local points
-            fanmembers = self.local_points[:]
-            fanmembers.pop(outwhich)
-            for fm in fanmembers:
-                if not fm is shared:
-                    etang = cv.v1_v2(fm.position,shared.position)
-                    fm.position.translate(etang.scale_u(0.9))
-            fanmembers.insert(0,shared)
-
-            for fm in fanmembers:
-                for ow in fm.owners:
-                    ow.set_bbox()
-
-            self.local_points = []
-            tcnt = len(fanmembers) - 2
-            for trdx in range(tcnt):
-                c2dx = trdx+1
-                c3dx = trdx+2
-                if c3dx == tcnt + 1: c3dx = 1
-                c1 = fanmembers[0]
-                c2 = fanmembers[c2dx]
-                c3 = fanmembers[c3dx]
-                c1.weights = cv.zero()
-                c2.weights = cv.zero()
-                c3.weights = cv.zero()
-                self.local_points.extend([c1,c2,c3])
-            self.set_bbox()
-            # for any vertex whose position changes, recalc the bbox for
-            # that vertex's owner triangle
-            '''#
+            #self.local_points = []
         elif incnt == 1:
             for tpt in self.local_points:
-                if self in tpt.owners:
-                    tpt.owners.remove(self)
+                tpt.hole_boundary = True
                 for n in tpt.neighbors:
                     if tpt in n.neighbors:
-                        n.neighbors.remove(tpt)
+                        #n.neighbors.remove(tpt)
                         n.hole_boundary = True
-            self.local_points = []
+            #self.local_points = []
 
     def cut_holes(self, holes):
         bb = self.bbox
@@ -678,12 +639,48 @@ class terrain_piece:
             ch.cut_holes(holes)
 
     def mesh(self, lod = False):
+    
+        def veg_face(fdat):
+            veg = [f.hole_boundary for f in fdat].count(True) == 0
+            if veg:
+                com = cv.center_of_mass([f.position for f in fdat])
+                veg = com.z > 5.0
+            return veg
+
+        depth = None
+        max_depth = None
+        if lod:
+            depth = 0
+            max_depth = self.splits - 1
+        data = self.face_data(depth, max_depth)
+
+        bp = mbp.blueprint()
+        for fdx,fdat in enumerate(data):
+            if not fdat:continue
+            fposs = [f.position.copy() for f in fdat]
+            ns = [f.calculate_smooth_normal() for f in fdat]
+            veg = veg_face(fdat)
+            m = 'grass1'
+            pm = '/common/pmat/Grass'
+            nfs = bp._triangle(*fposs,ns = ns,m = m,pm = pm)
+            bp._project_uv_xy(nfs)
+            if veg:bp._vegetate_faces(nfs)
+        
+        xmlfile = '.'.join(['terrain',
+            self.get_terrain_number(),'mesh','xml'])
+        #mesh = bp._primitive_from_slice(
+        mesh = bp._primitives(
+            xmlfile = xmlfile,
+            hlod = not lod,ilod = lod)
+        return mesh
+
+    def mesh_old(self, lod = False):
         verts = []
         nverts = []
         uvs = []
         faces = []
         face_materials = []
-        materials = ['grass2']
+        materials = ['grass1']
 
         depth = None
         max_depth = None
@@ -810,7 +807,33 @@ def reneighbor_pieces(global_points,nthresh):
             pt.reneighbors(ownerpts,nthresh)
     print 'reneighbored!', time.time() - reneightime
 
+def summarize(summary,pieces):
+    p1 = pieces[0]
+    primbase = 0.5*p1.primitive_size
+    primheight = sqrt(p1.primitive_size**2 - primbase**2)
+    squnits = primbase*primheight*len(pieces)
+
+    summary.write('\tprimtive edge length: ')
+    summary.write(str(p1.primitive_size))
+    summary.write('\n')
+    summary.write('\tpolygon edge length: ')
+    summary.write(str(p1.final_poly_length))
+    summary.write('\n')
+    summary.write('\ttarget polygon edge length: ')
+    summary.write(str(p1.poly_size))
+    summary.write('\n')
+    summary.write('\tfinal split count: ')
+    summary.write(str(p1.final_splits))
+    summary.write('\n')
+    summary.write('\tsquare unit minimum: ')
+    summary.write(str(squnits))
+    summary.write('\n')
+
 def make_terrain(**someinput):
+    inputkeys = someinput.keys()
+    if 'summary' in inputkeys:summary = someinput['summary']
+    else:summary = None
+
     poly_length = someinput['polygon_edge_length']
     prim_length = someinput['primitive_edge_length']
 
@@ -869,8 +892,7 @@ def make_terrain(**someinput):
     #plot_tpts(global_points)
     #plot_tpts(global_bounding_points)
     
-    #smooths = 0
-    smooths = 100
+    smooths = 10
     for sdx in range(smooths):
         print 'smoothing global points', sdx
         #for pt in global_bounding_points:
@@ -880,24 +902,54 @@ def make_terrain(**someinput):
     tprimitives = [p.mesh() for p in pieces]
     tlodprimitives = [p.mesh(lod = True) for p in pieces]
     
-    p1 = pieces[0]
-    summ = [p1.final_poly_length,p1.poly_size,
-            p1.primitive_size,p1.final_splits]
-    primbase = 0.5*p1.primitive_size
-    primheight = sqrt(p1.primitive_size**2 - primbase**2)
-    squnits = primbase*primheight*len(tprimitives)
-    print squnits,'square units of terrain were generated!'
+    summarize(summary,pieces)
 
     terrain_node = sg.node(
         grit_renderingdistance = 1.5*prim_length, 
         grit_lod_renderingdistance = 5000, 
         primitives = tprimitives, 
         lod_primitives = tlodprimitives)
-    terrain_node.summary = summ
     return terrain_node
 
-if __name__ == '__main__':
-    test()
+def terrain_fill(loop):
+    # loop is a counterclockwise set of convex points
+    # use loop to generate of a set of points of target poly size length away
+    # from one another which completely intersects loop, and is also ccw
+    # tripie should then work on this set, but produce poor results for large loops
+    # produce a set of loops to bridge from the outer loop to the center
+    # every few loops reduce the number of points in the loop to fix topology
+    def move(oloop):
+        iloop = [l.copy() for l in oloop]
+        [l.translate(ray) for l,ray in zip(iloop,rays)]
+
+        #mbp.plot(iloop,color = 'red')
+        #mbp.plot(oloop,color = 'blue')
+        #plt.show()
+
+        nfs.extend(bp._bridge_asymmetric(iloop,oloop,m = 'grass1'))
+        return iloop
+
+    com = cv.center_of_mass(loop)
+    loop.append(loop[0])
+    rays = [cv.v1_v2(l,com).scale_u(0.1) for l in loop]
+
+    bp = mbp.blueprint()
+    nfs = []
+
+    for x in range(10):loop = move(loop)
+    nfs.extend(bp._tripie(loop,m = 'grass1'))
+    bp._project_uv_xy(nfs)
+
+    gritgeo.reset_world_scripts()
+    gritgeo.create_primitive(bp._primitives())
+    gritgeo.output_world_scripts()
+
+def test_fill():
+    loop = mbp.polygon(32)
+    cv.scale_coords(loop,cv.vector(20,100,0))
+    terrain_fill(loop)
+
+if __name__ == '__main__':pass
 
 
 

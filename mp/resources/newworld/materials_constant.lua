@@ -54,7 +54,7 @@ material `grasstuft2` {
     specular = 0,
 }
 
-material `ocean` {
+material `oceanold` {
 	diffuseColour = V_ZERO,
 	--diffuseMap=`textures/ocean_D.dds`,
 	normalMap=`../textures/ocean_N.tga`,

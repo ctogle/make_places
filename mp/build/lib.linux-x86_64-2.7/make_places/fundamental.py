@@ -1,5 +1,5 @@
 import mp_utils as mpu
-import mp_vector as cv
+#import mp_vector as cv
 #from mp_utils import dot
 #from mp_utils import magnitude
 

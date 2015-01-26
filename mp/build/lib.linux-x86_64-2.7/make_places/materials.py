@@ -17,6 +17,13 @@ class material(fu.base):
         msio.write(str(val))
         msio.write(',\n')
 
+    def _write_bool_property(self,msio,prop,val):
+        if val is None:return
+        msio.write(prop)
+        msio.write(' = ')
+        msio.write(str(val).lower())
+        msio.write(',\n')
+        
     def _write_path_property(self,msio,prop,val):
         if val is None:return
         msio.write(prop)
@@ -28,13 +35,9 @@ class material(fu.base):
         if val is None:return
         msio.write(prop)
         msio.write(' = {')
-
         vstr = val.__str__()
-        vstr = vstr[:vstr.find('(')]
-        vstr.replace('(','{',1)
-        vstr.replace(')','}',1)
+        vstr = vstr[vstr.find('(')+1:-1]
         msio.write(vstr)
-
         msio.write('},\n')
 
     def _write(self,msio):
@@ -49,52 +52,69 @@ class material(fu.base):
         self._write_shadow_properties(msio)
         self._write_misc_properties(msio)
         self._write_diffuse_properties(msio)
+        self._write_normal_properties(msio)
         self._write_emissive_properties(msio)
+        self._write_gloss_properties(msio)
+        self._write_translucency_properties(msio)
+        self._write_paint_properties(msio)
 
     def _write_alpha_properties(self,msio):
         self._write_float_property(msio,'alpha',self.alpha)
+        self._write_bool_property(msio,'depthSort',self.depthSort)
+        self._write_bool_property(msio,'vertexAlpha',self.vertexAlpha)
+        self._write_float_property(msio,'alphaReject',self.alphaReject)
+        self._write_bool_property(msio,'premultipliedAlpha',self.premultipliedAlpha)
 
     def _write_shadow_properties(self,msio):
+        self._write_bool_property(msio,'castShadows',self.castShadows)
+        self._write_bool_property(msio,'shadowAlphaReject',self.shadowAlphaReject)
+        self._write_float_property(msio,'shadowBias',self.shadowBias)
         self._write_float_property(msio,'shadowObliqueCutOff',self.shadowObliqueCutOff)
 
     def _write_misc_properties(self,msio):
+        self._write_bool_property(msio,'backfaces',self.backfaces)
+        self._write_float_property(msio,'blendedBones',self.blendedBones)
+        self._write_bool_property(msio,'clamp',self.clamp)
+        self._write_bool_property(msio,'depthWrite',self.depthWrite)
+        self._write_bool_property(msio,'stipple',self.stipple)
+        self._write_vector_property(msio,'textureAnimation',self.textureAnimation)
         self._write_vector_property(msio,'textureScale',self.textureScale)
-        '''#
-        txsc = self.textureScale
-        if not txsc == [1,1]:
-            msio.write('textureScale = {')
-            msio.write(str(txsc[0]))
-            msio.write(',')
-            msio.write(str(txsc[1]))
-            msio.write('},\n')
-        '''#
 
     def _write_diffuse_properties(self,msio):
+        self._write_vector_property(msio,'diffuseColour',self.diffuseColour)
         self._write_path_property(msio,'diffuseMap',self.diffuseMap)
-        #if self.diffuseMap:
-        #    msio.write('diffuseMap = `')
-        #    msio.write(self.diffuseMap)
-        #    msio.write('`,\n')
+        self._write_bool_property(msio,'vertexDiffuse',self.vertexDiffuse)
 
-    def _write_normal_properties(self,msio):pass
+    def _write_normal_properties(self,msio):
+        self._write_path_property(msio,'normalMap',self.normalMap)
 
     def _write_emissive_properties(self,msio):
-        emcl = self.emissiveColour
-        if not emcl == [0,0,0]:
-            msio.write('emissiveColour = {')
-            msio.write(str(emcl[0]))
-            msio.write(',')
-            msio.write(str(emcl[1]))
-            msio.write(',')
-            msio.write(str(emcl[2]))
-            msio.write('},\n')
+        self._write_path_property(msio,'emissiveMap',self.emissiveMap)
+        self._write_vector_property(msio,'emissiveColour',self.emissiveColour)
 
-    def _write_gloss_properties(self,msio):pass
-    def _write_translucency_properties(self,msio):pass
-    def _write_paint_properties(self,msio):pass
+    def _write_gloss_properties(self,msio):
+        self._write_path_property(msio,'glossMap',self.glossMap)
+        self._write_bool_property(msio,'noSpecularChannel',self.noSpecularChannel)
+        self._write_float_property(msio,'specular',self.specular)
+        self._write_float_property(msio,'gloss',self.gloss)
+
+    def _write_translucency_properties(self,msio):
+        self._write_path_property(msio,'translucencyMap',self.translucencyMap)
+
+    def _write_paint_properties(self,msio):
+        self._write_float_property(msio,'paintColour',self.paintColour)
+        self._write_bool_property(msio,'paintByDiffuseAlpha',self.paintByDiffuseAlpha)
 
     def _add_diffuse(self,path):
         self.diffuseMap = path
+        return self
+
+    def _add_normal(self,path):
+        self.normalMap = path
+        return self
+
+    def _add_gloss(self,path):
+        self.glossMap = path
         return self
 
     def __init__(self,name,**kwargs):
@@ -102,102 +122,187 @@ class material(fu.base):
 
         ### alpha ###
         self._default_('alpha',None,**kwargs)
-        self._default_('depthSort',True,**kwargs)
-        self._default_('vertexAlpha',False,**kwargs)
-        self._default_('alphaReject',0.5,**kwargs)
-        self._default_('premultipliedAlpha',False,**kwargs)
+        self._default_('depthSort',None,**kwargs)
+        self._default_('vertexAlpha',None,**kwargs)
+        self._default_('alphaReject',None,**kwargs)
+        self._default_('premultipliedAlpha',None,**kwargs)
 
         ### shadows ###
-        self._default_('castShadows',True,**kwargs)
-        self._default_('shadowAlphaReject',False,**kwargs)
-        self._default_('shadowBias',0.1,**kwargs)
+        self._default_('castShadows',None,**kwargs)
+        self._default_('shadowAlphaReject',None,**kwargs)
+        self._default_('shadowBias',None,**kwargs)
         self._default_('shadowObliqueCutOff',None,**kwargs)
 
         ### misc ###
-        self._default_('backfaces',False,**kwargs)
-        self._default_('blendedBones',0,**kwargs)
-        self._default_('clamp',False,**kwargs)
-        self._default_('depthWrite',True,**kwargs)
-        self._default_('stipple',False,**kwargs)
-        self._default_('textureAnimation',[0,0],**kwargs)
-        self._default_('textureScale',cv.one2d(),**kwargs)
-        #self._default_('textureScale',[1,1],**kwargs)
+        self._default_('backfaces',None,**kwargs)
+        self._default_('blendedBones',None,**kwargs)
+        self._default_('clamp',None,**kwargs)
+        self._default_('depthWrite',None,**kwargs)
+        self._default_('stipple',None,**kwargs)
+        self._default_('textureAnimation',None,**kwargs)
+        self._default_('textureScale',None,**kwargs)
 
         ### diffuse ###
-        self._default_('diffuseColour',[1,1,1],**kwargs)
+        self._default_('diffuseColour',None,**kwargs)
         self._default_('diffuseMap',None,**kwargs)
-        self._default_('vertexDiffuse',False,**kwargs)
+        self._default_('vertexDiffuse',None,**kwargs)
 
         ### normal ###
         self._default_('normalMap',None,**kwargs)
 
         ### emissive ###
         self._default_('emissiveMap',None,**kwargs)
-        self._default_('emissiveColour',[0,0,0],**kwargs)
+        self._default_('emissiveColour',None,**kwargs)
 
         ### gloss ###
         self._default_('glossMap',None,**kwargs)
-        self._default_('noSpecularChannel',False,**kwargs)
-        self._default_('specular',0.0,**kwargs)
-        self._default_('gloss',0.0,**kwargs)
+        self._default_('noSpecularChannel',None,**kwargs)
+        self._default_('specular',None,**kwargs)
+        self._default_('gloss',None,**kwargs)
 
         ### translucency ###
         self._default_('translucencyMap',None,**kwargs)
 
         ### painting ###
-        self._default_('paintColour',1,**kwargs)
-        self._default_('paintByDiffuseAlpha',False,**kwargs)
+        self._default_('paintColour',None,**kwargs)
+        self._default_('paintByDiffuseAlpha',None,**kwargs)
 
 default_materials = []
 def write_default_materials(msio):
+    write_generic_materials()
     write_concrete_materials()
     write_metal_materials()
     write_nature_materials()
     write_misc_materials()
     write_emissive_materials()
 
-    generic_grid = material('cubemat')._add_diffuse('../textures/cubetex.png')
-    generic_octg = material('octagonmat')._add_diffuse('../textures/octagontex.png')
-    #generic_green = material('green')._add_diffuse('../textures/green.png')
-    default_materials.append(generic_grid)
-    default_materials.append(generic_octg)
-    #default_materials.append(generic_green)
-
     for dfm in default_materials:
         dfm._write(msio)
 
+def write_generic_materials():
+    generic_grid = material('gridmat')._add_diffuse('../textures/generic/orangeboxtex.png')
+    default_materials.append(generic_grid)
+
+    generic_cube = material('cubemat')._add_diffuse('../textures/generic/cubetex.png')
+    default_materials.append(generic_cube)
+
+    generic_octg = material('octagonmat')._add_diffuse('../textures/generic/octagontex.png')
+    default_materials.append(generic_octg)
+
 def write_concrete_materials():
-    concrete = material('concrete')._add_diffuse('../textures/concrete.png')
-    asphalt = material('asphalt')._add_diffuse('../textures/asphalt.jpg')
-    brick = material('brick')._add_diffuse('../textures/brick.jpg')
-    brick.textureScale = [4,4]
-    hokie = material('hokie')._add_diffuse('../textures/hokiestone.jpg')
-    road = material('road')._add_diffuse('../textures/road.png')
-    default_materials.append(concrete)
+    concrete1 = material('concrete1')._add_diffuse('../textures/concrete/concrete.png')
+    concrete1.textureScale = cv.vector2d(2,2)
+    default_materials.append(concrete1)
+
+    concrete2 = material('concrete2')._add_diffuse('../textures/concrete/concrete2.png')
+    concrete2.textureScale = cv.vector2d(4,4)
+    default_materials.append(concrete2)
+
+    concrete3 = material('concrete3')._add_diffuse('../textures/concrete/concrete2.png')
+    concrete3.textureScale = cv.vector2d(4,4)
+    concrete3.diffuseColour = cv.vector(0.4,0.4,0.4)
+    default_materials.append(concrete3)
+
+    concrete4 = material('concrete4')._add_diffuse('../textures/concrete/concrete3.png')
+    concrete4.textureScale = cv.vector2d(4,4)
+    default_materials.append(concrete4)
+
+    cement1 = material('cement1')._add_diffuse('../textures/concrete/indoor-cement.jpg')
+    concrete3.textureScale = cv.vector2d(4,4)
+    default_materials.append(cement1)
+
+    sidewalk1 = material('sidewalk1')._add_diffuse('../textures/concrete/sidewalk1.jpg')
+    #concrete3.textureScale = cv.vector2d(4,4)
+    default_materials.append(sidewalk1)
+
+    asphalt = material('asphalt')._add_diffuse('../textures/concrete/asphalt.jpg')
+    asphalt.textureScale = cv.vector2d(4,4)
+    asphalt.specular = 0
+    #asphalt.gloss = 0
     default_materials.append(asphalt)
-    default_materials.append(brick)
+
+    brick1 = material('brick1')._add_diffuse('../textures/concrete/brick.jpg')
+    brick1.textureScale = cv.vector2d(4,4)
+    default_materials.append(brick1)
+    
+    brick2 = material('brick2')._add_diffuse('../textures/concrete/brick2.jpg')
+    brick2.textureScale = cv.vector2d(3,3)
+    default_materials.append(brick2)
+
+    hokie = material('hokie')._add_diffuse('../textures/concrete/hokiestone.jpg')
+    hokie.textureScale = cv.vector2d(10,10)
     default_materials.append(hokie)
+    
+    road = material('road')._add_diffuse('../textures/concrete/road.png')
+    default_materials.append(road)
 
 def write_metal_materials():
-    metal = material('metal')._add_diffuse('../textures/metal.png')
-    default_materials.append(metal)
+    metal1 = material('metal1')._add_diffuse('../textures/metal/metal.png')
+    metal1.textureScale = cv.vector2d(10,10)
+    default_materials.append(metal1)
 
 def write_nature_materials():
-    grass = material('grass')._add_diffuse('../textures/grass.dds')
-    grass.textureScale = [2,2]
-    grass.shadowObliqueCutOff = 0
-    default_materials.append(grass)
+    grass1 = material('grass1')._add_diffuse('../textures/nature/grass.dds')
+    grass1.textureScale = cv.vector2d(2,2)
+    grass1.shadowObliqueCutOff = 0
+    default_materials.append(grass1)
+
+    tree1 = material('Tree_aelmTrunk')
+    tree1._add_diffuse('../textures/nature/tree_aelm.dds')
+    tree1._add_normal('../textures/nature/tree_aelm_N.dds')
+    tree1.gloss = 0
+    tree1.specular = 0
+    default_materials.append(tree1)
+
+    tree2 = material('Tree_aelmLev')
+    tree2._add_diffuse('../textures/nature/tree_aelm.dds')
+    tree2._add_normal('../textures/nature/tree_aelm_N.dds')
+    tree2.clamp = True
+    tree2.gloss = 0
+    tree2.specular = 0
+    tree2.alphaReject = 0.5
+    default_materials.append(tree2)
+
+    bmat1 = material('bmat1')
+    bmat1._add_diffuse('../textures/nature/bush1.png')
+    bmat1.alphaReject = 0.5
+    bmat1.gloss = 0
+    bmat1.specular = 0
+    default_materials.append(bmat1)
+
+    bmat2 = material('bmat2')
+    bmat2._add_diffuse('../textures/nature/bush_tree_baum.jpg')
+    bmat2.alphaReject = 0.5
+    bmat2.gloss = 0
+    bmat2.specular = 0
+    default_materials.append(bmat2)
+
+    ocean = material('ocean')
+    ocean._add_normal('../textures/nature/ocean_N.tga')
+    ocean._add_gloss('../textures/nature/ocean_S.tga')
+    ocean.diffuseColour = cv.zero()
+    ocean.textureAnimation = cv.vector2d(-0.1,0)
+    ocean.alpha = 0.9
+    ocean.depthWrite = True
+    default_materials.append(ocean)
 
 def write_misc_materials():
-    rubber = material('rubber')._add_diffuse('../textures/rubber.png')
-    glass = material('glass')._add_diffuse('../textures/glass.png')
-    glass.alpha = 0.2
+    bumper = material('bumper')._add_diffuse('../textures/misc/bumper.png')
+    default_materials.append(bumper)
+    
+    greenhaze = material('greenhaze')._add_diffuse('../textures/misc/greenhaze.png')
+    default_materials.append(greenhaze)
+    
+    rubber = material('rubber')._add_diffuse('../textures/misc/rubber.png')
     default_materials.append(rubber)
+
+    glass = material('glass')._add_diffuse('../textures/misc/glass.png')
+    glass.alpha = 0.2
     default_materials.append(glass)
 
 def write_emissive_materials():
-    light = material('light')._add_diffuse('../textures/light.png')
-    light.emissiveColour = [1,1,1]
+    light = material('light')._add_diffuse('../textures/emissive/light.png')
+    light.emissiveColour = cv.vector(1,1,1)
     default_materials.append(light)
 
 def enumerate_materials():

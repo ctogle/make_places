@@ -17,14 +17,28 @@ import pdb
 
 class newwall(mbp.blueprint):
 
-    def _plot(self):
+    def _plot(self,color = None):
         vs = [self.v1,self.v2]
-        mbp.plot(vs,number = False,color = 'blue',marker = 'o')
+        if color is None:
+            if self.sort == 'interior':col = 'blue'
+            else:col = 'red'
+        else:col = color
+        mbp.plot(vs,number = False,color = col,marker = 'o')
 
     def __init__(self,v1 = cv.zero(),v2 = cv.one(),
-            h = 5.0,fh = 0.0,w = 0.5,m = 'brick',
-            sort = 'exterior',sector = None):
+            h = 5.0,fh = 0.0,w = 0.5,m = 'brick2',
+            sort = 'exterior',sector = None,
+            unswitchable = False,solid = False,
+            cap = False,cornered = None):
         mbp.blueprint.__init__(self)
+        if cornered is None:
+            if sort == 'exterior':cornered = True
+            else:cornered = False
+        self.unswitchable = unswitchable
+        self.solid = solid
+        self.cap = cap
+        self.cornered = cornered
+
         self.v1 = v1
         self.v2 = v2
         self.h = h
@@ -55,6 +69,26 @@ class newwall(mbp.blueprint):
 
         self._face_away()
 
+    def _distance_to_border(self,border):
+
+        def distance_to_edge(pt,e1,e2,norm):
+            eproj = mpbb.project([e1,e2],norm)
+            pproj = mpbb.project([pt],norm)
+            return abs(eproj.x - pproj.x)
+
+        edgenorms = mpbb.get_norms(border)
+        pt = self.center 
+        dists = []
+        for edx in range(len(border)):
+            e1 = border[edx-1]
+            e2 = border[edx]
+            norm = edgenorms[edx-1]
+            dists.append(distance_to_edge(pt,e1,e2,norm))
+            #dists.append(mpbb.distance_to_edge(pt,e1,e2))
+        dists.append(dists.pop(0))
+        distance = min(dists)
+        return distance
+
     def _face_away(self):
         if self.sector is None:return
         intpt = self.sector.center.copy()
@@ -73,6 +107,10 @@ class newwall(mbp.blueprint):
             self.tangent = self.v1v2.copy().normalize()
 
     def _build(self):
+        self._extra_primitives = []
+        self._gaps = []
+        self._portals = []
+
         if self.sort == 'exterior':self._build_exterior()
         elif self.sort == 'interior':self._build_interior()
 
@@ -83,12 +121,28 @@ class newwall(mbp.blueprint):
 
         self._build_segments(spts)
         self._build_portals()
+        if self.cap:self._build_cap()
+        if self.cornered:
+            self._build_corner(self.v1)
+            self._build_corner(self.v2)
 
     def _build_exterior(self):
+        if self.solid or self.l < 6 or self.h < 3.0:return
         fh = self.fh
-        self._window_gap(0.5,fh)
+        if self.unswitchable:self._door_gap(0.5,self.fh)
+        else:
+            wlen = float(self.l)
+            winw = 1.5
+            gcnt = int(wlen/(winw*3))
+            if gcnt % 2 != 0: gcnt -= 1
+            if gcnt > 0: gspa = wlen/gcnt
+            for gn in range(gcnt):
+                #gp = (gn + 0.5)*gspa - winw/2.0
+                gp = gn*gspa
+                self._window_gap(gp/wlen,fh)
 
     def _build_interior(self):
+        if self.solid or self.l < 6 or self.h < 3.0:return
         fh = self.fh
         self._door_gap(0.5,fh)
 
@@ -110,6 +164,10 @@ class newwall(mbp.blueprint):
             if d13 <= d12 and d23 <= d12:return True
             else:return False
 
+        g1d = min([cv.distance(g1,self.v1),cv.distance(g1,self.v2)])
+        g2d = min([cv.distance(g2,self.v1),cv.distance(g2,self.v2)])
+        if g1d < 2 or g2d < 2: return None
+
         for g in self._gaps:
             og1,og2 = g
             if inside(og1,og2,g1) or inside(og1,og2,g2):
@@ -119,18 +177,19 @@ class newwall(mbp.blueprint):
         return g1,g2
 
     def _window_gap(self,dx,fh):
-        dw,dh,dz = 1.5,2,1+fh
+        wh,winh = self.h,0.5*self.h
+        dw,dh,dz = 0.75*winh,winh,max([(wh-winh)/2.0,fh+0.5])
         wpts = self._gap(dx,dw)
         if wpts is None:return
         wkws = {'z':dz,'w':dw,'h':dh,'gap':wpts,'wall':self}
         self._portals.append(po.window(**wkws))
 
     def _door_gap(self,dx,fh):
-        dw,dh,dz = 1.5,3,fh
+        wh,ch = self.h,self.fh
+        dw,dh,dz = 1.5,mpu.clamp(0.8*(wh-fh-ch),2,3),fh
         dpts = self._gap(dx,dw)
         if dpts is None:return
         dkws = {'z':dz,'w':dw,'h':dh,'gap':dpts,'wall':self}
-        #self._portals.append(po.portal(**dkws))
         self._portals.append(po.door(**dkws))
 
     def _build_portals(self):
@@ -141,7 +200,7 @@ class newwall(mbp.blueprint):
     def _build_segments(self,spts):
         w = self.w
         scnt = len(spts)
-        self.wnorm = self.normal.copy().scale_u(w*0.5)
+        self.wnorm = self.normal.copy().scale_u(abs(w*0.5))
         for s in range(scnt)[::2]:
             s1,s2 = spts[s],spts[s+1]
             self._build_segment(s1,s2)
@@ -158,7 +217,49 @@ class newwall(mbp.blueprint):
         t4 = b4.copy().translate_z(h)
         bs = [b1,b2,b3,b4,b1]
         ts = [t1,t2,t3,t4,t1]
+
+        #wcw = mbp.clockwise(bs)
+        #if not wcw:
+        #    bs.reverse()
+        #    ts.reverse()
+        #print 'w cw ness',wcw
+
+        #mbp.plot(bs)
+        #plt.show()
+
         nfs = self._bridge(bs,ts,m = m)
+        #nfs = self._bridge(ts,bs,m = m)
+        #self._flip_faces(nfs)
+        self._project_uv_flat(nfs)
+
+    def _build_corner(self,v):
+        #cw,wh,m = abs(self.w*1.5),self.h,'concrete1'
+        cw,wh,m = self.w*1.5,self.h,'concrete1'
+        #cw,wh,m = w*1.5,self.h,self.m
+        bl = mbp.ucube(m = m)
+        bump = 0.5 if self.cap else 0.0
+        bl.scale(cv.vector(cw,cw,wh+bump))
+        #bl.calculate_normals()
+        bl.translate(v)
+        self._extra_primitives.append(bl)
+
+    def _build_cap(self):
+        h,m,wnorm = self.h,self.m,self.wnorm.copy().scale_u(1.25)
+        v1,v2 = self.v1.copy().translate_z(h),self.v2.copy().translate_z(h)
+        b1 = v1.copy().translate(wnorm.flip())
+        b2 = v2.copy().translate(wnorm)
+        b3 = v2.copy().translate(wnorm.flip())
+        b4 = v1.copy().translate(wnorm)
+        caph = 0.25
+        t1 = b1.copy().translate_z(caph)
+        t2 = b2.copy().translate_z(caph)
+        t3 = b3.copy().translate_z(caph)
+        t4 = b4.copy().translate_z(caph)
+        bs = [b2,b3,t3,t2,b2]
+        ts = [b1,b4,t4,t1,b1]
+        nfs = self._bridge(ts,bs,m = 'concrete1')
+        #nfs = self._bridge(ts,bs,m = m)
+        #self._flip_faces(nfs)
         self._project_uv_flat(nfs)
 
 wall_factory = newwall()
@@ -402,6 +503,8 @@ class wall(sg.node):
         self._default_('tform',self.def_tform(*args,**kwargs),**kwargs)
         self._default_('uv_tform',self.def_uv_tform(*args,**kwargs),**kwargs)
         sg.node.__init__(self, *args, **kwargs)
+        wmat = 'brick2' if rm.random() < 0.5 else 'concrete1'
+        self.assign_material(wmat)
 
     def gape_wall(self):
         wlen = float(self.length)

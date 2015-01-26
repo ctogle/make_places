@@ -96,6 +96,14 @@ cdef class vector2d:
         self.y *= sv.y
         return self
 
+    cpdef vector2d scale_x(self, float sx):
+        self.x *= sx
+        return self
+
+    cpdef vector2d scale_y(self, float sy):
+        self.y *= sy
+        return self
+
 cdef vector2d midpoint2d_c(vector2d v1, vector2d v2):
     cdef float x = (v1.x + v2.x)/2.0
     cdef float y = (v1.y + v2.y)/2.0

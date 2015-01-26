@@ -33,12 +33,14 @@ class floor_sector(mbp.blueprint):
             self.length = abs(c3.x - c1.x)
             self.width = abs(c3.y - c1.y)
             self.position = cv.center_of_mass(self.corners)
+            self.center = cv.center_of_mass(self.corners)
         else:
             l,w,p = kwargs['length'],kwargs['width'],kwargs['position']
             self.corners = mpu.make_corners(p,l,w,0)
             self.length = l
             self.width = w
             self.position = p
+            self.center = p
         self.set_bboxes() 
 
     def set_bboxes(self):
@@ -94,7 +96,7 @@ class floor_sector(mbp.blueprint):
         wh = self.wall_height
         loff = wh + ch
         lheight = loff + fh
-        piece = mbp.ucube()
+        piece = mbp.ucube(m = 'concrete1')
         piece.is_lod = True
         #piece = pr.ucube(is_lod = True)
         piecenode = sg.node(
@@ -119,8 +121,10 @@ class floor_sector(mbp.blueprint):
                 'l':self.length,
                 'w':self.width,
                 'h':self.floor_height,
+                'm':'concrete2',
                     }
             afloor = build_floor(**fopts)
+            afloor.translate_z(self.floor_height)
             final.consume(afloor)
         if hasceiling:
             if self.cgaps: cgap = self.cgaps[0]
@@ -130,9 +134,11 @@ class floor_sector(mbp.blueprint):
                 'l':self.length,
                 'w':self.width,
                 'h':self.floor_height,
+                'm':'concrete3',
                     }
             aceiling = build_floor(**copts)
-            coff = self.ceiling_height + self.wall_height
+            coff = self.wall_height
+            #coff = self.ceiling_height + self.wall_height
             aceiling.translate_z(coff)
             final.consume(aceiling)
 
@@ -244,22 +250,24 @@ class floorold(sg.node):
 
 class newfloor(mbp.blueprint):
 
-    def __init__(self,l = 10,w = 10,h = 1,gap = None):
+    def __init__(self,l = 10,w = 10,h = 1,
+            gap = None,m = 'concrete2'):
         mbp.blueprint.__init__(self)
         self.l = l
         self.w = w
         self.h = h
         self.gap = gap
+        self.m = m
 
     def _build_gap(self):
-        l,w,h,g = self.l,self.w,self.h,self.gap
+        l,w,h,g,m = self.l,self.w,self.h,self.gap,self.m
         gp,gl,gw = g
         iloop = mpu.make_corners(gp,gl,gw,0)
         oloop = mpu.make_corners(cv.zero(),l,w,0)
         iloop.append(iloop[0])
         oloop.append(oloop[0])
 
-        newfaces = self._bridge(iloop,oloop)
+        newfaces = self._bridge(iloop,oloop,m = m)
         self._project_uv_xy(newfaces)
 
         iloopb = [c.copy() for c in iloop]
@@ -267,23 +275,32 @@ class newfloor(mbp.blueprint):
         [c.translate_z(-h) for c in iloopb]
         [c.translate_z(-h) for c in oloopb]
 
-        newfaces = self._bridge(oloopb,iloopb)
+        newfaces = self._bridge(oloopb,iloopb,m = m)
         self._project_uv_xy(newfaces)
 
-        newfaces = self._bridge(iloopb,iloop)
+        nfs = self._bridge(iloopb,iloop,m = m)
+        self._project_uv_flat(nfs)
+        nfs = self._bridge(oloop,oloopb,m = m)
+        self._project_uv_flat(nfs)
 
     def _build_nogap(self):
-        l,w,h = self.l,self.w,self.h
+        l,w,h,m = self.l,self.w,self.h,self.m
         corners = mpu.make_corners(cv.zero(),l,w,0)
         us = mbp.polygon(4)
         cv.translate_coords(us,cv.one().scale_u(0.5))
         cv.scale_coords_x(us,l)
         cv.scale_coords_y(us,w)
         us = [v.xy2d() for v in us]
-        self._quad(*corners,us = us)
-        [c.translate_z(-h) for c in corners]
-        corners.reverse()
-        self._quad(*corners,us = us)
+        self._quad(*corners,us = us,m = m)
+        bcorners = [c.copy().translate_z(-h) for c in corners]
+        bcorners.reverse()
+        self._quad(*bcorners,us = us,m = m)
+
+        bcorners.reverse()
+        bcorners.append(bcorners[0])
+        corners.append(corners[0])
+        nfs = self._bridge(corners,bcorners,m = m)
+        self._project_uv_flat(nfs)
 
     def _build(self):
         if self.gap is None: self._build_nogap()

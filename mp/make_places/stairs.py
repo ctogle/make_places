@@ -19,9 +19,10 @@ import pdb
 
 class stairs(mbp.blueprint):
 
-    def __init__(self,steps = 8,l = 10,w = 4,h = 8,m = 'cubemat'):
+    def __init__(self,steps = 8,p = None,l = 10,w = 4,h = 8,m = 'gridmat'):
         mbp.blueprint.__init__(self)
         self.steps = steps
+        self.p = p
         self.l = l
         self.w = w
         self.h = h
@@ -32,7 +33,11 @@ class stairs(mbp.blueprint):
         steps = self.steps
         stepheight = h/steps
         steplength = l/steps
-        p = cv.zero()
+
+        #print 'stepheight',stepheight,h
+
+        if self.p is None:p = cv.zero()
+        else:p = self.p.copy()
         line = []
         for sx in range(steps):
             line.append(p.copy())
@@ -50,10 +55,12 @@ class stairs(mbp.blueprint):
         cv.translate_coords_z(bottom[1:],-stepheight)
         bottomleft = [pt.copy().translate_x(-w/2.0) for pt in bottom] 
         bottomright = [pt.copy().translate_x(w/2.0) for pt in bottom] 
-        self._bridge(topleft,topright,m = self.m)
-        self._bridge(bottomleft,topleft,m = self.m)
-        self._bridge(topright,bottomright,m = self.m)
-        self._bridge(bottomright,bottomleft,m = self.m)
+        nfs = []
+        nfs.extend(self._bridge(topleft,topright,m = self.m))
+        nfs.extend(self._bridge(bottomleft,topleft,m = self.m))
+        nfs.extend(self._bridge(topright,bottomright,m = self.m))
+        nfs.extend(self._bridge(bottomright,bottomleft,m = self.m))
+        self._project_uv_flat(nfs)
 
 stair_factory = stairs()
 stair_factory._build()
@@ -86,8 +93,9 @@ class shaft(mbp.blueprint):
             self.waheights.extend([lwah]*extra)
             lclh = self.clheights[-1]
             self.clheights.extend([lclh]*extra)
-        self.toheights = [x+y+z for x,y,z in
-            zip(self.flheights,self.waheights,self.clheights)]
+        self.toheights = self.waheights
+        #self.toheights = [x+y+z for x,y,z in
+        #    zip(self.flheights,self.waheights,self.clheights)]
 
     def __init__(self,floors = 3,l = 12,w = 16,
             flheights = None,clheights = None,waheights = None):
@@ -101,45 +109,84 @@ class shaft(mbp.blueprint):
         else:self.clheights = clheights
         if waheights is None:self.waheights = [5.0]*self.floors
         else:self.waheights = waheights
-        self.toheights = [x+y+z for x,y,z in
-            zip(self.flheights,self.waheights,self.clheights)]
+        self.toheights = waheights
+        #self.toheights = [x+y+z for x,y,z in
+        #    zip(self.flheights,self.waheights,self.clheights)]
         self.style = 'uturn'
+
+    def _params(self,fldex):
+        fh = self.flheights[fldex]
+        wh = self.waheights[fldex]
+        ch = self.clheights[fldex]
+        l,w = self.l,self.w
+        return l,w,fh,wh,ch
+
+    def _build_walls(self,fldex):
+        l,w,fh,wh,ch = self._params(fldex)
+        cs = mpu.make_corners(cv.zero(),l,w,0)
+        wargs = [
+            {'v1':cs[1],'v2':cs[2], 
+            'solid':True,'m':'brick2',
+            'h':wh,'fh':fh,'w':0.25}, 
+            {'v1':cs[2],'v2':cs[3], 
+            'solid':True,'m':'brick2',
+            'h':wh,'fh':fh,'w':0.25}, 
+            {'v1':cs[3],'v2':cs[0], 
+            'solid':True,'m':'brick2',
+            'h':wh,'fh':fh,'w':0.25},
+            {'v1':cs[0],'v2':cs[1],
+            'sort':'interior','solid':False,'m':'brick2',
+            'h':wh,'fh':fh,'w':0.25}]
+        wals = [wa.newwall(**w) for w in wargs]
+        [w._build() for w in wals]
+        return pr.sum_primitives([w._primitives() for w in wals])
 
     def _build_uturn(self,fldex):
         fh = self.flheights[fldex]
         wh = self.waheights[fldex]
         ch = self.clheights[fldex]
         l,w = self.l,self.w
+
+        p1h = fh;p1l = l;p1w = 3.0
+        p1x = 0.0;p1y = (p1w - w)/2.0;p1z = 0
+        pform1 = mbp.ucube(m = 'cement1')
+        pform1.scale(cv.vector(p1l,p1w,p1h))
+        pform1.translate(cv.vector(p1x,p1y,p1z))
+
+        p2h = ch;p2l = l;p2w = 3.0
+        p2x = 0.0;p2y = (p2w - w)/2.0;p2z = wh - ch
+        pform2 = mbp.ucube(m = 'cement1')
+        pform2.scale(cv.vector(p2l,p2w,p2h))
+        pform2.translate(cv.vector(p2x,p2y,p2z))
+
         gap = l/5.0
-        s = 8
+        s = int(wh)
         rw = 2.0*gap
-        pw = rw
-        rl = w - 2.0*pw
-        diff = (wh + fh + ch)/2.0
-        ph = 2*diff/s
-        self.ph = ph
-        rwoff = l/2.0 - rw/2.0
-        p2y = rl + 3.0*pw/2.0
-        p2z = diff - ph/2.0
+        rl = w - 2.0*p1w
+        diff = wh/2.0
+        rwoffx = l/2.0 - rw/2.0
+        rwoffy = rl/2.0
+        sheight = diff/s
 
-        pform1 = mbp.ucube(m = 'cubemat')
-        pform1.scale(cv.vector(l,pw,ph))
-        pform1._scale_uvs_ = False
-        pform1.translate_z(-ph/2.0).translate_y(pw/2.0)
-        pform2 = mbp.ucube(m = 'cubemat')
-        pform2.scale(cv.vector(l,pw,ph))
-        pform2._scale_uvs_ = False
-        pform2.translate_z(p2z).translate_y(p2y)
-        sopts = {'steps':s,'l':rl,'w':rw,'h':diff,'m':'cubemat'}
-        lside = build_stairs(**sopts)
-        rside = build_stairs(**sopts)
+        p3h = 2.0*sheight;p3l = l;p3w = 3.0
+        p3x = 0.0;p3y = (w - p3w)/2.0;p3z = diff-sheight
+        pform3 = mbp.ucube(m = 'cement1')
+        pform3.scale(cv.vector(p3l,p3w,p3h))
+        pform3.translate(cv.vector(p3x,p3y,p3z))
+
+        extra = mbp.ucube(m = 'brick2')
+        extra.scale(cv.vector(gap,rl,wh))
+        extra.translate(cv.vector(0,0,0))
+        pform1.consume(extra)
+
+        sopts1 = {'bflag':True,'steps':s,'l':rl,'w':rw,'h':diff,'m':'cement1'}
+        sopts2 = {'bflag':True,'steps':s,'l':rl,'w':rw,'h':diff,'m':'cement1'}
+        lside = build_stairs(**sopts1)
+        rside = build_stairs(**sopts2)
         lside.rotate_z(fu.PI).translate_y(rl).translate_z(diff)
-        lside.translate_x(-rwoff).translate_y(pw)
-        rside.translate_x( rwoff).translate_y(pw)
-
-        pform1.consume(lside)
-        pform1.consume(rside)
-        pform1.consume(pform2)
+        lside.translate_x(-rwoffx).translate_y(-rwoffy).translate_z(fh-sheight)
+        rside.translate_x( rwoffx).translate_y(-rwoffy).translate_z(fh-sheight)
+        pr.sum_primitives([pform1,pform2,pform3,lside,rside])
         return pform1
 
     def _build_switchback(self,fldex):
@@ -153,6 +200,7 @@ class shaft(mbp.blueprint):
             floor = self._build_uturn(fldex)
         elif style == 'switchback':
             floor = self._build_switchback(fldex)
+        floor.consume(self._build_walls(fldex))
         return floor
 
     def _primitive_from_slice(self):
@@ -163,8 +211,9 @@ class shaft(mbp.blueprint):
             np.translate_z(zoff)
             fp.consume(np)
             zoff += self.toheights[fx]
-        fp.translate_y(-self.w/2.0)
-        fp.translate_z(-self.ph)
+            #print 'zoff',zoff
+        #fp.translate_y(-self.w/2.0)
+        #fp.translate_z(-self.ph)
 
         fp.consume(mbp.ucube())
 

@@ -1069,7 +1069,7 @@
         </vertexbuffer>
     </sharedgeometry>
     <submeshes>
-        <submesh material="hashima_walls" usesharedvertices="true" use32bitindexes="false" operationtype="triangle_list">
+        <submesh material="brick2" usesharedvertices="true" use32bitindexes="false" operationtype="triangle_list">
             <faces>
                 <face v1="0" v2="1" v3="2" />
                 <face v1="1" v2="0" v3="3" />
@@ -1211,7 +1211,7 @@
                 <face v1="211" v2="210" v3="209" />
             </faces>
         </submesh>
-        <submesh material="hashima_walls_top" usesharedvertices="true" use32bitindexes="false" operationtype="triangle_list">
+        <submesh material="concrete2" usesharedvertices="true" use32bitindexes="false" operationtype="triangle_list">
             <faces>
                 <face v1="72" v2="73" v3="74" />
                 <face v1="74" v2="75" v3="72" />

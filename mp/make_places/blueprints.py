@@ -71,6 +71,14 @@ def extrude_edge_normal(c1,c2,length):
     c1c2n = cv.cross(cv.zhat,c1c2)
     return extrude_edge(c1,c2,length,c1c2n)
 
+def clockwise(convex):
+    v1v2 = cv.v1_v2(convex[0],convex[1])
+    v1v3 = cv.v1_v2(convex[0],convex[2])
+    a12 = cv.angle_from_xaxis_xy(v1v2)
+    a13 = cv.angle_from_xaxis_xy(v1v3)
+    cw = a12 > a13
+    return cw
+
 def point_line(s,e,l,n):
     line = [s.copy()]
     tn = cv.v1_v2(s,e).normalize()
@@ -190,12 +198,46 @@ class blueprint(fu.base):
                     continue
                 self.ucoords[fdx] = nu
 
+    def _scale_uv_u(self,faces,du):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                u = self.ucoords[fdx]
+                u.scale_x(du)
+
+    def _scale_uv_v(self,faces,dv):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                u = self.ucoords[fdx]
+                u.scale_y(dv)
+
     def _flip_faces(self,faces):
         for nf in faces:
             face = self.faces[nf]
             face.reverse()
             for fdx in face:
                 self.ncoords[fdx].flip()
+
+    def _vegetate_faces(self,faces):
+
+        import make_places.foliage as mfo
+
+        for nf in faces:
+            face = self.faces[nf]
+            ps = [self.pcoords[fdx] for fdx in face]
+            com = cv.center_of_mass(ps)
+            poleb = [p.translate(com) for p in polygon(8)]
+            poleb.append(poleb[0])
+            polet = [p.copy().translate_z(1) for p in poleb]
+            #if rm.random() < 0.9:
+            if True:
+                #self._bridge(polet,poleb,m = 'gridmat')
+                pass
+            else:
+                tree = mfo.tree()
+                tree.translate(com)
+                self._extra_primitives.append(tree)
 
     def _reset_data(self):
         self.pcoords = []
@@ -208,10 +250,12 @@ class blueprint(fu.base):
     def _build(self):pass
 
     def _rebuild(self,**opts):
+        optkeys = opts.keys()
         bflag = False
-        for oke in opts.keys():
+        for oke in optkeys:
             oval = opts[oke]
-            if not self.__dict__[oke] == oval:
+            if oke == 'bflag':bflag = oval
+            elif not self.__dict__[oke] == oval:
                 bflag = True
                 self.__dict__[oke] = oval
         if bflag:
@@ -232,7 +276,7 @@ class blueprint(fu.base):
 
         self._extra_primitives = []
 
-        self.mats = ['cubemat']
+        self.mats = ['gridmat']
         self.pmats = ['/common/pmat/Stone']
 
     def _trifan(self,apex,blade,ns = None,us = None,m = None,pm = None):
@@ -275,6 +319,43 @@ class blueprint(fu.base):
             v3 = loop2[ldx]
             v4 = loop1[ldx]
             self._quad(v1,v2,v3,v4,ns,us,m,pm)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
+
+    # given two loops of equal length, bridge with quads
+    def _bridge_spline(self,loop1,loop2,n = 3,n1 = None,n2 = None,
+                        ns = None,us = None,m = None,pm = None):
+        if not len(loop1) == len(loop2): raise ValueError
+        nfstart = len(self.faces)
+
+        if n1 is None:n1 = normal(*loop1[:3])
+        if n2 is None:n2 = normal(*loop2[:3]).flip()
+
+        curves = []
+        lcnt = len(loop1)
+        for x in range(lcnt):
+            v2 = loop1[x].copy()
+            v3 = loop2[x].copy()
+            v1 = v2.copy().translate(n1)
+            v4 = v3.copy().translate(n2)
+            curve = cv.spline(v1,v2,v3,v4,n)
+            curves.append(curve)
+
+        ccnt = len(curves)
+        for y in range(1,ccnt):
+            lp2 = curves[y-1]
+            lp1 = curves[y]
+            self._bridge(lp1,lp2,ns,us,m,pm)
+
+        '''#
+        loops = zip(*curves)
+        lpcnt = len(loops)
+        for y in range(1,lpcnt):
+            lp1 = loops[y-1]
+            lp2 = loops[y]
+            self._bridge(lp1,lp2,ns,us,m,pm)
+        '''#
+        
         nfend = len(self.faces)
         return range(nfstart,nfend)
 
@@ -336,11 +417,12 @@ class blueprint(fu.base):
 
     # given three points, add new triangle face
     def _triangle(self,v1,v2,v3,ns = None,us = None,m = None,pm = None):
+        nfstart = len(self.faces)
         nps = [v1.copy(),v2.copy(),v3.copy()]
         if ns is None:
             n = normal(*nps)
             nns = [n,n,n]
-        else: nss = ns
+        else: nns = ns
         if us is None:
             nus = [cv.vector2d(0,1),cv.vector2d(0,0),cv.vector2d(1,0)]
         else: nus = us
@@ -356,6 +438,8 @@ class blueprint(fu.base):
         nfpms = [pm]
 
         self._add_fdata(nfs,nfms,nfpms)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
 
     def _add_vdata(self,ps,ns,us):
         self.pcoords.extend(ps)
@@ -367,7 +451,28 @@ class blueprint(fu.base):
         self.face_mats.extend(fms)
         self.face_pmats.extend(fpms)
 
-    def _primitives(self):return []
+    def _node_wrap(self,p = None,r = None):
+        if p is None:pos = cv.zero()
+        else:pos = p.copy()
+        if r is None:rot = cv.zero()
+        else:rot = r.copy()
+        selfprim = self._primitive_from_slice()
+        exprims = [selfprim]
+        for p in self._extra_primitives:
+            selfprim.consume(p)
+        no = sg.node(
+            position = pos,rotation = rot,
+            primitives = [selfprim])
+        return no
+
+    def _primitives(self,xmlfile = None,hlod = False,ilod = False):
+        selfprim = self._primitive_from_slice(
+            xmlfile = xmlfile,hlod = hlod,ilod = ilod)
+        exprims = [selfprim]
+        for p in self._extra_primitives:
+            selfprim.consume(p)
+        return selfprim
+
     def _primitive_from_slice(self,dslice = slice(None),
             xmlfile = None,hlod = False,ilod = False):
         if xmlfile is None: xmlfile = self._xmlfilename()
@@ -405,7 +510,7 @@ class blueprint(fu.base):
 
 
 
-    def tripie(self,vs,nvs,nus,nfs,fms,pfms,convex):
+    def ____tripie(self,vs,nvs,nus,nfs,fms,pfms,convex):
         convex.insert(0,cv.center_of_mass(convex))
         tcnt = len(convex) - 1
         for trdx in range(tcnt):
@@ -419,10 +524,10 @@ class blueprint(fu.base):
         #plot(convex)
         #plt.show()
 
-    def quadrafy(convex):
+    def ______quadrafy(convex):
         pdb.set_trace()
 
-    def bridge(self,vs,nvs,nus,nfs,fms,pfms,loop1,loop2):
+    def _______bridge(self,vs,nvs,nus,nfs,fms,pfms,loop1,loop2):
         if not len(loop1) == len(loop2): raise ValueError
         lcnt = len(loop1)
         for ldx in range(1,lcnt):
@@ -432,7 +537,7 @@ class blueprint(fu.base):
             v4 = loop1[ldx].copy()
             self.add_quad(vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4)
 
-    def add_tri(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3):
+    def _______add_tri(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3):
         foffset = len(vs)
         n = cv.v1_v2(v1,v2).cross(cv.v1_v2(v2,v3)).normalize()
         vs.extend([v1,v2,v3])       
@@ -446,7 +551,7 @@ class blueprint(fu.base):
         fms.extend([0])
         pfms.extend([0])
 
-    def add_quad(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4):
+    def ______add_quad(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4):
         foffset = len(vs)
         n = cv.v1_v2(v1,v2).cross(cv.v1_v2(v2,v3)).normalize()
         vs.extend([v1,v2,v3,v4])       
@@ -460,7 +565,7 @@ class blueprint(fu.base):
         fms.extend([0,0])
         pfms.extend([0,0])
 
-    def quaddata(self,data_methods = []):
+    def ________quaddata(self,data_methods = []):
         vs = []
         nvs = []
         nus = []
@@ -471,7 +576,7 @@ class blueprint(fu.base):
             dm(vs,nvs,nus,nfs,fms,pfms)
         return vs,nvs,nus,nfs,fms,pfms
 
-    def build(self,xmlfile,ilod,hlod):
+    def __________build(self,xmlfile,ilod,hlod):
         vdat = self.quaddata()
         newverts,newnorml,newuvs,newfaces,fmats,pfmats = vdat
         pwargs = {
@@ -493,7 +598,7 @@ class blueprint(fu.base):
         mesh = pr.arbitrary_primitive(**pwargs)
         return mesh
 
-    def build_lod(self):
+    def ______build_lod(self):
         scubes = [ucube()]
         return scubes
 
@@ -516,11 +621,11 @@ class cylinder(blueprint):
         self._tripie(bottom,m = 'grass')
         bottom.append(bottom[0])
         top.append(top[0])
-        self._bridge(bottom,top,m = 'metal')
+        self._bridge(bottom,top,m = 'metal1')
 
 class cube(blueprint):
 
-    def __init__(self,l = 1,w = 1,h = 1,a = 0,m = 'cubemat'):
+    def __init__(self,l = 1,w = 1,h = 1,a = 0,m = 'gridmat'):
         blueprint.__init__(self)
         self.l = l
         self.w = w
@@ -532,6 +637,8 @@ class cube(blueprint):
         l,w,h,a = self.l,self.w,self.h,self.a
         bcorners = mpu.make_corners(cv.zero(),l,w,fu.to_deg(a))
         tcorners = [bc.copy().translate_z(h) for bc in bcorners]
+        cv.rotate_z_coords(bcorners,fu.to_rad(90))
+        cv.rotate_z_coords(tcorners,fu.to_rad(90))
         bcorners.reverse()
         self._quad(*bcorners,m = self.m)
         self._quad(*tcorners,m = self.m)

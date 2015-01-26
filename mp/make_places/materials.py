@@ -109,6 +109,14 @@ class material(fu.base):
         self.diffuseMap = path
         return self
 
+    def _add_normal(self,path):
+        self.normalMap = path
+        return self
+
+    def _add_gloss(self,path):
+        self.glossMap = path
+        return self
+
     def __init__(self,name,**kwargs):
         self.name = name
 
@@ -172,44 +180,154 @@ def write_default_materials(msio):
         dfm._write(msio)
 
 def write_generic_materials():
-    generic_grid = material('cubemat')._add_diffuse('../textures/cubetex.png')
+    generic_grid = material('gridmat')._add_diffuse('../textures/generic/orangeboxtex.png')
     default_materials.append(generic_grid)
-    generic_octg = material('octagonmat')._add_diffuse('../textures/octagontex.png')
+
+    generic_cube = material('cubemat')._add_diffuse('../textures/generic/cubetex.png')
+    default_materials.append(generic_cube)
+
+    generic_octg = material('octagonmat')._add_diffuse('../textures/generic/octagontex.png')
     default_materials.append(generic_octg)
 
 def write_concrete_materials():
-    concrete = material('concrete')._add_diffuse('../textures/concrete.png')
-    asphalt = material('asphalt')._add_diffuse('../textures/asphalt.jpg')
-    brick = material('brick')._add_diffuse('../textures/brick.jpg')
-    brick.textureScale = cv.vector2d(4,4)
-    hokie = material('hokie')._add_diffuse('../textures/hokiestone.jpg')
-    hokie.textureScale = cv.vector2d(10,10)
-    road = material('road')._add_diffuse('../textures/road.png')
-    default_materials.append(concrete)
+    concrete1 = material('concrete1')._add_diffuse('../textures/concrete/concrete.png')
+    concrete1.textureScale = cv.vector2d(2,2)
+    concrete1.diffuseColour = cv.vector(0.5,0.5,0.5)
+    default_materials.append(concrete1)
+
+    concrete2 = material('concrete2')._add_diffuse('../textures/concrete/concrete2.png')
+    concrete2.textureScale = cv.vector2d(4,4)
+    default_materials.append(concrete2)
+
+    concrete3 = material('concrete3')._add_diffuse('../textures/concrete/concrete2.png')
+    concrete3.textureScale = cv.vector2d(4,4)
+    concrete3.diffuseColour = cv.vector(0.4,0.4,0.2)
+    default_materials.append(concrete3)
+
+    concrete4 = material('concrete4')._add_diffuse('../textures/concrete/concrete3.jpg')
+    concrete4.textureScale = cv.vector2d(4,4)
+    default_materials.append(concrete4)
+
+    cement1 = material('cement1')._add_diffuse('../textures/concrete/indoor-cement.jpg')
+    cement1.textureScale = cv.vector2d(4,4)
+    default_materials.append(cement1)
+
+    sidewalk1 = material('sidewalk1')._add_diffuse('../textures/concrete/sidewalk1.jpg')
+    default_materials.append(sidewalk1)
+
+    sidewalk2 = material('sidewalk2')._add_diffuse('../textures/concrete/sidewalk2.jpg')
+    default_materials.append(sidewalk2)
+
+    asphalt = material('asphalt')._add_diffuse('../textures/concrete/asphalt.jpg')
+    asphalt.textureScale = cv.vector2d(4,4)
+    asphalt.specular = 0
+    asphalt.diffuseColour = cv.vector(0.75,0.75,0.75)
     default_materials.append(asphalt)
-    default_materials.append(brick)
+
+    roadline_y = material('roadline_y')._add_diffuse('../textures/concrete/roadline.png')
+    roadline_y.specular = 0
+    roadline_y.alphaReject = 0.5
+    roadline_y.diffuseColour = cv.vector(0.8,0.8,0.8)
+    default_materials.append(roadline_y)
+
+    #roadline_y_cont = material('roadline_y_cont')._add_diffuse('../textures/concrete/roadline_continuous.png')
+    #roadline_y_cont.specular = 0
+    #roadline_y_cont.alphaReject = 0.5
+    #roadline_y_cont.diffuseColour = cv.vector(0.8,0.8,0.8)
+    #default_materials.append(roadline_y_cont)
+    roadline_y_cont = material('roadline_y_cont')._add_diffuse('../textures/concrete/roadline_w_continuous.png')
+    #roadline_y_cont.specular = 0
+    roadline_y_cont.alphaReject = 0.5
+    roadline_y_cont.diffuseColour = cv.vector(1.0,0.8,0.2)
+    default_materials.append(roadline_y_cont)
+
+    roadline_w_cont = material('roadline_w_cont')._add_diffuse('../textures/concrete/roadline_w_continuous.png')
+    #roadline_w_cont.specular = 0
+    roadline_w_cont.alphaReject = 0.5
+    roadline_w_cont.diffuseColour = cv.vector(0.8,0.8,0.8)
+    default_materials.append(roadline_w_cont)
+
+    brick1 = material('brick1')._add_diffuse('../textures/concrete/brick.jpg')
+    brick1.textureScale = cv.vector2d(4,4)
+    default_materials.append(brick1)
+    
+    brick2 = material('brick2')._add_diffuse('../textures/concrete/brick2.jpg')
+    brick2.textureScale = cv.vector2d(3,3)
+    default_materials.append(brick2)
+
+    hokie = material('hokie')._add_diffuse('../textures/concrete/hokiestone.jpg')
+    hokie.textureScale = cv.vector2d(10,10)
     default_materials.append(hokie)
+    
+    road = material('road')._add_diffuse('../textures/concrete/road.png')
+    default_materials.append(road)
 
 def write_metal_materials():
-    metal = material('metal')._add_diffuse('../textures/metal.png')
-    metal.textureScale = cv.vector2d(10,10)
-    default_materials.append(metal)
+    metal1 = material('metal1')._add_diffuse('../textures/metal/metal.png')
+    metal1.textureScale = cv.vector2d(10,10)
+    default_materials.append(metal1)
 
 def write_nature_materials():
-    grass = material('grass')._add_diffuse('../textures/grass.dds')
-    grass.textureScale = cv.vector2d(2,2)
-    grass.shadowObliqueCutOff = 0
-    default_materials.append(grass)
+    grass1 = material('grass1')._add_diffuse('../textures/nature/grass.dds')
+    grass1.textureScale = cv.vector2d(2,2)
+    grass1.shadowObliqueCutOff = 0
+    default_materials.append(grass1)
+
+    tree1 = material('Tree_aelmTrunk')
+    tree1._add_diffuse('../textures/nature/tree_aelm.dds')
+    tree1._add_normal('../textures/nature/tree_aelm_N.dds')
+    tree1.gloss = 0
+    tree1.specular = 0
+    default_materials.append(tree1)
+
+    tree2 = material('Tree_aelmLev')
+    tree2._add_diffuse('../textures/nature/tree_aelm.dds')
+    tree2._add_normal('../textures/nature/tree_aelm_N.dds')
+    tree2.clamp = True
+    tree2.gloss = 0
+    tree2.specular = 0
+    tree2.alphaReject = 0.5
+    default_materials.append(tree2)
+
+    bmat1 = material('bmat1')
+    bmat1._add_diffuse('../textures/nature/bush1.png')
+    bmat1.alphaReject = 0.5
+    bmat1.gloss = 0
+    bmat1.specular = 0
+    default_materials.append(bmat1)
+
+    bmat2 = material('bmat2')
+    bmat2._add_diffuse('../textures/nature/bush_tree_baum.jpg')
+    bmat2.alphaReject = 0.5
+    bmat2.gloss = 0
+    bmat2.specular = 0
+    default_materials.append(bmat2)
+
+    ocean = material('ocean')
+    ocean._add_normal('../textures/nature/ocean_N.tga')
+    ocean._add_gloss('../textures/nature/ocean_S.tga')
+    ocean.diffuseColour = cv.zero()
+    ocean.textureAnimation = cv.vector2d(-0.1,0)
+    ocean.alpha = 0.9
+    ocean.depthWrite = True
+    default_materials.append(ocean)
 
 def write_misc_materials():
-    rubber = material('rubber')._add_diffuse('../textures/rubber.png')
-    glass = material('glass')._add_diffuse('../textures/glass.png')
-    glass.alpha = 0.2
+    bumper = material('bumper')._add_diffuse('../textures/misc/bumper.png')
+    default_materials.append(bumper)
+    
+    greenhaze = material('greenhaze')._add_diffuse('../textures/misc/greenhaze.png')
+    default_materials.append(greenhaze)
+    
+    rubber = material('rubber')._add_diffuse('../textures/misc/rubber.png')
     default_materials.append(rubber)
+
+    glass = material('glass')._add_diffuse('../textures/misc/glass.png')
+    glass.alpha = 0.2
     default_materials.append(glass)
 
 def write_emissive_materials():
-    light = material('light')._add_diffuse('../textures/light.png')
+    light = material('light')._add_diffuse('../textures/emissive/light.png')
     light.emissiveColour = cv.vector(1,1,1)
     default_materials.append(light)
 

@@ -22,10 +22,10 @@ xml_library_keys = []
 
 def load_xml_library():
     wdir = ui.info['worlddir']
-    #tdir = ui.info['texturedir']
+    tdir = ui.info['texturedir']
     if os.path.isdir(wdir): shutil.rmtree(wdir)
     if not os.path.isdir(wdir):shutil.copytree(ui.info['newworlddir'],wdir)
-    #if not os.path.isdir(tdir):shutil.copytree(ui.info['newtexturedir'],tdir)
+    if not os.path.isdir(tdir):shutil.copytree(ui.info['newtexturedir'],tdir)
 
     for xfi in os.listdir(wdir):
         if not xfi.endswith('.xml'): continue
@@ -55,6 +55,7 @@ class arbitrary_primitive(fu.base):
         self.gfxmesh_name = self.xml_filename.replace('.xml','')
         self.colmesh_name = self.gcol_filename
         
+        self._default_('gcol',True,**kwargs)
         self._default_('is_lod',False,**kwargs)
         self._default_('has_lod',False,**kwargs)
         
@@ -63,7 +64,8 @@ class arbitrary_primitive(fu.base):
         self._default_('smooth_normals',False,**kwargs)                   
 
         self._default_('origin',None,**kwargs)
-        self._default_('materials',['cubemat'],**kwargs)
+        #self._default_('materials',['gridmat','concrete1','brick2'],{})
+        self._default_('materials',['gridmat'],**kwargs)
         self._default_('phys_materials',['/common/pmat/Stone'],**kwargs)
         
         fcnt = len(self.faces)
@@ -193,6 +195,7 @@ class arbitrary_primitive(fu.base):
         fa = {}
         for mdx in range(mcnt):
             ma = self.phys_materials[mdx]
+            if ma == 'skip':continue
             fa[ma] = []
             for fmdx in range(fcnt):
                 if self.phys_face_materials[fmdx] == mdx:

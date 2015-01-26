@@ -15,6 +15,7 @@ import mp_vector as cv
 import mp_utils as mpu
 import mp_bboxes as mpbb
 
+import cStringIO as sio
 import matplotlib.pyplot as plt
 from math import sqrt
 import numpy as np
@@ -60,21 +61,129 @@ class newblock(mbp.blueprint):
             }
     themes = [ke for ke in bl_themes.keys()]
 
-    def __init__(self,theme = None):
+    def terrain_points(self,buildings):
+        pts = []
+        [pts.extend(bg.terrain_points()) for bg in buildings]
+        return pts
+
+    def terrain_holes(self,buildings):
+        pts = []
+        [pts.extend(bg.terrain_holes()) for bg in buildings]
+        return pts
+
+    def _params(self):
+        bcnt = self.theme_data['max_buildings']
+        minblen = self.theme_data['min_length']
+        minbwid = self.theme_data['min_width']
+        maxblen = self.theme_data['max_length']
+        maxbwid = self.theme_data['max_width']
+        return bcnt,minblen,minbwid,maxblen,maxbwid
+
+    def __init__(self,road = None,side = 'left',theme = None):
         mbp.blueprint.__init__(self)
+        self.road = road
+        self.side = side
 
         if theme is None: bth = rm.choice(self.themes)
         else: bth = theme
         self.theme = bth
         self.theme_data = self.bl_themes[self.theme]
 
-block_factory = newblock()
-block_factory._build()
+    def _make(self,bboxes):
+        if bboxes is None: bboxes = []
+        road,side = self.road,self.side
+        tpts,hpts = [],[]
+        if not road.style == 'interstate' and blg._building_count_ < 500:
+            blnodes = self.buildings_from_road(road,side,bboxes)
+            tpts.extend(self.terrain_points(blnodes))
+            hpts.extend(self.terrain_holes(blnodes))
+            gritgeo.create_element(blnodes)
+        return tpts,hpts
+
+    def buildings_from_road(self,rd,rdside,bboxes):
+        buildings = []
+        bcnt,minblen,minbwid,maxblen,maxbwid = self._params()
+        for bdx in range(bcnt):
+            flcnt = self.get_building_floor_count()
+            bpos,blen,bwid,ang =\
+                self.get_building_position_from_road(
+                    rd,rdside,bboxes,minblen,minbwid,
+                    maxblen,maxbwid)
+            if not bpos is False:
+                blarg = {'theme':self.theme, 
+                    'position':bpos,'length':blen,'width':bwid, 
+                    'rotation':cv.vector(0,0,ang),'floors':flcnt}
+                buildings.append(blg.building(**blarg))
+                bboxes.append(buildings[-1].get_bbox())
+        return buildings
+
+
+
+
+
+    def get_building_position_from_road(self,road,rdside,bboxes,
+                                minblen,minbwid,maxblen,maxbwid):
+        def check_lot(boxtry):
+            for bb in bboxes:
+                isect = boxtry.intersect_xy(bb)
+                if isect:
+                    if [io.bottomlevel for io in isect['other members']].count(True) > 0:
+                        return False
+            return True
+
+        try_cnt = 0
+        max_tries = 100
+        tries_exceeded = False
+        acceptable = False
+        while not acceptable and not tries_exceeded:
+            try_cnt += 1
+            tries_exceeded = try_cnt == max_tries
+            boxtry,bpos,blen,bwid,bpitch = get_random(
+                road,rdside,bboxes,minblen,maxblen,minbwid,maxbwid)
+            acceptable = check_lot(boxtry)
+
+        print 'tried',try_cnt,'times to place a building'
+        if tries_exceeded:return False,None,None,None
+        else:return bpos,blen,bwid,bpitch
+
+    def get_building_floor_count(self, *args, **kwargs):
+        mflc = self.theme_data['max_floors']
+        flcnt = rm.randrange(int(mflc/4.0),mflc)
+        flcnt = int(mpu.clamp(flcnt,1,mflc))
+        return flcnt
+
+def get_random(road,rdside,bboxes,minblen,maxblen,minbwid,maxbwid):
+    rdtangs = road.tangents
+    rdnorms = road.normals
+    rdwidth = road.total_width
+    rdvts = road.vertices
+    segcnt = len(rdvts) - 1
+
+    segdx = rm.randrange(segcnt)
+    segtang = rdtangs[segdx]
+    rdpitch = cv.angle_from_xaxis_xy(segtang)
+    segnorm = rdnorms[segdx].copy()
+    if rdside == 'left':segnorm.flip()
+    if rdside == 'right':rdpitch += fu.PI
+    blen = rm.randrange(minblen,maxblen)
+    bwid = rm.randrange(minbwid,maxbwid)
+    d_to_road = rdwidth/2.0 + bwid/2.0 + rm.randrange(int(bwid))
+    base = rdvts[segdx].copy()
+    base.translate(segnorm.copy().scale_u(d_to_road))
+    corners = mpu.make_corners(base,blen,bwid,rdpitch)
+    boxtry = mpbb.xy_bbox(corners = corners)
+    return boxtry,base,blen,bwid,rdpitch
+
+
+
+
 def build_block(**buildopts):
-    block_factory._rebuild(**buildopts)
-                
-    ################
-    return block_factory._primitive_from_slice()
+    block_factory = newblock(**buildopts)
+
+
+
+
+
 
 
 
@@ -126,8 +235,12 @@ class block(sg.node):
         self._default_('theme',bth,**kwargs)
         self.theme_data = self.bl_themes[self.theme]
 
-        children = self.make_buildings_from_road(*args, **kwargs)
-        self.add_child(*children)
+        rd = kwargs['road']
+        rdside = kwargs['side']
+        bboxes = kwargs['bboxes']
+        if not rd.style == 'interstate' and blg._building_count_ < 500:
+            children = self.make_buildings_from_road(rd,rdside,bboxes)
+            self.add_child(*children)
         sg.node.__init__(self, *args, **kwargs)
 
     def terrain_points(self):
@@ -146,124 +259,76 @@ class block(sg.node):
         pbd.set_trace()
         return self.bboxes
 
-    def make_buildings_from_road(self, *args, **kwargs):
-        bboxes = kwargs['bboxes']
-        rd = kwargs['road']
-        rdside = kwargs['side']
-
-        corns = rd.vertices
-        zhat = cv.zhat
-        thats = rd.tangents
-        rdnorms = [that.cross(zhat).normalize() for that in thats]
-
-        bcnt = self.theme_data['max_buildings']
+    def make_buildings_from_road(self,rd,rdside,bboxes):
         buildings = []
 
-        if rd.style == 'interstate': bcnt = 0
-        if blg._building_count_ >= 500: bcnt = 0
-
-        for bdx in range(bcnt):
-            flcnt = self.get_building_floor_count()
-            bpos,blen,bwid,ang =\
-                self.get_building_position_from_road(
-                    corns,rdnorms,flcnt,side = rdside, 
-                    road = rd,bboxes = bboxes)
-            if not bpos is False:
-                blarg = {
-                    'theme':self.theme, 
-                    #'name':bname, 
-                    'parent':self, 
-                    'position':bpos, 
-                    'length':blen, 
-                    'width':bwid, 
-                    'floors':flcnt, 
-                    'rotation':cv.vector(0,0,ang), 
-                        }
-
-                buildings.append(blg.building(**blarg))
-                bboxes.append(buildings[-1].get_bbox())
-        self.buildings = buildings
-        return buildings
-
-    def get_building_position_from_road(self, 
-            corners, rdnorms, flcnt, **kwargs):
-        bboxes = kwargs['bboxes']
-        road = kwargs['road']
-        rdwidth = road.road_width
-
-        segcnt = len(rdnorms) - 1
-        segdx = rm.randrange(segcnt)
-        leadcorner = corners[segdx]
-        rearcorner = corners[segdx+1]
-        seglen = cv.distance(rearcorner,leadcorner)
-
-        segtang = cv.v1_v2(leadcorner,corners[segdx+1]).normalize()
-        rdpitch = cv.angle_from_xaxis(segtang)
-        segnorm = rdnorms[segdx].copy()
-        if kwargs['side'] == 'left':
-            segnorm.flip()
-        if kwargs['side'] == 'right':
-            rdpitch += fu.PI
-
+        bcnt = self.theme_data['max_buildings']
         minblen = self.theme_data['min_length']
         minbwid = self.theme_data['min_width']
         maxblen = self.theme_data['max_length']
         maxbwid = self.theme_data['max_width']
 
-        def get_random():
-            blen = rm.randrange(minblen,maxblen)
-            bwid = rm.randrange(minbwid,maxbwid)
+        for bdx in range(bcnt):
+            flcnt = self.get_building_floor_count()
+            bpos,blen,bwid,ang =\
+                self.get_building_position_from_road(
+                    rd,rdside,bboxes,minblen,minbwid,
+                    maxblen,maxbwid)
+            if not bpos is False:
+                blarg = {'parent':self,'theme':self.theme, 
+                    'position':bpos,'length':blen,'width':bwid, 
+                    'rotation':cv.vector(0,0,ang),'floors':flcnt}
+                buildings.append(blg.building(**blarg))
+                bboxes.append(buildings[-1].get_bbox())
+        self.buildings = buildings
+        return buildings
 
-            d_to_road = rdwidth/2.0 + bwid/2.0 + rm.randrange(int(bwid))
-            stry = rm.randrange(int(seglen))
+    def get_building_position_from_road(self,road,rdside,bboxes,
+                                minblen,minbwid,maxblen,maxbwid):
+        rdvts = road.vertices
+        rdtangs = road.tangents
+        rdnorms = road.normals
+        #rdwidth = road.road_width
+        rdwidth = road.total_width
+        segcnt = len(rdvts) - 1
 
-            base = leadcorner.copy()
-            base.translate(segnorm.copy().scale_u(d_to_road))
-            base.translate(segtang.copy().scale_u(stry))
-
-            postry = base
-            corners = mpu.make_corners(postry,blen,bwid,rdpitch)
-            boxtry = mpbb.xy_bbox(corners = corners)
-            return boxtry,postry,blen,bwid
-
-        try_cnt = 0
-        max_tries = 100
-        tries_exceeded = False
-        boxtry,boxpos,blen,bwid = get_random()
-
-        acceptable = True
-        for bb in bboxes:
-            isect = boxtry.intersect_xy(bb)
-            if isect:
-                if [io.bottomlevel for io in isect['other members']].count(True) > 0:
-                    acceptable = False
-
-        #if not acceptable:
-        #    for bb in bboxes: bb.plot()
-        #    boxtry.plot(colors = ['green','blue','purple'])
-        #    plt.show()
-
-        while not acceptable and not tries_exceeded:
-            try_cnt += 1
-            tries_exceeded = try_cnt == max_tries
-            boxtry,boxpos,blen,bwid = get_random()
-
-            acceptable = True
+        def check_lot(boxtry):
             for bb in bboxes:
                 isect = boxtry.intersect_xy(bb)
                 if isect:
                     if [io.bottomlevel for io in isect['other members']].count(True) > 0:
-                        acceptable = False
+                        return False
+            return True
+
+        def get_random():
+            segdx = rm.randrange(segcnt)
+            segtang = rdtangs[segdx]
+            rdpitch = cv.angle_from_xaxis_xy(segtang)
+            segnorm = rdnorms[segdx].copy()
+            if rdside == 'left':segnorm.flip()
+            if rdside == 'right':rdpitch += fu.PI
+            blen = rm.randrange(minblen,maxblen)
+            bwid = rm.randrange(minbwid,maxbwid)
+            d_to_road = rdwidth/2.0 + bwid/2.0 + rm.randrange(int(bwid))
+            base = rdvts[segdx].copy()
+            base.translate(segnorm.copy().scale_u(d_to_road))
+            corners = mpu.make_corners(base,blen,bwid,rdpitch)
+            boxtry = mpbb.xy_bbox(corners = corners)
+            return boxtry,base,blen,bwid,rdpitch
+
+        try_cnt = 0
+        max_tries = 100
+        tries_exceeded = False
+        acceptable = False
+        while not acceptable and not tries_exceeded:
+            try_cnt += 1
+            tries_exceeded = try_cnt == max_tries
+            boxtry,bpos,blen,bwid,bpitch = get_random()
+            acceptable = check_lot(boxtry)
 
         print 'tried',try_cnt,'times to place a building'
-
-        global trydatax
-        global trydatay
-        trydatay.append(try_cnt)
-        trydatax.append(len(trydatay))
-
         if tries_exceeded:return False,None,None,None
-        else:return boxpos, blen, bwid, rdpitch
+        else:return bpos,blen,bwid,bpitch
 
     def get_building_floor_count(self, *args, **kwargs):
         mflc = self.theme_data['max_floors']
@@ -271,20 +336,12 @@ class block(sg.node):
         flcnt = int(mpu.clamp(flcnt,1,mflc))
         return flcnt
 
-trydatax = []
-trydatay = []
-def plot_try_data():
-    global trydatax
-    global trydatay
-    plt.plot(trydatax,trydatay)
-    plt.show()
 
 
 
 
-
-def city(road_steps = 50,roads = True,blocks = True,terrain = True,water = True):
-    summary = []
+def city(road_steps = 2,roads = True,blocks = True,terrain = True,water = True):
+    summary = sio.StringIO()
     rplans,iplans,bboxes,fpts,hpts,rpts = [],[],[],[],[],[]
     if roads:
         rplans,iplans,bboxes,fpts,hpts,rpts =\
@@ -295,16 +352,16 @@ def city(road_steps = 50,roads = True,blocks = True,terrain = True,water = True)
     if terrain:
         rplans,iplans,bboxes,fpts,hpts,rpts =\
             build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
-    if water:build_waters(-0.5,summary)
-    for su in summary: print su
+    if water:build_waters(-2.5,summary)
+    print summary.getvalue()
 
 def lay_roads(rplans,iplans,bboxes,fpts,hpts,rpts,gsteps,summary):
-    summary.append('\nlay_roads:\n')
-    summary.append('\t' + str(gsteps) + ' growth steps')
+    summary.write('\nlay_roads:\n')
+    summary.write('\t' + str(gsteps) + ' growth steps\n')
     ret,took = prf.measure_time('making road plans',nrds.make_road_system_plans,gsteps)
-    summary.append(' '.join(
-        ['\t','making road plans took',
-        str(np.round(took,3)),'seconds']))
+    summary.write('\tmaking road plans took ')
+    summary.write(str(np.round(took,3)))
+    summary.write(' seconds\n')
 
     #iplans,rplans = nrds.make_road_system_plans(gsteps)
     iplans,rplans = ret
@@ -327,38 +384,28 @@ def lay_roads(rplans,iplans,bboxes,fpts,hpts,rpts,gsteps,summary):
 def build_blocks_from_roads(rplans,iplans,bboxes,fpts,hpts,rpts,summary):
     blcnt = 0
     for rd in rplans:
-        if not issubclass(rd.__class__,nrds.road_plan):
-            print 'skipping',rd
-            continue
-
-        ablock = block(name = 'block_' + str(blcnt + 1), 
-            road = rd,side = 'right',bboxes = bboxes)
-        lasttheme = ablock.theme
-        blcnt += 1
-        gritgeo.create_element(ablock)
-        fpts.extend(ablock.terrain_points())
-        hpts.extend(ablock.terrain_holes())
-
-        ablock = block(name = 'block_' + str(blcnt + 1), 
-            theme = lasttheme,road = rd, 
-            side = 'left',bboxes = bboxes)
-        blcnt += 1
-        gritgeo.create_element(ablock)
-        fpts.extend(ablock.terrain_points())
-        hpts.extend(ablock.terrain_holes())
+        if not issubclass(rd.__class__,nrds.road_plan):continue
+        bth = rm.choice(newblock.themes)
+        ablock = newblock(**{'road':rd,'side':'right','theme':bth})
+        btpts,bhpts = ablock._make(bboxes)
+        fpts.extend(btpts)
+        hpts.extend(bhpts)
+        ablock = newblock(**{'road':rd,'side':'left','theme':bth})
+        btpts,bhpts = ablock._make(bboxes)
+        fpts.extend(btpts)
+        hpts.extend(bhpts)
+        blcnt += 2
     return rplans,iplans,bboxes,fpts,hpts,rpts
 
-def build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary = []):
+def build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary):
+    summary.write('\nbuild_terrain:\n')
     ter,took = prf.measure_time('generate terrain',mtr.make_terrain,
         fixed_pts = fpts, hole_pts = hpts, region_pts = rpts, 
-        polygon_edge_length = 10, primitive_edge_length = 200)
-    summary.append('\nbuild_terrain:\n')
-    summary.append(' '.join(['\t',
-        'generating terrain took',str(np.round(took,3)),'seconds']))
-    summary.append('\t' + 'primtive edge length:' + str(ter.summary[2]))
-    summary.append('\t' + 'polygon edge length:' + str(ter.summary[0]))
-    summary.append('\t' + 'target polygon edge length:' + str(ter.summary[1]))
-    summary.append('\t' + 'final split count:' + str(ter.summary[3]))
+        polygon_edge_length = 10, primitive_edge_length = 150,
+        summary = summary)
+    summary.write('\tgenerating terrain took ')
+    summary.write(str(np.round(took,3)))
+    summary.write(' seconds\n')
     gritgeo.create_element(ter)
     return rplans,iplans,bboxes,fpts,hpts,rpts
 
@@ -367,10 +414,36 @@ def build_waters(sea_level,summary):
         sealevel = sea_level,length = 4000,width = 4000)
     gritgeo.create_element(ocean)
 
+#################################################################################
+
+def hashima(road_steps = 2,roads = True,blocks = False,terrain = False,water = True):
+    summary = sio.StringIO()
+    rplans,iplans,bboxes,fpts,hpts,rpts = [],[],[],[],[],[]
+
+    hashimawallsxml = os.path.join(
+        pr.primitive_data_path,'hashima_walls.mesh.xml')
+    walls = pr.arbitrary_primitive(
+        **pr.primitive_data_from_xml(hashimawallsxml))
+    walls.scale(cv.one().scale_u(2)).translate_z(-20)
+    gritgeo.create_primitive(walls)
+
+    if roads:
+        rplans,iplans,bboxes,fpts,hpts,rpts =\
+            lay_roads(rplans,iplans,bboxes,fpts,hpts,rpts,road_steps,summary)
+    if blocks:
+        rplans,iplans,bboxes,fpts,hpts,rpts =\
+            build_blocks_from_roads(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
+    if terrain:
+        rplans,iplans,bboxes,fpts,hpts,rpts =\
+            build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
+    if water:build_waters(-25,summary)
+    print summary.getvalue()
+
+#################################################################################
 
 
 
-class hashima(sg.node):
+class hashima___(sg.node):
 
     hashimawallsxml = os.path.join(
         pr.primitive_data_path, 'hashima_walls.mesh.xml')

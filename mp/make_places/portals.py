@@ -47,8 +47,8 @@ class portal(mbp.blueprint):
         wnorm.flip()
         [l.translate(wnorm) for l in l2]
         l2.reverse()
-        #self._quad(*l1,m = 'glass')
-        #self._quad(*l2,m = 'glass')
+        self._quad(*l1,m = 'glass')
+        self._quad(*l2,m = 'glass')
 
     def _build_header(self,v1,v2,wnorm,h):
         b1 = v1.copy().translate(wnorm.flip())
@@ -63,19 +63,21 @@ class portal(mbp.blueprint):
         bs = [b1,b2,b3,b4,b1]
         ts = [t1,t2,t3,t4,t1]
         nfs = self._bridge(bs,ts,m = self.wall.m)
-        self._project_uv_flat(nfs)
+        #nfs = self._bridge(ts,bs,m = self.wall.m)
+        #self._project_uv_flat(nfs)
 
 class door(portal):
-    def __init__(self,z = 1.0,w = 0.5,h = 2.0,gap = None,wall = None):
+    def __init__(self,z = 1.0,w = 0.5,h = 2.0,
+            m = 'cement1',gap = None,wall = None):
         portal.__init__(self,z,w,h,gap,wall)
+        self.m = m
 
     def _build_frame(self,floop,wnorm):
+        framemat = self.m
         mbp.inflate(floop,-0.05)
-        wnorm.scale_u(2.0)
+        wnorm.scale_u(1.25)
         l1 = [f.copy() for f in floop]
         l2 = [f.copy() for f in floop]
-        #l1.append(l1[0].copy())
-        #l2.append(l2[0].copy())
         [l.translate(wnorm) for l in l1]
         wnorm.flip()
         [l.translate(wnorm) for l in l2]
@@ -87,19 +89,25 @@ class door(portal):
         l2.append(l2[0].copy())
         l3.append(l3[0].copy())
         l4.append(l4[0].copy())
-        self._bridge(l2,l1,m = 'concrete')
-        self._bridge(l3,l2,m = 'concrete')
-        self._bridge(l1,l4,m = 'concrete')
-        self._bridge(l4,l3,m = 'concrete')
+        nfs = []
+        nfs.extend(self._bridge(l2,l1,m = framemat))
+        nfs.extend(self._bridge(l3,l2,m = framemat))
+        nfs.extend(self._bridge(l1,l4,m = framemat))
+        nfs.extend(self._bridge(l4,l3,m = framemat))
+        #self._project_uv_flat(nfs)
+        #self._flip_faces(nfs)
 
 class window(portal):
     def __init__(self,z = 1.0,w = 0.5,h = 2.0,
-            m = 'concrete',gap = None,wall = None):
+            m = 'cement1',gap = None,wall = None):
         portal.__init__(self,z,w,h,gap,wall)
+        self.m = m
 
     def _build_frame(self,floop,wnorm):
+        m = self.m
         mbp.inflate(floop,-0.05)
-        wnorm.scale_u(2.0)
+        #wnorm.scale_u(2.0)
+        wnorm.scale_u(1.25)
         l1 = [f.copy() for f in floop]
         l2 = [f.copy() for f in floop]
         #l1.append(l1[0].copy())
@@ -115,10 +123,13 @@ class window(portal):
         l2.append(l2[0].copy())
         l3.append(l3[0].copy())
         l4.append(l4[0].copy())
-        self._bridge(l2,l1,m = 'concrete')
-        self._bridge(l3,l2,m = 'concrete')
-        self._bridge(l1,l4,m = 'concrete')
-        self._bridge(l4,l3,m = 'concrete')
+        nfs = []
+        nfs.extend(self._bridge(l2,l1,m = m))
+        nfs.extend(self._bridge(l3,l2,m = m))
+        nfs.extend(self._bridge(l1,l4,m = m))
+        nfs.extend(self._bridge(l4,l3,m = m))
+        #self._project_uv_flat(nfs)
+        #self._flip_faces(nfs)
 
 #portal_factory = portal()
 #portal_factory._build()

@@ -366,7 +366,7 @@ def create_prim(prim, name = None, center = False,
     # rotate coords backwards by world_rotation?
 
     is_new = prim.write_as_xml(world_dir)
-    if is_new:create_gcol(prim)
+    if is_new and prim.gcol:create_gcol(prim)
 
     gnum = get_grit_number(repeat = prim.is_lod)
     if name is None: oname = prim.tag + gnum

@@ -13,6 +13,7 @@ import make_places.newterrain as nmpt
 import make_places.profiler as prf
 import make_places.stairs as mpstairs
 import make_places.houses as hss
+import make_places.foliage as mfo
 
 import make_places.gritty as gritgeo
 
@@ -225,9 +226,11 @@ def buildfew():
         'position':cv.vector(10,50,10), 
         'length':40, 
         'width':40, 
+        'floors':3, 
             }, {
         'length':40, 
         'width':40, 
+        'floors':3, 
         'position':cv.vector(-10,-10,0), 
         'rotation':cv.vector(0,0,ang), 
             }]
@@ -285,9 +288,18 @@ def block():
 def profile_block():
     prf.profile_function(block)
 
+def hashima():
+    gritgeo.reset_world_scripts()
+    cities.hashima()
+    gritgeo.output_world_scripts()
+    #cities.plot_try_data()
+
+def profile_hashima():
+    prf.profile_function(hashima)
+
 def city():
     gritgeo.reset_world_scripts()
-    cities.city()
+    cities.city(road_steps = 20,terrain = False,blocks = False,water = False)
     gritgeo.output_world_scripts()
     #cities.plot_try_data()
 
@@ -428,6 +440,10 @@ def material_demo():
     bp.demo_materials()
     gritgeo.output_world_scripts()
 
+def foliage_demo():
+    gritgeo.reset_world_scripts()
+    mfo.demo_foliage()
+    gritgeo.output_world_scripts()
 
 
 

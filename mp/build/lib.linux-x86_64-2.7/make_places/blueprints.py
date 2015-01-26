@@ -190,12 +190,45 @@ class blueprint(fu.base):
                     continue
                 self.ucoords[fdx] = nu
 
+    def _scale_uv_u(self,faces,du):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                u = self.ucoords[fdx]
+                u.scale_x(du)
+
+    def _scale_uv_v(self,faces,dv):
+        for nf in faces:
+            face = self.faces[nf]
+            for fdx in face:
+                u = self.ucoords[fdx]
+                u.scale_y(dv)
+
     def _flip_faces(self,faces):
         for nf in faces:
             face = self.faces[nf]
             face.reverse()
             for fdx in face:
                 self.ncoords[fdx].flip()
+
+    def _vegetate_faces(self,faces):
+
+        import make_places.foliage as mfo
+
+        for nf in faces:
+            face = self.faces[nf]
+            ps = [self.pcoords[fdx] for fdx in face]
+            com = cv.center_of_mass(ps)
+            poleb = [p.translate(com) for p in polygon(8)]
+            poleb.append(poleb[0])
+            polet = [p.copy().translate_z(1) for p in poleb]
+            #if rm.random() < 0.9:
+            if True:
+                self._bridge(polet,poleb,m = 'gridmat')
+            else:
+                tree = mfo.tree()
+                tree.translate(com)
+                self._extra_primitives.append(tree)
 
     def _reset_data(self):
         self.pcoords = []
@@ -208,10 +241,12 @@ class blueprint(fu.base):
     def _build(self):pass
 
     def _rebuild(self,**opts):
+        optkeys = opts.keys()
         bflag = False
-        for oke in opts.keys():
+        for oke in optkeys:
             oval = opts[oke]
-            if not self.__dict__[oke] == oval:
+            if oke == 'bflag':bflag = oval
+            elif not self.__dict__[oke] == oval:
                 bflag = True
                 self.__dict__[oke] = oval
         if bflag:
@@ -232,7 +267,7 @@ class blueprint(fu.base):
 
         self._extra_primitives = []
 
-        self.mats = ['cubemat']
+        self.mats = ['gridmat']
         self.pmats = ['/common/pmat/Stone']
 
     def _trifan(self,apex,blade,ns = None,us = None,m = None,pm = None):
@@ -336,11 +371,12 @@ class blueprint(fu.base):
 
     # given three points, add new triangle face
     def _triangle(self,v1,v2,v3,ns = None,us = None,m = None,pm = None):
+        nfstart = len(self.faces)
         nps = [v1.copy(),v2.copy(),v3.copy()]
         if ns is None:
             n = normal(*nps)
             nns = [n,n,n]
-        else: nss = ns
+        else: nns = ns
         if us is None:
             nus = [cv.vector2d(0,1),cv.vector2d(0,0),cv.vector2d(1,0)]
         else: nus = us
@@ -356,6 +392,8 @@ class blueprint(fu.base):
         nfpms = [pm]
 
         self._add_fdata(nfs,nfms,nfpms)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
 
     def _add_vdata(self,ps,ns,us):
         self.pcoords.extend(ps)
@@ -367,7 +405,28 @@ class blueprint(fu.base):
         self.face_mats.extend(fms)
         self.face_pmats.extend(fpms)
 
-    def _primitives(self):return []
+    def _node_wrap(self,p = None,r = None):
+        if p is None:pos = cv.zero()
+        else:pos = p.copy()
+        if r is None:rot = cv.zero()
+        else:rot = r.copy()
+        selfprim = self._primitive_from_slice()
+        exprims = [selfprim]
+        for p in self._extra_primitives:
+            selfprim.consume(p)
+        no = sg.node(
+            position = pos,rotation = rot,
+            primitives = [selfprim])
+        return no
+
+    def _primitives(self,xmlfile = None,hlod = False,ilod = False):
+        selfprim = self._primitive_from_slice(
+            xmlfile = xmlfile,hlod = hlod,ilod = ilod)
+        exprims = [selfprim]
+        for p in self._extra_primitives:
+            selfprim.consume(p)
+        return selfprim
+
     def _primitive_from_slice(self,dslice = slice(None),
             xmlfile = None,hlod = False,ilod = False):
         if xmlfile is None: xmlfile = self._xmlfilename()
@@ -516,11 +575,11 @@ class cylinder(blueprint):
         self._tripie(bottom,m = 'grass')
         bottom.append(bottom[0])
         top.append(top[0])
-        self._bridge(bottom,top,m = 'metal')
+        self._bridge(bottom,top,m = 'metal1')
 
 class cube(blueprint):
 
-    def __init__(self,l = 1,w = 1,h = 1,a = 0,m = 'cubemat'):
+    def __init__(self,l = 1,w = 1,h = 1,a = 0,m = 'gridmat'):
         blueprint.__init__(self)
         self.l = l
         self.w = w
@@ -532,6 +591,8 @@ class cube(blueprint):
         l,w,h,a = self.l,self.w,self.h,self.a
         bcorners = mpu.make_corners(cv.zero(),l,w,fu.to_deg(a))
         tcorners = [bc.copy().translate_z(h) for bc in bcorners]
+        cv.rotate_z_coords(bcorners,fu.to_rad(90))
+        cv.rotate_z_coords(tcorners,fu.to_rad(90))
         bcorners.reverse()
         self._quad(*bcorners,m = self.m)
         self._quad(*tcorners,m = self.m)

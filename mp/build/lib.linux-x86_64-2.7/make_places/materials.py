@@ -192,6 +192,7 @@ def write_generic_materials():
 def write_concrete_materials():
     concrete1 = material('concrete1')._add_diffuse('../textures/concrete/concrete.png')
     concrete1.textureScale = cv.vector2d(2,2)
+    concrete1.diffuseColour = cv.vector(0.5,0.5,0.5)
     default_materials.append(concrete1)
 
     concrete2 = material('concrete2')._add_diffuse('../textures/concrete/concrete2.png')
@@ -200,26 +201,51 @@ def write_concrete_materials():
 
     concrete3 = material('concrete3')._add_diffuse('../textures/concrete/concrete2.png')
     concrete3.textureScale = cv.vector2d(4,4)
-    concrete3.diffuseColour = cv.vector(0.4,0.4,0.4)
+    concrete3.diffuseColour = cv.vector(0.4,0.4,0.2)
     default_materials.append(concrete3)
 
-    concrete4 = material('concrete4')._add_diffuse('../textures/concrete/concrete3.png')
+    concrete4 = material('concrete4')._add_diffuse('../textures/concrete/concrete3.jpg')
     concrete4.textureScale = cv.vector2d(4,4)
     default_materials.append(concrete4)
 
     cement1 = material('cement1')._add_diffuse('../textures/concrete/indoor-cement.jpg')
-    concrete3.textureScale = cv.vector2d(4,4)
+    cement1.textureScale = cv.vector2d(4,4)
     default_materials.append(cement1)
 
     sidewalk1 = material('sidewalk1')._add_diffuse('../textures/concrete/sidewalk1.jpg')
-    #concrete3.textureScale = cv.vector2d(4,4)
     default_materials.append(sidewalk1)
+
+    sidewalk2 = material('sidewalk2')._add_diffuse('../textures/concrete/sidewalk2.jpg')
+    default_materials.append(sidewalk2)
 
     asphalt = material('asphalt')._add_diffuse('../textures/concrete/asphalt.jpg')
     asphalt.textureScale = cv.vector2d(4,4)
     asphalt.specular = 0
-    #asphalt.gloss = 0
+    asphalt.diffuseColour = cv.vector(0.75,0.75,0.75)
     default_materials.append(asphalt)
+
+    roadline_y = material('roadline_y')._add_diffuse('../textures/concrete/roadline.png')
+    roadline_y.specular = 0
+    roadline_y.alphaReject = 0.5
+    roadline_y.diffuseColour = cv.vector(0.8,0.8,0.8)
+    default_materials.append(roadline_y)
+
+    #roadline_y_cont = material('roadline_y_cont')._add_diffuse('../textures/concrete/roadline_continuous.png')
+    #roadline_y_cont.specular = 0
+    #roadline_y_cont.alphaReject = 0.5
+    #roadline_y_cont.diffuseColour = cv.vector(0.8,0.8,0.8)
+    #default_materials.append(roadline_y_cont)
+    roadline_y_cont = material('roadline_y_cont')._add_diffuse('../textures/concrete/roadline_w_continuous.png')
+    #roadline_y_cont.specular = 0
+    roadline_y_cont.alphaReject = 0.5
+    roadline_y_cont.diffuseColour = cv.vector(1.0,0.8,0.2)
+    default_materials.append(roadline_y_cont)
+
+    roadline_w_cont = material('roadline_w_cont')._add_diffuse('../textures/concrete/roadline_w_continuous.png')
+    #roadline_w_cont.specular = 0
+    roadline_w_cont.alphaReject = 0.5
+    roadline_w_cont.diffuseColour = cv.vector(0.8,0.8,0.8)
+    default_materials.append(roadline_w_cont)
 
     brick1 = material('brick1')._add_diffuse('../textures/concrete/brick.jpg')
     brick1.textureScale = cv.vector2d(4,4)

@@ -89,9 +89,10 @@ class newwall(mbp.blueprint):
         distance = min(dists)
         return distance
 
-    def _face_away(self):
-        if self.sector is None:return
-        intpt = self.sector.center.copy()
+    def _face_away(self,intpt = None):
+        if intpt is None:
+            if self.sector is None:return
+            intpt = self.sector.center.copy()
         midpt = self.center.copy()
         tstpt = midpt.copy().translate(self.normal)
         if cv.distance(intpt,midpt) > cv.distance(intpt,tstpt):
@@ -218,6 +219,12 @@ class newwall(mbp.blueprint):
         bs = [b1,b2,b3,b4,b1]
         ts = [t1,t2,t3,t4,t1]
 
+        #wcw = mbp.clockwise(bs)
+        #if not wcw:
+        #    bs.reverse()
+        #    ts.reverse()
+        #print 'w cw ness',wcw
+
         #mbp.plot(bs)
         #plt.show()
 
@@ -227,12 +234,13 @@ class newwall(mbp.blueprint):
         self._project_uv_flat(nfs)
 
     def _build_corner(self,v):
+        #cw,wh,m = abs(self.w*1.5),self.h,'concrete1'
         cw,wh,m = self.w*1.5,self.h,'concrete1'
         #cw,wh,m = w*1.5,self.h,self.m
         bl = mbp.ucube(m = m)
         bump = 0.5 if self.cap else 0.0
         bl.scale(cv.vector(cw,cw,wh+bump))
-        bl.calculate_normals()
+        #bl.calculate_normals()
         bl.translate(v)
         self._extra_primitives.append(bl)
 

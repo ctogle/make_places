@@ -99,6 +99,28 @@ def make_corners(pos,l,w,theta):
     cv.translate_coords(corners,pos)
     return corners
 
+cpdef list theta_order(list ppts):
+    cdef list ordered = []
+    com = cv.com(ppts)
+    #cv.translate_coords(ppts,com.flip())
+
+    cdef int pcnt = len(ppts)
+    cdef int pdx
+    cdef list angles = []
+    for pdx in range(pcnt):
+        p = ppts[pdx]
+        v = cv.v1_v2(com,p)
+        a = cv.angle_from_xaxis_xy(v)
+        angles.append(a)
+
+    ordered = list(zip(*sorted(zip(angles,ppts)))[1])
+    #ordered = zip(*sorted(zip(angles,ppts)))[1]
+
+    #cv.translate_coords(ppts,com.flip())
+    #cv.translate_coords(ordered,com)
+
+    return ordered
+
 def subset(superset, sub):
     for su in sub:
         if not su in superset:
@@ -330,24 +352,17 @@ def in_region(regi,pt):
     return True
 
 cpdef list dice_edges(list verts, int dices = 3):
-    vcnt = len(verts)
     for di in range(dices):
         newpts = []
-        for tdx in range(1,vcnt):
+        vcnt = len(verts)
+        for tdx in range(vcnt):
             p1 = verts[tdx-1]
             p2 = verts[tdx]
             mpt = cv.midpoint_c(p1,p2)
-            #pair = verts[tdx-1],verts[tdx]
-            #mpt = cv.midpoint_c(*pair)
-            #newpts.extend([p1,mpt])
             newpts.append(p1)
             newpts.append(mpt)
-        p1 = newpts[-1]
-        p2 = verts[0]
-        mpt = cv.midpoint_c(p1,p2)
-        newpts.append(p1)
-        newpts.append(mpt)
-        #newpts.extend([newpts[-1],cv.midpoint_c(newpts[-1],verts[0])])
+        newpts.append(newpts.pop(0))
+        newpts.append(newpts.pop(0))
         verts = newpts
     return verts
 

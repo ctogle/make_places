@@ -156,9 +156,6 @@ class segment(mbp.blueprint):
         swleft = (lanes[0] - 0.5)*self.lw - 0.5*self.sww
         swright = (lanes[-1] + 0.5)*self.lw + 0.5*self.sww
 
-        #swfs = []
-        #swfs.extend(self._build_lane(swleft,sww,swh,swh,False,m))
-        #swfs.extend(self._build_lane(swright,sww,swh,swh,False,m))
         swfs = self._build_lane(swleft,sww,swh,swh,False,m)
         self._scale_uv_u(swfs,0.5)
         self._scale_uv_v(swfs,-1.0)
@@ -172,9 +169,15 @@ class segment(mbp.blueprint):
         dx1 = 5
         dx2 = 3
         drop_face(dx1,dx2) # right inside face
+        #dx1 = 11
+        #dx2 = 9
+        #drop_face(dx1,dx2) # left outside face
         #dx1 = 1
         #dx2 = 4
         #drop_face(dx1,dx2) # right outside face
+
+        self._left_edge = [swvs[11],swvs[9]]
+        self._right_edge = [swvs[1],swvs[4]]
 
     def _build(self,segdx):
         self._build_road()
@@ -524,14 +527,24 @@ class road_plan(mbp.blueprint):
 
         verts = self.vertices
         vcnt = len(verts)
+        strips = []
         segments = []
+        ledge = []
+        redge = []
         for sgdx in range(1,vcnt):
             a1,a2 = self.angles[sgdx-1],self.angles[sgdx]
             p1,p2 = verts[sgdx-1],verts[sgdx]
             strip = segment(p1,p2,a1,a2,lcnt,rw,sww,swh)
+            strips.append(strip)
             strip._build(sgdx)
+            ledge.append(strip._left_edge[1])
+            redge.append(strip._right_edge[1])
             segments.append(strip._primitives())
         segments = self.batch(segments)
+        ledge.insert(0,strips[0]._left_edge[0])
+        redge.insert(0,strips[0]._right_edge[0])
+        self._left_edge = ledge
+        self._right_edge = redge
         return segments
 
     def build_lod(self):
@@ -559,6 +572,8 @@ class intersection_segment(mbp.blueprint):
         swheights = []
         for rp in self.rplans:swheights.extend([rp.sidewalk_height]*2)
         com = cv.center_of_mass(rdconvex)
+        outerswedges = []
+        innerswedges = []
         
         innerloop = [c.copy() for c in rdconvex]
         for ic in innerloop: ic.translate(cv.v1_v2(ic,com).scale_u(0.5))
@@ -580,25 +595,40 @@ class intersection_segment(mbp.blueprint):
             #v4 = v1.copy().translate_z(-h1)
             #loop1 = [v1,v2,v3,v4]
             loop1 = [v1,v2,v3]
-
             v5 = swconvex[swdx].copy().translate_z(h2)
             v6 = rdconvex[swdx].copy().translate_z(h2)
             v7 = v6.copy().translate_z(-h2)
             #v8 = v5.copy().translate_z(-h2)
             #loop2 = [v5,v6,v7,v8]
             loop2 = [v5,v6,v7]
-
             scnt = self._seg_count(v2,v6)
-            nfs = self._bridge_spline(
-                loop1,loop2,n = scnt,m = 'sidewalk1')
+
+            n1 = mbp.normal(*loop1[:3])
+            n2 = mbp.normal(*loop2[:3]).flip()
+            v2 = loop1[0].copy()
+            v3 = loop2[0].copy()
+            v1 = v2.copy().translate(n1)
+            v4 = v3.copy().translate(n2)
+            outerswcurve = cv.spline(v1,v2,v3,v4,scnt)
+            v2 = loop1[2].copy()
+            v3 = loop2[2].copy()
+            v1 = v2.copy().translate(n1)
+            v4 = v3.copy().translate(n2)
+            innerswcurve = cv.spline(v1,v2,v3,v4,scnt)
+            outerswedges.append(outerswcurve)
+            innerswedges.append(innerswcurve)
+
+            nfs = self._bridge_spline(loop1,loop2,
+                n = scnt,n1 = n1,n2 = n2,m = 'sidewalk1')
             self._scale_uv_u(nfs,0.5)
             self._scale_uv_v(nfs,-1.0)
 
-        innerloop.append(innerloop[0].copy())
-        rdconvex.append(rdconvex[0].copy())
-        nfs = []
-        nfs.extend(self._bridge(innerloop,rdconvex,m = 'asphalt'))
-        nfs.extend(self._tripie(innerloop,m = 'asphalt'))
+        self._edges = outerswedges
+
+        pts = []
+        for eg in innerswedges:pts.extend(eg)
+        pts = mpu.theta_order(pts)
+        nfs = self._bridge_patch(pts,n = 3,m = 'asphalt')
         self._project_uv_xy(nfs)
 
     def _build(self):
@@ -616,8 +646,14 @@ class intersection_plan(mbp.blueprint):
         bboxes = []
         swconvex = [self.sidewalk_border]
         for cdx in range(len(swconvex)):
-            corns = swconvex[cdx]
-            bboxes.append(mpbb.xy_bbox(corns))
+            #corns = swconvex[cdx]
+            corns = mpu.theta_order(swconvex[cdx])
+            try: bboxes.append(mpbb.xy_bbox(corns))
+            except ZeroDivisionError:
+                print 'corns!'
+                for c in corns: print c
+                pdb.set_trace()
+                raise ZeroDivisionError
             bboxes[-1].segment_id = cdx
         self.xybb = mpbb.xy_bbox(children = bboxes,owner = self)
         return self.xybb
@@ -696,6 +732,7 @@ class intersection_plan(mbp.blueprint):
         iseg = intersection_segment(self.roadplans,
             self.road_tips,self.road_border,self.sidewalk_border)
         iseg._build()
+        self._edges = iseg._edges
         return [sg.node(
             primitives = [iseg._primitives(xmlfile,False,False)],
             grit_renderingdistance = 500)]

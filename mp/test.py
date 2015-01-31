@@ -7,6 +7,7 @@ import make_places.gritty as gritgeo
 import make_places.walls as wa
 import make_places.newnewroads as nrds
 import make_places.newterrain as mpt
+import make_places.urban as murb
 
 import mp_utils as mpu
 import mp_vector as cv
@@ -40,6 +41,7 @@ def problem():
 
 #problem()
 
+murb.test()
 
 #mp.wall_speed_test()
 
@@ -55,7 +57,7 @@ def problem():
 #mp.afloor()
 
 #mp.profile_block()
-mp.profile_city()
+#mp.profile_city()
 #mp.profile_hashima()
 
 #mpt.test_fill()

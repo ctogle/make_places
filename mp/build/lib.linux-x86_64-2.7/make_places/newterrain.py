@@ -32,8 +32,6 @@ import pdb
 #   should generate lods which are properly stitched, and non lods
 #       should return the kwargs to make the primitives
 
-
-
 def some_input():
     ls = [5, 10, 15]
     ws = [2, 4, 6, 8]
@@ -644,7 +642,7 @@ class terrain_piece:
             veg = [f.hole_boundary for f in fdat].count(True) == 0
             if veg:
                 com = cv.center_of_mass([f.position for f in fdat])
-                veg = com.z > 5.0
+                veg = com.z > -20.0
             return veg
 
         depth = None

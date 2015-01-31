@@ -21,11 +21,11 @@ import pdb
 
 
 class segment(mbp.blueprint):
-    def get_segment_number(self):
-        global segment_number
-        num = str(segment_number)
-        segment_number += 1
-        return num
+    #def get_segment_number(self):
+    #    global segment_number
+    #    num = str(segment_number)
+    #    segment_number += 1
+    #    return num
 
     #materials = ['gridmat','concrete2']
     #phys_materials = ['/common/pmat/Stone']
@@ -55,21 +55,28 @@ class segment(mbp.blueprint):
         self.sn = sn
         self.en = en
 
-    def _build_line(self,v1,v2,w,style = 'solid'):
+    def _build_line(self,v1,v2,w,style = 'solidwhite'):
         rn = self.n.copy().scale_u(w/2.0)
         l1 = v1.copy().translate(rn)
         l2 = v1.copy().translate(rn.flip())
         l3 = v2.copy().translate(rn)
         l4 = v2.copy().translate(rn.flip())
+        '''#
+        strn = self.sn.copy().scale_u(w/2.0)
+        enrn = self.en.copy().scale_u(w/2.0)
+        l1 = v1.copy().translate(strn)
+        l2 = v1.copy().translate(strn.flip())
+        l3 = v2.copy().translate(enrn.flip())
+        l4 = v2.copy().translate(enrn.flip())
+        '''#
+
         vs = [l1,l2,l3,l4]
-
-        #t = cv.v1_v2(v1,v2)
-        #alpha = cv.angle_from_xaxis_xy(t)
-        #vs = mpu.make_corners(
-        #    cv.midpoint(v1,v2),cv.distance(v1,v2),w,alpha)
-
-        cv.translate_coords_z(vs,0.01)
-        self._quad(*vs,m = 'gridmat',pm = 'skip')
+        cv.translate_coords_z(vs,0.005)
+        if style == 'solidwhite':
+            self._quad(*vs,m = 'roadline_w_cont',pm = 'skip')
+        elif style == 'solidyellow':
+            self._quad(*vs,m = 'roadline_y_cont',pm = 'skip')
+        else:self._quad(*vs,m = 'gridmat',pm = 'skip')
 
     def _build_lane(self,l,lw,lh = 0,rh = 0,
             project = False,m = 'gridmat'):
@@ -80,9 +87,6 @@ class segment(mbp.blueprint):
         v2 = v1.copy()
         v3 = self.end.copy().translate(lt2)
         v4 = v3.copy()
-
-        #self._build_line(v1,v3,0.5)
-
         v1.translate(tr).translate_z(lh)
         v2.translate(tr.flip()).translate_z(rh)
         v3.translate(tr).translate_z(rh)
@@ -96,20 +100,41 @@ class segment(mbp.blueprint):
     def _draw_lines(self):
         lc,lw = self.lcnt,self.lw
         lanes = [x-(lc-1)/2.0 for x in range(lc)]
-        for lan in lanes:
+        linestyles = []
+        #linestyles.append(['solidwhite','solidyellow'])
+        linestyles.append(['solidyellow','solidwhite'])
+        linestyles.extend([['solidyellow','solidyellow']]*(len(lanes)-2))
+        linestyles.append(['solidwhite','solidyellow'])
+        #linestyles.append(['solidyellow','solidwhite'])
+        for ldx in range(len(lanes)):
+            lan = lanes[ldx]
             lanw = lan*lw
             
             lt1 = self.sn.copy().scale_u(lanw)
             lt2 = self.en.copy().scale_u(lanw)
-            tr = self.n.copy().scale_u(lw/2.0 - 0.25)
+            #tr = self.n.copy().scale_u(lw/2.0 - 0.25)
+            sttr = self.sn.copy().scale_u(lw/2.0 - 0.25)
+            entr = self.en.copy().scale_u(lw/2.0 - 0.25)
             v1 = self.start.copy().translate(lt1)
             v2 = self.end.copy().translate(lt2)
-            l1 = v1.copy().translate(tr)
-            l2 = v2.copy().translate(tr)
-            self._build_line(l1,l2,0.5)
-            l1 = v1.copy().translate(tr.flip())
-            l2 = v2.copy().translate(tr)
-            self._build_line(l1,l2,0.5)
+
+            styles = linestyles[ldx]
+            sty1 = styles[0]
+            sty2 = styles[1]
+
+            l1 = v1.copy().translate(sttr)
+            l2 = v2.copy().translate(entr)
+            self._build_line(l1,l2,0.5,style = sty1)
+            l1 = v1.copy().translate(entr.flip())
+            l2 = v2.copy().translate(sttr.flip())
+            self._build_line(l1,l2,0.5,style = sty2)
+
+            #l1 = v1.copy().translate(tr)
+            #l2 = v2.copy().translate(tr)
+            #self._build_line(l1,l2,0.5)
+            #l1 = v1.copy().translate(tr.flip())
+            #l2 = v2.copy().translate(tr)
+            #self._build_line(l1,l2,0.5)
 
     def _build_road(self):
         lc,lw,m = self.lcnt,self.lw,'asphalt'
@@ -123,15 +148,20 @@ class segment(mbp.blueprint):
             swdrop = [
                 swvs[dx1].copy(),swvs[dx1].copy().translate_z(-swh), 
                 swvs[dx2].copy().translate_z(-swh),swvs[dx2].copy()]
-            nfs = self._quad(*swdrop,m = m)
-            self._scale_uv_v(nfs,5)
+            swuvs = [cv.vector2d(0,1),cv.vector2d(0,0.94),
+                    cv.vector2d(0.5,0.94),cv.vector2d(0.5,1)]
+            nfs = self._quad(*swdrop,us = swuvs,m = m)
         lc,sww,swh,m = self.lcnt,self.sww,self.swh,'sidewalk1'
         lanes = [x-(lc-1)/2.0 for x in range(lc)]
         swleft = (lanes[0] - 0.5)*self.lw - 0.5*self.sww
         swright = (lanes[-1] + 0.5)*self.lw + 0.5*self.sww
-        swfs = []
-        swfs.extend(self._build_lane(swleft,sww,swh,swh,False,m))
-        swfs.extend(self._build_lane(swright,sww,swh,swh,False,m))
+
+        swfs = self._build_lane(swleft,sww,swh,swh,False,m)
+        self._scale_uv_u(swfs,0.5)
+        self._scale_uv_v(swfs,-1.0)
+        swfs = self._build_lane(swright,sww,swh,swh,False,m)
+        self._scale_uv_u(swfs,0.5)
+
         swvs = self.pcoords[-12:]
         dx1 = 7
         dx2 = 8
@@ -139,13 +169,21 @@ class segment(mbp.blueprint):
         dx1 = 5
         dx2 = 3
         drop_face(dx1,dx2) # right inside face
+        #dx1 = 11
+        #dx2 = 9
+        #drop_face(dx1,dx2) # left outside face
         #dx1 = 1
         #dx2 = 4
         #drop_face(dx1,dx2) # right outside face
 
-    def _build(self):
+        self._left_edge = [swvs[11],swvs[9]]
+        self._right_edge = [swvs[1],swvs[4]]
+
+    def _build(self,segdx):
         self._build_road()
         self._build_sidewalks()
+        
+        #if segdx % 2 == 0:self._draw_lines()
         self._draw_lines()
         
     def _primitives_from_slice(self):
@@ -325,7 +363,7 @@ class road_plan(mbp.blueprint):
         self.xy_bbox()
 
     def extrude_tips(self,controls):
-        eleng = 5.0
+        eleng = 3.0
         start_tip = self.start.copy().translate(
                 self.tail.copy().scale_u(eleng))
         end_tip = self.end.copy().translate(
@@ -338,7 +376,7 @@ class road_plan(mbp.blueprint):
 
     def pick_seg_count(self,v1,v2):
         ds = cv.distance(v1,v2)
-        seglen = 4
+        seglen = 3
         self.lastsegcnt = int(ds/seglen)
         return self.lastsegcnt
 
@@ -489,18 +527,112 @@ class road_plan(mbp.blueprint):
 
         verts = self.vertices
         vcnt = len(verts)
+        strips = []
         segments = []
+        ledge = []
+        redge = []
         for sgdx in range(1,vcnt):
             a1,a2 = self.angles[sgdx-1],self.angles[sgdx]
             p1,p2 = verts[sgdx-1],verts[sgdx]
             strip = segment(p1,p2,a1,a2,lcnt,rw,sww,swh)
-            strip._build()
+            strips.append(strip)
+            strip._build(sgdx)
+            ledge.append(strip._left_edge[1])
+            redge.append(strip._right_edge[1])
             segments.append(strip._primitives())
         segments = self.batch(segments)
+        ledge.insert(0,strips[0]._left_edge[0])
+        redge.insert(0,strips[0]._right_edge[0])
+        self._left_edge = ledge
+        self._right_edge = redge
         return segments
 
     def build_lod(self):
         return []
+
+#intersection_segment_number = 0
+class intersection_segment(mbp.blueprint):
+
+    def _seg_count(self,v1,v2):
+        ds = cv.distance(v1,v2)
+        seglen = 3
+        return int(ds/seglen)
+
+    def __init__(self,rplans,rtips,rborder,sborder):
+        mbp.blueprint.__init__(self)
+        self.rplans = rplans
+        self.rtips = rtips
+        self.rborder = rborder
+        self.sborder = sborder
+
+    def _build_flat(self):
+        rdconvex = self.rborder
+        swconvex = self.sborder
+
+        swheights = []
+        for rp in self.rplans:swheights.extend([rp.sidewalk_height]*2)
+        com = cv.center_of_mass(rdconvex)
+        outerswedges = []
+        innerswedges = []
+        
+        innerloop = [c.copy() for c in rdconvex]
+        for ic in innerloop: ic.translate(cv.v1_v2(ic,com).scale_u(0.5))
+        for swdx in range(len(rdconvex)):
+            rc1 = rdconvex[swdx-1]
+            rc2 = rdconvex[swdx]
+            tiptest = True
+            for rtip in self.rtips:
+                if cv.near_xy(cv.midpoint(rc1,rc2),rtip):
+                    tiptest = False
+                    break
+            if not tiptest: continue
+            h1 = swheights[swdx-1]
+            h2 = swheights[swdx]
+
+            v1 = swconvex[swdx-1].copy().translate_z(h1)
+            v2 = rdconvex[swdx-1].copy().translate_z(h1)
+            v3 = v2.copy().translate_z(-h1)
+            #v4 = v1.copy().translate_z(-h1)
+            #loop1 = [v1,v2,v3,v4]
+            loop1 = [v1,v2,v3]
+            v5 = swconvex[swdx].copy().translate_z(h2)
+            v6 = rdconvex[swdx].copy().translate_z(h2)
+            v7 = v6.copy().translate_z(-h2)
+            #v8 = v5.copy().translate_z(-h2)
+            #loop2 = [v5,v6,v7,v8]
+            loop2 = [v5,v6,v7]
+            scnt = self._seg_count(v2,v6)
+
+            n1 = mbp.normal(*loop1[:3])
+            n2 = mbp.normal(*loop2[:3]).flip()
+            v2 = loop1[0].copy()
+            v3 = loop2[0].copy()
+            v1 = v2.copy().translate(n1)
+            v4 = v3.copy().translate(n2)
+            outerswcurve = cv.spline(v1,v2,v3,v4,scnt)
+            v2 = loop1[2].copy()
+            v3 = loop2[2].copy()
+            v1 = v2.copy().translate(n1)
+            v4 = v3.copy().translate(n2)
+            innerswcurve = cv.spline(v1,v2,v3,v4,scnt)
+            outerswedges.append(outerswcurve)
+            innerswedges.append(innerswcurve)
+
+            nfs = self._bridge_spline(loop1,loop2,
+                n = scnt,n1 = n1,n2 = n2,m = 'sidewalk1')
+            self._scale_uv_u(nfs,0.5)
+            self._scale_uv_v(nfs,-1.0)
+
+        self._edges = outerswedges
+
+        pts = []
+        for eg in innerswedges:pts.extend(eg)
+        pts = mpu.theta_order(pts)
+        nfs = self._bridge_patch(pts,n = 3,m = 'asphalt')
+        self._project_uv_xy(nfs)
+
+    def _build(self):
+        self._build_flat()
 
 intersection_number = 0
 class intersection_plan(mbp.blueprint):
@@ -510,15 +642,16 @@ class intersection_plan(mbp.blueprint):
         intersection_number += 1
         return num
 
-    materials = ['gridmat']
-    phys_materials = ['/common/pmat/Stone']
-
     def xy_bbox(self):
         bboxes = []
         swconvex = [self.sidewalk_border]
         for cdx in range(len(swconvex)):
-            corns = swconvex[cdx]
-            bboxes.append(mpbb.xy_bbox(corns))
+            #corns = swconvex[cdx]
+            corns = mpu.theta_order(swconvex[cdx])
+            try: bboxes.append(mpbb.xy_bbox(corns))
+            except:
+                print 'corns!'
+                for c in corns: print c
             bboxes[-1].segment_id = cdx
         self.xybb = mpbb.xy_bbox(children = bboxes,owner = self)
         return self.xybb
@@ -539,19 +672,19 @@ class intersection_plan(mbp.blueprint):
         self.xy_bbox()
 
     def find_tips(self,rplan,width):
-            stdist = cv.distance(self.position,rplan.start)
-            endist = cv.distance(self.position,rplan.end)
-            if stdist < endist:
-                p1 = rplan.vertices[0].copy()
-                p2 = p1.copy()
-                p1.translate(rplan.tailnormal.copy().scale_u(-width/2.0))
-                p2.translate(rplan.tailnormal.copy().scale_u(width/2.0))
-            else:
-                p1 = rplan.vertices[-1].copy()
-                p2 = p1.copy()
-                p1.translate(rplan.tipnormal.copy().scale_u(-width/2.0))
-                p2.translate(rplan.tipnormal.copy().scale_u(width/2.0))
-            return [p1,p2]
+        stdist = cv.distance(self.position,rplan.start)
+        endist = cv.distance(self.position,rplan.end)
+        if stdist < endist:
+            p1 = rplan.vertices[0].copy()
+            p2 = p1.copy()
+            p1.translate(rplan.tailnormal.copy().scale_u(-width/2.0))
+            p2.translate(rplan.tailnormal.copy().scale_u(width/2.0))
+        else:
+            p1 = rplan.vertices[-1].copy()
+            p2 = p1.copy()
+            p1.translate(rplan.tipnormal.copy().scale_u(-width/2.0))
+            p2.translate(rplan.tipnormal.copy().scale_u(width/2.0))
+        return [p1,p2]
 
     def reposition_roads(self,rplans):
         def find_tip(rplan,ileng):
@@ -571,7 +704,8 @@ class intersection_plan(mbp.blueprint):
         #infllngs = [2.0*rw for rw in rdwidths]
         #infllngs = [(sqrt(3.0)/2.0)*rw for rw in rdwidths]
         mxrw = max(rdwidths)
-        infllngs = [(sqrt(3.0)/2.0)*mxrw for rw in rdwidths]
+        #infllngs = [(sqrt(3.0)/2.0)*mxrw for rw in rdwidths]
+        infllngs = [(0.6)*mxrw for rw in rdwidths]
         rtips = [find_tip(rp,infl) for rp,infl in zip(rplans,infllngs)]
         for rtip in rtips:rtip[0].translate(rtip[1])
         for rp in rplans:rp.calculate()
@@ -589,54 +723,17 @@ class intersection_plan(mbp.blueprint):
 
         self.road_border = rdconvex
         self.sidewalk_border = swconvex
-
-    def build_flat(self,vs,nvs,nus,nfs,fms,pfms):
-        rdconvex = self.road_border
-        swconvex = self.sidewalk_border
-
-        swheights = []
-        for rp in self.roadplans:swheights.extend([rp.sidewalk_height]*2)
-        com = cv.center_of_mass(rdconvex)
-        
-        innerloop = [c.copy() for c in rdconvex]
-        for ic in innerloop: ic.translate(cv.v1_v2(ic,com).scale_u(0.5))
-        for swdx in range(len(rdconvex)):
-            rc1 = rdconvex[swdx-1]
-            rc2 = rdconvex[swdx]
-            tiptest = True
-            for rtip in self.road_tips:
-                if cv.near_xy(cv.midpoint(rc1,rc2),rtip):
-                    tiptest = False
-                    break
-            if not tiptest: continue
-            h1 = swheights[swdx-1]
-            h2 = swheights[swdx]
-            v1 = rdconvex[swdx-1].copy().translate_z(h1)
-            v2 = swconvex[swdx-1].copy().translate_z(h1)
-            v3 = swconvex[swdx].copy().translate_z(h2)
-            v4 = rdconvex[swdx].copy().translate_z(h2)
-            v5 = v4.copy()
-            v6 = v4.copy().translate_z(-h1)
-            v7 = v1.copy().translate_z(-h2)
-            v8 = v1.copy()
-            self.add_quad(vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4)
-            self.add_quad(vs,nvs,nus,nfs,fms,pfms,v5,v6,v7,v8)
-
-        innerloop.append(innerloop[0])
-        rdconvex.append(rdconvex[0])
-        self.bridge(vs,nvs,nus,nfs,fms,pfms,innerloop,rdconvex)
-        self.tripie(vs,nvs,nus,nfs,fms,pfms,innerloop)
-
-    def quaddata(self):
-        dmethods = [self.build_flat]
-        return mbp.blueprint.quaddata(self,dmethods)
-
+    
     def build(self):
         xmlfile = '.'.join(['intersection',
             self.get_segment_number(),'mesh','xml'])
-        iprim = mbp.blueprint.build(self,xmlfile,False,False)
-        return [sg.node(primitives = [iprim],
-                grit_renderingdistance = 500)]
+        iseg = intersection_segment(self.roadplans,
+            self.road_tips,self.road_border,self.sidewalk_border)
+        iseg._build()
+        self._edges = iseg._edges
+        return [sg.node(
+            primitives = [iseg._primitives(xmlfile,False,False)],
+            grit_renderingdistance = 500)]
         
 
 

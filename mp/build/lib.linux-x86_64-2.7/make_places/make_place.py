@@ -299,9 +299,8 @@ def profile_hashima():
 
 def city():
     gritgeo.reset_world_scripts()
-    cities.city()
+    cities.city(terrain = False)
     gritgeo.output_world_scripts()
-    #cities.plot_try_data()
 
 def profile_city():
     prf.profile_function(city)

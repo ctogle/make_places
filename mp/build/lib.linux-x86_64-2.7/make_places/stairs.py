@@ -138,6 +138,7 @@ class shaft(mbp.blueprint):
             'sort':'interior','solid':False,'m':'brick2',
             'h':wh,'fh':fh,'w':0.25}]
         wals = [wa.newwall(**w) for w in wargs]
+        [w._face_away(cv.zero()) for w in wals]
         [w._build() for w in wals]
         return pr.sum_primitives([w._primitives() for w in wals])
 

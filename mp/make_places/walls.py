@@ -89,9 +89,10 @@ class newwall(mbp.blueprint):
         distance = min(dists)
         return distance
 
-    def _face_away(self):
-        if self.sector is None:return
-        intpt = self.sector.center.copy()
+    def _face_away(self,intpt = None):
+        if intpt is None:
+            if self.sector is None:return
+            intpt = self.sector.center.copy()
         midpt = self.center.copy()
         tstpt = midpt.copy().translate(self.normal)
         if cv.distance(intpt,midpt) > cv.distance(intpt,tstpt):

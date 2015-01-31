@@ -32,8 +32,6 @@ import pdb
 #   should generate lods which are properly stitched, and non lods
 #       should return the kwargs to make the primitives
 
-
-
 def some_input():
     ls = [5, 10, 15]
     ws = [2, 4, 6, 8]

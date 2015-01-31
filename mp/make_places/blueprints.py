@@ -322,7 +322,81 @@ class blueprint(fu.base):
         nfend = len(self.faces)
         return range(nfstart,nfend)
 
-    # given two loops of equal length, bridge with quads
+    def _bridge_afm(self,loop,ns = None,us = None,m = None,pm = None):
+        nfstart = len(self.faces)
+
+        def vertex_front(bnd):
+            verts = []
+            for b in bnd:
+                tbnd = [bp for bp in bnd if not bp is b]
+                v = vertex(b.copy())
+                closest1 = cv.find_closest(v.p,tbnd,len(tbnd),1.0)
+                v.vs.append(tbnd.pop(closest1))
+                closest2 = cv.find_closest(v.p,tbnd,len(tbnd),1.0)
+                v.vs.append(tbnd[closest2])
+                #tbnd.insert(closest1,v.vs[0])
+                v._theta()
+                verts.append(v)
+            return verts
+
+        def advance(front):
+            mina = fu.PI
+            mink = 0
+            for k in range(len(front)):
+                v = front[k]
+                a = v.theta
+                if a < mina:
+                    mina = a
+                    mink = k
+            fan = front[mink]._fill_fan()
+            # attempt to merge fan points with front as appropriate
+            self._trifan(front[mink].p,fan)
+            pre = len(front)
+            front.pop(mink)
+            fpts = [v.p for v in front]
+            fpts.extend(fan[1:-1])
+            pos = len(fpts)
+            print 'advancement', pre, pos
+            return fpts
+
+        x = 0
+
+        front = vertex_front(loop)
+        while len(front) > 3:
+            frontpts = advance(front)
+            front = vertex_front(frontpts)
+            print 'advanced', len(front)
+
+            x += 1
+          
+            sprim = self._primitives()
+            sprim.translate_z(x*10)
+            gritgeo.create_primitive(sprim,rdist = 2000)
+            #plot([v.p for v in front])
+            #plt.show()
+        
+        self._triangle(*[f.p for f in front])
+
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
+
+    def _bridge_patch(self,loop,n = 10,ns = None,us = None,m = None,pm = None):
+        nfstart = len(self.faces)
+
+        def move(oloop):
+            iloop = [l.copy() for l in oloop]
+            [l.translate(ray) for l,ray in zip(iloop,rays)]
+            self._bridge(iloop,oloop,m = m)
+            return iloop
+
+        com = cv.center_of_mass(loop)
+        loop.append(loop[0])
+        rays = [cv.v1_v2(l,com).scale_u(1.0/n) for l in loop]
+        for x in range(n):loop = move(loop)
+        self._tripie(loop,m = m)
+        nfend = len(self.faces)
+        return range(nfstart,nfend)
+
     def _bridge_spline(self,loop1,loop2,n = 3,n1 = None,n2 = None,
                         ns = None,us = None,m = None,pm = None):
         if not len(loop1) == len(loop2): raise ValueError
@@ -506,101 +580,64 @@ class blueprint(fu.base):
         
 
 
+class vertex:
+    cut1 = fu.to_rad(75)
+    cut2 = fu.to_rad(135)
 
+    def __init__(self,p):
+        self.p = p
+        self.vs = []
+        self.ts = []
+        self.es = []
 
+    def _theta(self):
+        e1 = cv.v1_v2(self.p,self.vs[0])
+        e2 = cv.v1_v2(self.p,self.vs[1])
+        self.es.append(e1)
+        self.es.append(e2)
+        self.theta = cv.angle_between(*self.es)
 
+    def _fill_fan(self):
+        def plot():
+            plot(fan,color = 'green',marker = 's')
+            plot([self.p],color = 'red',marker = 's')
+            plot(self.vs,color = 'blue',marker = 's')
+            plt.show()
 
-    def ____tripie(self,vs,nvs,nus,nfs,fms,pfms,convex):
-        convex.insert(0,cv.center_of_mass(convex))
-        tcnt = len(convex) - 1
-        for trdx in range(tcnt):
-            c2dx = trdx+1
-            c3dx = trdx+2
-            if c3dx == tcnt + 1: c3dx = 1
-            c1 = convex[0].copy()
-            c2 = convex[c2dx].copy()
-            c3 = convex[c3dx].copy()
-            self.add_tri(vs,nvs,nus,nfs,fms,pfms,c1,c2,c3)
-        #plot(convex)
-        #plt.show()
+        d = (self.es[0].magnitude()+self.es[1].magnitude())/2.0
+        if self.theta < self.cut1:
+            print 'cut1'
+            return self.vs[:]
+        elif self.theta < self.cut2:
+            mp = cv.midpoint(*self.vs)
+            n = cv.v1_v2(self.p,mp).normalize().scale_u(d)
+            fan = self.vs[:]
+            fan.insert(1,self.p.copy().translate(n))
+            print 'cut2'
+            return fan
+        else:
+            mp = cv.midpoint(*self.vs)
+            mp1 = cv.midpoint(self.vs[0],mp)
+            mp2 = cv.midpoint(self.vs[1],mp)
+            n1 = cv.v1_v2(self.p,mp1).normalize().scale_u(d)
+            n2 = cv.v1_v2(self.p,mp2).normalize().scale_u(d)
+            fan = self.vs[:]
+            fan.insert(1,self.p.copy().translate(n2))
+            fan.insert(1,self.p.copy().translate(n1))
 
-    def ______quadrafy(convex):
-        pdb.set_trace()
+            '''#
+            v1v2 = cv.v1_v2(*self.vs).normalize().scale_u(0.33)
+            fp1 = self.vs[0].copy().translate(v1v2)
+            fp2 = self.vs[0].copy().translate(v1v2.scale_u(2.0))
+            n1 = cv.v1_v2(self.p,fp1).normalize().scale_u(d)
+            n2 = cv.v1_v2(self.p,fp2).normalize().scale_u(d)
+            fan = self.vs[:]
+            fan.insert(1,self.p.copy().translate(n2))
+            fan.insert(1,self.p.copy().translate(n1))
+            '''#
+            print 'cut3'
+            return fan
 
-    def _______bridge(self,vs,nvs,nus,nfs,fms,pfms,loop1,loop2):
-        if not len(loop1) == len(loop2): raise ValueError
-        lcnt = len(loop1)
-        for ldx in range(1,lcnt):
-            v1 = loop1[ldx-1].copy()
-            v2 = loop2[ldx-1].copy()
-            v3 = loop2[ldx].copy()
-            v4 = loop1[ldx].copy()
-            self.add_quad(vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4)
-
-    def _______add_tri(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3):
-        foffset = len(vs)
-        n = cv.v1_v2(v1,v2).cross(cv.v1_v2(v2,v3)).normalize()
-        vs.extend([v1,v2,v3])       
-        nvs.extend([n,n,n])
-        nus.extend([cv.vector2d(0,1),
-            cv.vector2d(0,0),cv.vector2d(1,0)])
-        uvlength = cv.distance(v2,v3)
-        #cv.scale_coords2d(nus,cv.vector2d(uvlength,self.lane_width))
-        #cv.translate_coords2d(nus,self.uvguide)
-        nfs.extend(mpu.offset_faces([[0,1,2]],foffset))
-        fms.extend([0])
-        pfms.extend([0])
-
-    def ______add_quad(self,vs,nvs,nus,nfs,fms,pfms,v1,v2,v3,v4):
-        foffset = len(vs)
-        n = cv.v1_v2(v1,v2).cross(cv.v1_v2(v2,v3)).normalize()
-        vs.extend([v1,v2,v3,v4])       
-        nvs.extend([n,n,n,n])
-        nus.extend([cv.vector2d(0,1),cv.vector2d(0,0),
-                  cv.vector2d(1,0),cv.vector2d(1,1)])
-        uvlength = cv.distance(v2,v3)
-        #cv.scale_coords2d(nus,cv.vector2d(uvlength,self.lane_width))
-        #cv.translate_coords2d(nus,self.uvguide)
-        nfs.extend(mpu.offset_faces([[0,1,3],[1,2,3]],foffset))
-        fms.extend([0,0])
-        pfms.extend([0,0])
-
-    def ________quaddata(self,data_methods = []):
-        vs = []
-        nvs = []
-        nus = []
-        nfs = []
-        fms = []
-        pfms = []
-        for dm in data_methods:
-            dm(vs,nvs,nus,nfs,fms,pfms)
-        return vs,nvs,nus,nfs,fms,pfms
-
-    def __________build(self,xmlfile,ilod,hlod):
-        vdat = self.quaddata()
-        newverts,newnorml,newuvs,newfaces,fmats,pfmats = vdat
-        pwargs = {
-            'verts' : newverts, 
-            'nverts' : newnorml, 
-            'uvs' : newuvs, 
-            'faces' : newfaces, 
-            'materials' : self.materials[:], 
-            'face_materials' : fmats, 
-            'phys_materials' : self.phys_materials[:], 
-            'phys_face_materials' : pfmats, 
-            'xmlfilename' : xmlfile, 
-            'force_normal_calc' : True, 
-            'prevent_normal_calc' : False, 
-            'smooth_normals' : False, 
-            'is_lod' : ilod, 
-            'has_lod' : hlod,
-                }
-        mesh = pr.arbitrary_primitive(**pwargs)
-        return mesh
-
-    def ______build_lod(self):
-        scubes = [ucube()]
-        return scubes
 
 
 

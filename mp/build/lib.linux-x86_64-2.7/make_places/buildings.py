@@ -29,9 +29,7 @@ class floor_plan(mbp.blueprint):
         self._default_('ceiling_height',0.5,**kwargs)
         self._default_('wall_height',4.0,**kwargs)
         self._default_('wall_width',0.5,**kwargs)
-
-        wmat = rm.choice(self.wmat_options)
-        self._default_('wall_material',wmat,**kwargs)
+        self._default_('wall_material','cement1',**kwargs)
 
         self.corners = mpu.make_corners(cv.zero(),self.length,self.width,0)
         self.interior_walls = []
@@ -658,7 +656,10 @@ class building_plan(mbp.blueprint):
 
         #if rm.random() < 0.5: wmat = 'brick2'
         #else: wmat = 'concrete1'
-        wmat = 'brick2'
+        #wmat = 'brick2'
+
+        wmat = rm.choice(floor_plan.wmat_options)
+        print 'wmat choice',wmat
 
         self.st0plan = floor_plan(wall_material = wmat,
             length = self.length,width = self.width)
@@ -893,9 +894,9 @@ class building(sg.node):
         self._default_('width',40,**kwargs)
         self._default_('tform',
             self.def_tform(*args,**kwargs),**kwargs)
-        kwargs['uv_scales'] = cv.vector(10,10,10)
-        self._default_('uv_tform',
-            self.def_uv_tform(*args,**kwargs),**kwargs)
+        #kwargs['uv_scales'] = cv.vector(10,10,10)
+        #self._default_('uv_tform',
+        #    self.def_uv_tform(*args,**kwargs),**kwargs)
         self.building_plan = building_plan(**kwargs)
         children = self.building_plan.build()
         #for ch in children:

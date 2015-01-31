@@ -64,7 +64,7 @@ class portal(mbp.blueprint):
         ts = [t1,t2,t3,t4,t1]
         nfs = self._bridge(bs,ts,m = self.wall.m)
         #nfs = self._bridge(ts,bs,m = self.wall.m)
-        self._project_uv_flat(nfs)
+        #self._project_uv_flat(nfs)
 
 class door(portal):
     def __init__(self,z = 1.0,w = 0.5,h = 2.0,
@@ -75,12 +75,9 @@ class door(portal):
     def _build_frame(self,floop,wnorm):
         framemat = self.m
         mbp.inflate(floop,-0.05)
-        #wnorm.scale_u(2.0)
         wnorm.scale_u(1.25)
         l1 = [f.copy() for f in floop]
         l2 = [f.copy() for f in floop]
-        #l1.append(l1[0].copy())
-        #l2.append(l2[0].copy())
         [l.translate(wnorm) for l in l1]
         wnorm.flip()
         [l.translate(wnorm) for l in l2]
@@ -97,6 +94,7 @@ class door(portal):
         nfs.extend(self._bridge(l3,l2,m = framemat))
         nfs.extend(self._bridge(l1,l4,m = framemat))
         nfs.extend(self._bridge(l4,l3,m = framemat))
+        #self._project_uv_flat(nfs)
         #self._flip_faces(nfs)
 
 class window(portal):
@@ -130,6 +128,7 @@ class window(portal):
         nfs.extend(self._bridge(l3,l2,m = m))
         nfs.extend(self._bridge(l1,l4,m = m))
         nfs.extend(self._bridge(l4,l3,m = m))
+        #self._project_uv_flat(nfs)
         #self._flip_faces(nfs)
 
 #portal_factory = portal()

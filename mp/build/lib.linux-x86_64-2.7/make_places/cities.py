@@ -94,11 +94,101 @@ class newblock(mbp.blueprint):
         road,side = self.road,self.side
         tpts,hpts = [],[]
         if not road.style == 'interstate' and blg._building_count_ < 500:
-            blnodes = self.buildings_from_road(road,side,bboxes)
+            #blnodes = self.buildings_from_road(road,side,bboxes)
+            blnodes = self.buildings_from_road_tight(road,side,bboxes)
             tpts.extend(self.terrain_points(blnodes))
             hpts.extend(self.terrain_holes(blnodes))
             gritgeo.create_element(blnodes)
         return tpts,hpts
+
+    def buildings_from_road_tight(self,rd,rdside,bboxes):
+        bcnt,minblen,minbwid,maxblen,maxbwid = self._params()
+
+        rdtangs = rd.tangents
+        rdnorms = rd.normals
+        rdwidth = rd.total_width
+        rdvts = rd.vertices
+        segcnt = len(rdvts) - 1
+
+        binfo = [cv.zero(),None,None,0.0]
+        def lot_to_bb(lot,dtr,seg):
+            segtang = rdtangs[seg]
+            binfo[0] = cv.zero()
+            binfo[3] = 0.0
+            binfo[3] += cv.angle_from_xaxis_xy(segtang)
+            segnorm = rdnorms[seg].copy()
+            if rdside == 'left':segnorm.flip()
+            if rdside == 'right':binfo[3] += fu.PI
+            binfo[0].translate(rdvts[seg])
+            binfo[0].translate(segnorm.copy().scale_u(dtr))
+            cs = [l.copy() for l in lot]
+            cv.rotate_z_coords(cs,binfo[3])
+            cv.translate_coords(cs,binfo[0])
+            bb = mpbb.xy_bbox(corners = cs)
+            return bb
+
+        def check_seg(lot,dtr,seg):
+            bb = lot_to_bb(lot,dtr,seg)
+            for ebb in bboxes:
+                isect = bb.intersect_xy(ebb)
+                if isect:
+                    omcnt = [io.bottomlevel for io in 
+                        isect['other members']].count(True)
+                    if omcnt > 0:return False
+            return True
+
+        def new_lot():
+            p = cv.zero()
+            l = rm.randrange(minblen,maxblen)
+            w = rm.randrange(minbwid,maxbwid)
+            binfo[1],binfo[2] = l,w
+            d_to_road = rdwidth/2.0 + w/2.0 + 1.0 + rm.randrange(int(w/10.0))
+            flcnt = self.get_building_floor_count()
+            corns = mpu.make_corners(p,l,w,0.0)
+            return corns,d_to_road,flcnt
+            
+        def accept():
+            p = binfo[0].copy()
+            l = binfo[1]
+            w = binfo[2]
+            a = binfo[3]
+            r = cv.vector(0,0,a)
+
+            bp = mbp.blueprint()
+            cs = mpu.make_corners(cv.zero(),l,w,0)
+            bp._quad(*cs,m = 'gridmat')
+            bnode = sg.node(position = p,rotation = r,
+                primitives = [bp._primitives()])
+            def hcorners(): return [cs]
+            def tcorners(): return cs
+            bnode.terrain_holes = hcorners
+            bnode.terrain_points = tcorners
+            buildings.append(bnode)
+            cv.rotate_z_coords(cs,a)
+            cv.translate_coords(cs,p)
+            nbb = mpbb.xy_bbox(corners = cs)
+            '''#
+            blarg = {'theme':self.theme, 
+                'position':p,'length':l,'width':w, 
+                'rotation':cv.vector(0,0,a),'floors':flcnt}
+            buildings.append(blg.building(**blarg))
+            nbb = buildings[-1].get_bbox()
+            '''#
+            bboxes.append(nbb)
+
+        buildings = []
+        lot,dtr,flcnt = new_lot()
+        segx = 0
+        bcnt = 0
+        while segx < segcnt:
+            segx += 1
+            check = check_seg(lot,dtr,segx)
+            if check:
+                bcnt += 1
+                accept()
+                lot,dtr,flcnt = new_lot()
+        print 'finished placing buildings by road!',segx,segcnt,bcnt
+        return buildings
 
     def buildings_from_road(self,rd,rdside,bboxes):
         buildings = []
@@ -340,8 +430,7 @@ class block(sg.node):
 
 
 
-def city(road_steps = 2,roads = True,blocks = True,terrain = True,water = True):
-    #summary = []
+def city(road_steps = 10,roads = True,blocks = True,terrain = True,water = True):
     summary = sio.StringIO()
     rplans,iplans,bboxes,fpts,hpts,rpts = [],[],[],[],[],[]
     if roads:
@@ -417,7 +506,7 @@ def build_waters(sea_level,summary):
 
 #################################################################################
 
-def hashima(road_steps = 3,roads = True,blocks = False,terrain = False,water = True):
+def hashima(road_steps = 2,roads = True,blocks = False,terrain = False,water = True):
     summary = sio.StringIO()
     rplans,iplans,bboxes,fpts,hpts,rpts = [],[],[],[],[],[]
 
@@ -437,7 +526,7 @@ def hashima(road_steps = 3,roads = True,blocks = False,terrain = False,water = T
     if terrain:
         rplans,iplans,bboxes,fpts,hpts,rpts =\
             build_terrain(rplans,iplans,bboxes,fpts,hpts,rpts,summary)
-    if water:build_waters(-1.5,summary)
+    if water:build_waters(-25,summary)
     print summary.getvalue()
 
 #################################################################################

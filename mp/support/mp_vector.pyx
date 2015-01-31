@@ -18,49 +18,6 @@ import mp_utils as mpu
 
 stuff = 'hi'
 
-# 3x3 matrix class/functions
-
-cdef class matrix:
-    cdef list rows
-    cdef list columns
-
-    cdef list columns_from_rows(self, rows):
-        cdef vector c1 = vector(rows[0].x,rows[1].x,rows[2].x)
-        cdef vector c2 = vector(rows[0].y,rows[1].y,rows[2].y)
-        cdef vector c3 = vector(rows[0].z,rows[1].z,rows[2].z)
-        cdef list columns = [c1,c2,c3]
-        return columns
-
-    cpdef vector multiply(self, vector v):
-        cdef float x = dot_c(self.rows[0],v)
-        cdef float y = dot_c(self.rows[1],v)
-        cdef float z = dot_c(self.rows[2],v)
-        v.x = x
-        v.y = y
-        v.z = z
-        return v
-
-    def __init__(self, rows = None, columns = None):
-        if rows:
-            self.rows = rows
-            #self.columns = self.columns_from_rows(rows)
-        elif columns:
-            print 'must use rows for cv.matrix!'
-        else:
-            z1 = vector(0,0,0)
-            z2 = z1.copy()
-            z3 = z1.copy()
-            rows = [z1,z2,z3]
-            self.rows = rows
-            #self.columns = self.columns_from_rows(rows)
-
-cdef matrix rotation_matrix____(float ang,char axis = 'z'):
-    #if axis == 'z':
-    r1 = vector(cos(ang),-sin(ang),0)
-    r2 = vector(sin(ang), cos(ang),0)
-    r3 = vector(       0,        0,1)
-    return matrix(rows = [r1,r2,r3])
-
 # 2d classes/functions
 
 cdef class vector2d:
@@ -547,6 +504,25 @@ cpdef bint near(vector v1, vector v2):
 cpdef bint near_xy(vector v1, vector v2):
     cdef bint isnear = distance_xy_c(v1,v2) < 0.01
     return isnear
+
+cdef int find_closest_c(vector one,list bunch,int bcnt,float close_enough):
+    cdef float nearest = 100000000.0
+    cdef float ds = nearest
+    cdef int bdx
+    cdef int ndx = 0
+    cdef vector which
+    for bdx in range(bcnt):
+        which = <vector>bunch[bdx]
+        ds = distance_c(one,which)
+        if ds < nearest:
+            nearest = ds
+            ndx = bdx
+            if ds <= close_enough:
+                return ndx
+    return ndx
+
+cpdef int find_closest(vector one,list bunch,int bcnt,float close_enough):
+    return find_closest_c(one,bunch,bcnt,close_enough)
 
 cdef int find_closest_xy_c(vector one,list bunch,int bcnt,float close_enough):
     cdef float nearest = 100000000.0

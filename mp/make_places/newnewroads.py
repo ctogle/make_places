@@ -313,6 +313,7 @@ class road_plan(mbp.blueprint):
             }
     def __init__(self,start,end,tip,tail,controls = None,style = None, 
                     lanes = 3,swheight = 0.25,swwidth = 3,lnwidth = 5):
+        mbp.blueprint.__init__(self)
         if not style is None:
             lanes = self.styles[style]['lanes']
             swheight = self.styles[style]['sidewalk_height']

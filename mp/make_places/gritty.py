@@ -258,40 +258,10 @@ def reset_materials_script():
         handle.write(matstring.getvalue())
         #[handle.write(li) for li in mats_start]
 
-# read the name of a material
-def read_material_name____(matline):
-    if matline.startswith('material'):
-        st = matline.find('`') + 1
-        matline = matline.replace('`','@',1)
-        en = matline.find('`')
-        matname = matline[st:en]
-        return matname
-
-# adds a material to the materials script
-def add_to_materials___(mats):
-    #global matlines
-
-    print 'called add to mats', mats
-
-    texfiles = []
-    for ma in mats:
-        if ma in materials.keys(): texfiles.append(ma)
-        else:texfiles.append(None)
-    
-    for tf, ma in zip(texfiles, mats):
-        if tf is None: continue
-        if not ma in used_mats.keys():
-            margs = (ma,tf,)
-            newmatlines = write_material(*margs)
-            #matlines += newmatlines
-            used_mats[ma] = newmatlines
-
 # generate the materials script file
 def output_mats():
     matfile = os.path.join(world_dir, 'materials.lua')
-    #mats_start = sio.StringIO()
     with open(matfile, 'w') as handle:
-        #handle.write(''.join(matlines))
         handle.write(matstring.getvalue())
 
 # write the lua code defining a new material

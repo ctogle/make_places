@@ -7,6 +7,7 @@ import make_places.cities as cities
 import make_places.buildings as blg
 import make_places.roads as roads
 import make_places.newroads as newroads
+import make_places.newnewroads as mpr
 import make_places.floors as floors
 import make_places.walls as walls
 import make_places.newterrain as nmpt
@@ -16,6 +17,7 @@ import make_places.houses as hss
 import make_places.foliage as mfo
 
 import make_places.gritty as gritgeo
+import make_places.obj as objgeo
 
 import mp_utils as mpu
 import mp_bboxes as mpbb
@@ -27,11 +29,13 @@ import numpy as np
 import pdb
 
 def ucube():
-    gritgeo.reset_world_scripts()
-    pcube = pr.ucube()
+    #gritgeo.reset_world_scripts()
+    objgeo.reset_materials_script()
+    pcube = bp.ucube(m = 'cubemat')
     #pcube.translate(cv.vector(10,0,0))
-    gritgeo.create_primitive(pcube)
-    gritgeo.output_world_scripts()
+    objgeo.create_primitive(pcube)
+    #gritgeo.create_primitive(pcube)
+    #gritgeo.output_world_scripts()
 
 def uoctagon():
     gritgeo.reset_world_scripts()
@@ -87,6 +91,17 @@ def intersection_g():
     gritgeo.output_world_scripts()
 
 def roady():
+    objgeo.reset_materials_script()
+    c1 = cv.vector(0,0,0)
+    c2 = cv.vector(150,60,20)
+    tip = cv.vector(0,1,0)
+    tail = cv.vector(1,0,0)
+    rplan1 = mpr.road_plan(c1,c2,tip,tail)
+    pcube = rplan1.build()
+    #pcube = bp.ucube(m = 'cubemat')
+    objgeo.create_element(pcube)
+
+    '''#
     gritgeo.reset_world_scripts()
     r1 = {
         'start':[0,0,0], 
@@ -98,6 +113,7 @@ def roady():
     rargs = [r1]
     gritgeo.create_element([roads.road(**rg) for rg in rargs])
     gritgeo.output_world_scripts()
+    '''#
 
 def highway():
     gritgeo.reset_world_scripts()

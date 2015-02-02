@@ -13,7 +13,7 @@ from numpy import matrix
 from math import sin
 from copy import deepcopy as dcopy
 from copy import copy
-
+import cStringIO as sio
 
 
 primitive_data_path = ui.info['primitivedir']
@@ -41,6 +41,12 @@ def load_xml_library():
     xml_library_keys = xml_library.keys()
 prf.measure_time('load xml library', load_xml_library)
 
+def initialize_obj_contentdir():
+    tdir = ui.info['contenttexturedir']
+    if os.path.isdir(tdir): shutil.rmtree(tdir)
+    if not os.path.isdir(tdir):shutil.copytree(ui.info['newtexturedir'],tdir)
+prf.measure_time('reset obj content dir', initialize_obj_contentdir)
+
 class arbitrary_primitive(fu.base):
 
     _scale_uvs_ = False
@@ -55,6 +61,8 @@ class arbitrary_primitive(fu.base):
         self.gfxmesh_name = self.xml_filename.replace('.xml','')
         self.colmesh_name = self.gcol_filename
         
+        self.obj_filename = self.xml_filename.replace('mesh.xml','mesh.obj')
+
         self._default_('gcol',True,**kwargs)
         self._default_('is_lod',False,**kwargs)
         self._default_('has_lod',False,**kwargs)
@@ -216,7 +224,9 @@ class arbitrary_primitive(fu.base):
         return fa
 
     def find_centroid(self):
-        if len(self.coords) < 1:com = None
+        if len(self.coords) < 1:
+            print 'i am empty inside!'
+            com = None
         else:com = cv.center_of_mass(self.coords)   
         return com
 
@@ -233,6 +243,18 @@ class arbitrary_primitive(fu.base):
         if self.origin is None:self.origin_to_centroid()
         else:self.reset_position(self.origin)
         return self.origin
+
+    def write_as_obj(self,world_dir):
+        self.calculate_normals(
+            self.prevent_normal_calc, 
+            self.force_normal_calc,
+            self.smooth_normals)
+        self.obj_representation,ofile = obj_from_primitive_data(self)
+
+        is_new = True
+        odir = os.path.join(world_dir,self.obj_filename)
+        with open(odir,'w') as handle:handle.write(self.obj_representation)
+        return is_new
 
     def write_as_xml(self,world_dir):
         if self.modified:
@@ -462,6 +484,67 @@ def primitive_data_from_xml(xmlfile):
 def primitive_from_xml(xmlfile):
     pwargs = primitive_data_from_xml(xmlfile)
     return arbitrary_primitive(**pwargs)
+
+obj_file_names = []
+def make_obj_name_unique(ofile):
+    ob = ofile[:ofile.rfind('mesh.obj')]
+    onum = len(obj_file_names) + 1
+    om += '.'.join([str(onum),'mesh','obj'])
+    return om
+
+def obj_from_primitive_data(prim):
+    ofile = prim.obj_filename
+    if ofile in obj_file_names:
+        ofile = make_obj_name_unique(ofile)
+    obj_file_names.append(ofile)
+
+    faces = prim.get_vertexes_faces()
+    mats = faces.keys()
+    mcnt = len(mats)
+
+    sioio = sio.StringIO()
+    sioio.write('mtllib materials.mtl\n')
+    for vdx in range(len(prim.coords)):
+        pvert = prim.coords[vdx]
+        nvert = prim.ncoords[vdx]
+        uvert = prim.uv_coords[vdx]
+        sioio.write( 'v %f %f %f\n' % (pvert.x, pvert.y, pvert.z) )
+        sioio.write( 'vn %f %f %f\n' % (nvert.x, nvert.y, nvert.z) )
+        sioio.write( 'vt %f %f\n' % (uvert.x, uvert.y) )
+    #for vert in prim.coords: sioio.write( 'v %f %f %f\n' % (vert.x, vert.y, vert.z) )
+        
+    for mdx in range(mcnt):
+        m = mats[mdx]
+        mfaces = faces[m]
+        fcnt = len(mfaces)
+        sioio.write('usemtl ')
+        sioio.write(m)
+        sioio.write('\n')
+        sioio.write('s off\n')
+        for fdx in range(fcnt):
+            f = mfaces[fdx]
+            f1 = f[0] + 1
+            f2 = f[1] + 1
+            f3 = f[2] + 1
+            sioio.write('f')
+            sioio.write( ' %i/%i/%i' % (f1,f1,f1) )
+            sioio.write( ' %i/%i/%i' % (f2,f2,f2) )
+            sioio.write( ' %i/%i/%i' % (f3,f3,f3) )
+            sioio.write('\n')
+
+    '''#
+    sioio.write('usemtl Material\n')
+    sioio.write('s off\n')
+    for face in prim.faces:
+        sioio.write('f')
+        for vert in face:
+            vi = vert + 1
+            sioio.write( ' %i/%i/%i' % (vi,vi,vi) )
+        sioio.write('\n')
+    '''#
+
+    orep = sioio.getvalue()
+    return orep,ofile
 
 def empty_primitive():
     xmlfile = 'empty.mesh.xml'

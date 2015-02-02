@@ -12,6 +12,9 @@ texture_dir = os.path.join(game_dir,'textures')
 make_places_dir = os.path.join('/home','athyra','dev','make_places','mp')
 mp_dir = os.path.join(make_places_dir, 'make_places')
 
+obj_world_dir = os.path.join('/home','athyra','dev','mpcontent')
+obj_texture_dir = os.path.join(obj_world_dir,'textures')
+
 resource_dir = os.path.join(make_places_dir,'resources')
 new_world_dir = os.path.join(resource_dir,'newworld')
 new_texture_dir = os.path.join(resource_dir,'textures')
@@ -27,5 +30,8 @@ info = {
     'texturedir':texture_dir, 
     'newtexturedir':new_texture_dir, 
     'primitivedir':prim_data_dir, 
+
+    'contentdir':obj_world_dir, 
+    'contenttexturedir':obj_texture_dir, 
         }
 

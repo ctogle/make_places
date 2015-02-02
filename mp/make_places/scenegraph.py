@@ -66,9 +66,9 @@ class sgraph(fu.base):
             strr += '\n'.join([n.__str__() for n in self.nodes])
         return strr
 
-    def make_scene(self, center = False):
+    def make_scene(self, scenetype, center = False):
         for nd in self.nodes:
-            nd.make(center = center)
+            nd.make(scenetype = scenetype,center = center)
 
 _node_count_ = 0
 class node(fu.base):
@@ -273,6 +273,7 @@ class node(fu.base):
                 scene_type.create_primitive(tpm,**kwargs)
 
     def make(self, *args, **kwargs):
+        scenetype = kwargs['scenetype']
 
         #if self.converts_to_lod:
         #    self.convert_to_lod()
@@ -280,7 +281,8 @@ class node(fu.base):
         if self.consumes_children: self.consume()
         else: [ch.owner.make(*args, **kwargs) for ch in self.tform.children]
 
-        self.make_primitives_in_scene(gritgeo)
+        self.make_primitives_in_scene(scenetype)
+        #self.make_primitives_in_scene(gritgeo)
 
 
 

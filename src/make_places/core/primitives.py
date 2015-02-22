@@ -2,8 +2,8 @@ import make_places.core.fundamental as fu
 import make_places.core.profiler as prf
 import make_places.core.user_info as ui
 
-import make_places.support.mp_utils as mpu
-import make_places.support.mp_vector as cv
+import mp_utils as mpu
+import mp_vector as cv
 
 import xml.etree.cElementTree
 import os, pdb, shutil
@@ -14,6 +14,7 @@ from math import sin
 from copy import deepcopy as dcopy
 from copy import copy
 import cStringIO as sio
+
 
 
 primitive_data_path = ui.info['primitivedir']
@@ -39,13 +40,13 @@ def load_xml_library():
             col = gcol
             xml_library[xml_rep] = (xfi,gcol,gfx,col)
     xml_library_keys = xml_library.keys()
-prf.measure_time('load xml library', load_xml_library)
+#prf.measure_time('load xml library', load_xml_library)
 
 def initialize_obj_contentdir():
     tdir = ui.info['contenttexturedir']
     if os.path.isdir(tdir): shutil.rmtree(tdir)
     if not os.path.isdir(tdir):shutil.copytree(ui.info['newtexturedir'],tdir)
-prf.measure_time('reset obj content dir', initialize_obj_contentdir)
+#prf.measure_time('reset obj content dir', initialize_obj_contentdir)
 
 class arbitrary_primitive(fu.base):
 

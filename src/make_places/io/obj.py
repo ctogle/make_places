@@ -1,7 +1,7 @@
-import make_places.fundamental as fu
-import make_places.scenegraph as sg
-import make_places.materials as mpm
-import make_places.user_info as ui
+import make_places.core.fundamental as fu
+import make_places.core.scenegraph as sg
+import make_places.core.materials as mpm
+import make_places.core.user_info as ui
 
 import mp_utils as mpu
 import mp_vector as cv

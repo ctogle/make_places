@@ -3,6 +3,7 @@ import make_places.core.blueprints as bp
 import make_places.core.scenegraph as sg
 import make_places.core.primitives as pr
 import make_places.core.profiler as prf
+import make_places.core.user_info as ui
 
 import make_places.generation.nature.newterrain as nmpt
 import make_places.generation.nature.foliage as mfo
@@ -19,14 +20,32 @@ import make_places.generation.houses as hss
 import make_places.io.gritty as gritgeo
 import make_places.io.obj as objgeo
 
-import make_places.support.mp_utils as mpu
+import make_places as mpu
 import mp_bboxes as mpbb
 import mp_vector as cv
 
-import os
+import pdb,os
 import numpy as np
 
-import pdb
+def creation(prims,nodes):
+    if ui.info['exporter'] == 'obj':
+        pr.initialize_obj_contentdir()
+        objgeo.reset_materials_script()
+        objgeo.create_primitive(*prims)
+        objgeo.create_element(*nodes)
+    elif ui.info['exporter'] == 'grit':
+        pr.load_xml_library()
+        gritgeo.reset_world_scripts()
+        gritgeo.create_primitive(*prims)
+        gritgeo.create_element(*nodes)
+        gritgeo.output_world_scripts()
+    elif ui.info['exporter'] == 'fbx':
+        pdb.set_trace()
+
+
+
+
+
 
 def ucube():
     #gritgeo.reset_world_scripts()
@@ -91,29 +110,21 @@ def intersection_g():
     gritgeo.output_world_scripts()
 
 def roady():
-    objgeo.reset_materials_script()
+    #objgeo.reset_materials_script()
+
+
     c1 = cv.vector(0,0,0)
     c2 = cv.vector(150,60,20)
     tip = cv.vector(0,1,0)
     tail = cv.vector(1,0,0)
     rplan1 = mpr.road_plan(c1,c2,tip,tail)
     pcube = rplan1.build()
+    creation([],[pcube])
     #pcube = bp.ucube(m = 'cubemat')
-    objgeo.create_element(pcube)
 
-    '''#
-    gritgeo.reset_world_scripts()
-    r1 = {
-        'start':[0,0,0], 
-        'end':[0,100,10], 
-        'directions':['north','south'],
-        'road_height':2, 
-        'road_width':20, 
-            }
-    rargs = [r1]
-    gritgeo.create_element([roads.road(**rg) for rg in rargs])
-    gritgeo.output_world_scripts()
-    '''#
+
+    
+    #objgeo.create_element(pcube)
 
 def highway():
     gritgeo.reset_world_scripts()
@@ -462,7 +473,7 @@ def foliage_demo():
 
 
 
-mp.roady()
+roady()
 
 
 

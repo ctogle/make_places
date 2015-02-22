@@ -1,15 +1,16 @@
-import make_places.fundamental as fu
-import make_places.primitives as pr
-import make_places.scenegraph as sg
-import make_places.blueprints as mbp
-import make_places.waters as mpw
-import make_places.newnewroads as nrds
-import make_places.buildings as blg
-import make_places.newterrain as mtr
-import make_places.pkler as pk
-import make_places.profiler as prf
+import make_places.core.fundamental as fu
+import make_places.core.primitives as pr
+import make_places.core.scenegraph as sg
+import make_places.core.blueprints as mbp
+import make_places.core.profiler as prf
 
-import make_places.gritty as gritgeo
+import make_places.generation.newnewroads as nrds
+import make_places.generation.buildings as blg
+import make_places.generation.nature.newterrain as mtr
+import make_places.generation.nature.waters as mpw
+
+import make_places.io.gritty as gritgeo
+import make_places.io.pkler as pk
 
 import mp_vector as cv
 import mp_utils as mpu

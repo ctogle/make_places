@@ -1,18 +1,17 @@
-import make_places.fundamental as fu
-import make_places.materials as mpm
-import make_places.user_info as ui
+import make_places.core.fundamental as fu
+import make_places.core.scenegraph as sg
+import make_places.core.materials as mpm
+import make_places.core.user_info as ui
 
 import mp_utils as mpu
 import mp_vector as cv
 
 import cStringIO as sio
-import os, subprocess
+import pdb,os,sys,subprocess
 
 from math import cos
 from math import sin
 from math import tan
-
-import pdb
 
 
 
@@ -302,9 +301,9 @@ def create_element(*args):
 
 # create one node and its children in the grit world
 def create_elem(elem, center = True):
-    import make_places.scenegraph as sg
     sgr = sg.sgraph(nodes = [elem])
-    sgr.make_scene(center = center)
+    gritgeo = sys.modules[__name__]
+    sgr.make_scene(gritgeo,center = center)
     #print 'creating node\n', elem
 
 # create primitives in the grit world

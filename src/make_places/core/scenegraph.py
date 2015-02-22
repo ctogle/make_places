@@ -1,7 +1,7 @@
 import make_places.core.fundamental as fu
 import make_places.core.primitives as pr
 
-import make_places.io.gritty as gritgeo
+#import make_places.io.gritty as gritgeo
 
 import mp_utils as mpu
 import mp_vector as cv

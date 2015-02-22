@@ -1,4 +1,4 @@
-import make_places.fundamental as fu
+import make_places.core.fundamental as fu
 
 import mp_vector as cv
 

@@ -1,8 +1,8 @@
-import make_places.fundamental as fu
-import make_places.primitives as pr
-import make_places.scenegraph as sg
-import make_places.blueprints as mbp
-import make_places.gritty as gritgeo
+import make_places.core.fundamental as fu
+import make_places.core.primitives as pr
+import make_places.core.scenegraph as sg
+import make_places.core.blueprints as mbp
+import make_places.io.gritty as gritgeo
 
 import mp_utils as mpu
 import mp_bboxes as mpbb
